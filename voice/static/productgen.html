@@ -491,7 +491,19 @@ document.getElementById('prodsel').onchange = async (ev) => {
     }
   } catch (e) { S.err = S.err || e.message; }
   render();
+  prefillFromConsole();
 })();
+/* Hand-off from the console onboarding: /productgen?project=ID&name=NAME&return=/%23/onboarding */
+function prefillFromConsole() {
+  const q = new URLSearchParams(location.search), project = q.get('project'), name = q.get('name'), back = q.get('return');
+  const set = (id, v) => { const el = document.getElementById(id); if (el && v && !el.value) el.value = v; };
+  set('f_tenant', project); set('f_name', name);
+  if (back && back.startsWith('/') && !back.startsWith('//') && !document.getElementById('backbar')) {
+    const bar = h('div', { id: 'backbar', style: 'padding:8px 20px;border-bottom:1px solid hsl(var(--rule));font-size:12.5px' },
+      h('a', { href: back, style: 'color:hsl(var(--signal))' }, '\u2190 Back to the SalesGod console'), project ? h('span', { class: 'hint' }, '  \u00b7 project ' + project) : null);
+    document.body.prepend(bar);
+  }
+}
 </script>
 </body>
 </html>
