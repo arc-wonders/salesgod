@@ -103,7 +103,10 @@ def show(call_id: str, r: dict) -> dict:
         print(f"   now : {t['text']}\n         -> {e.get('label')} ({e.get('confidence')}) arousal {e.get('arousal')} "
               f"words-frustration {st.get('frustration')} sim {t.get('voice_similarity')}  [{z}]")
     for e in ev:
-        if e["type"] in ("noise", "recovered_speech", "voicemail", "kept_caller", "barge_in", "barge_in_ignored"):
+        if e["type"] in ("barge_pause", "barge_resume", "barge_in"):
+            print(f"   {e['type']}: after_speech_ms={e.get('after_speech_ms')} confirmed_after_ms={e.get('confirmed_after_ms')} "
+                  f"paused_ms={e.get('paused_ms')} why={e.get('why')}")
+        elif e["type"] in ("noise", "recovered_speech", "voicemail", "kept_caller", "barge_in_ignored"):
             print(f"   {e['type']}: {e.get('why', '')} {e.get('text', '')!r} sim={e.get('voice_similarity')} snr={e.get('snr_db')}")
     return {"orig": len(orig), "replay": len(rep),
             "recovered": sum(e["type"] == "recovered_speech" for e in ev),

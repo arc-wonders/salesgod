@@ -3,13 +3,27 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import os
 import time
 
 import numpy as np
 from faster_whisper import WhisperModel
 
+log = logging.getLogger("voice.stt")
+
 ALLOWED = ("en", "hi")
+
+
+def normalise(audio: np.ndarray, target_db: float = -20.0, max_gain: float = 10.0) -> np.ndarray:
+    """Speech level to about -20 dBFS (at most +20 dB) before Whisper. Phone callers arrive at -15 to -30 dBFS;
+    on the phone-line benchmark (voice/bench) this cut Hindi CER 8.4% -> 7.3%. Only Whisper's copy is scaled:
+    the noise gates below still measure the real line level, so quiet noise is not boosted into words."""
+    if not len(audio):
+        return audio
+    r = float(np.sqrt(np.mean(np.square(audio)))) + 1e-9
+    g = min(10 ** ((target_db - 20 * np.log10(r)) / 20), max_gain)
+    return np.clip(audio * g, -1.0, 1.0).astype(np.float32)
 
 
 class WhisperSTT:
@@ -17,6 +31,20 @@ class WhisperSTT:
         self.model_name = model or os.getenv("STT_MODEL", "large-v3")
         self.model = WhisperModel(self.model_name, device=device, compute_type=compute_type)
         self.lock = asyncio.Semaphore(int(os.getenv("STT_CONCURRENCY", "4")))
+        # Hindi turns go to a Hindi phone-speech model: IISc/ARTPARK whisper-large-v3-vaani-hindi (Apache-2.0, trained on
+        # Project Vaani, crowd-sourced Hindi recorded on phones across India), CTranslate2 build. Phone-line benchmark
+        # (voice/bench, 8 kHz mu-law, known text): Hindi CER 8.4% (large-v3) -> 1.7%; on real call turns it turned
+        # "आब दोस्तों" into "आप बताओ" and "आपको मेरी वास्तव मदारी है" into "आपको मेरी बात समझ आ रही है". It writes
+        # English speech in Devanagari, so English turns and language ID stay on large-v3. Never with an initial
+        # prompt (it loops: "जजजज…"). STT_HI_MODEL="" turns it off; any load error falls back to large-v3 alone.
+        self.hi_model = None
+        self.hi_model_name = os.getenv("STT_HI_MODEL", "bjollans/whisper-large-v3-vaani-hindi-ct2")
+        if self.hi_model_name:
+            try:
+                self.hi_model = WhisperModel(self.hi_model_name, device=device, compute_type=compute_type)
+            except Exception as e:  # no network / no GPU memory: keep working on large-v3
+                log.warning("Hindi STT model %s not loaded (%s); using %s for Hindi", self.hi_model_name, e,
+                            self.model_name)
 
     def _transcribe(self, audio: np.ndarray, hint: str | None, prefer: str | None,
                     prompt: str | None) -> tuple[str, str, str, float]:
@@ -35,8 +63,12 @@ class WhisperSTT:
             lang = "en" if share_en >= need else "hi"
         else:
             share_en = None
+        mirror_en = lang == "hi" and hint is None and prefer == "en" and share_en is not None and share_en >= 0.15
+        mirror_hi = lang == "en" and hint is None and prefer != "en"
+        if lang == "hi" and self.hi_model is not None and not mirror_en:
+            return self._filter(audio, self._run_hi(audio), "hi")
         segs = self._run(audio, lang, prompt)
-        if lang == "hi" and hint is None and prefer == "en" and share_en is not None and share_en >= 0.15:
+        if mirror_en:
             # the mirror case: an ENGLISH call where the detector leaned Hindi on an unclear turn (live 2c4ec7a4ff:
             # the first English reply came out as "पूर्ण लोग"). Unless it is clearly Hindi, transcribe both and keep
             # English when it is at least as likely (it is the call's language).
@@ -52,6 +84,17 @@ class WhisperSTT:
             score = lambda ss: float(np.mean([x.avg_logprob for x in ss])) if ss else -9.0
             if score(hi_segs) + 0.15 >= score(segs):
                 segs, lang = hi_segs, "hi"
+        if lang == "hi" and self.hi_model is not None:
+            segs = self._run_hi(audio)  # the language comparison above used large-v3; the words come from the Hindi model
+        return self._filter(audio, segs, lang)
+
+    def _run_hi(self, audio: np.ndarray) -> list:
+        segments, _ = self.hi_model.transcribe(
+            normalise(audio), language="hi", beam_size=5, vad_filter=False, condition_on_previous_text=False,
+            without_timestamps=True, temperature=0.0)
+        return list(segments)
+
+    def _filter(self, audio: np.ndarray, segs: list, lang: str) -> tuple[str, str, str, float]:
         # Whisper hallucinates on noise ("प्रेम प्रेम प्रेम ..." on the first live call): drop segments
         # it marks as probably-not-speech or that are highly repetitive / very low confidence.
         # Live call 07b5082791: background noise at rms 0.013-0.022 came out as "हुआ है" / "कर दो" with
@@ -76,9 +119,11 @@ class WhisperSTT:
         self_nsp = max((s.no_speech_prob for s in keep), default=1.0)
         return text, lang, " ".join(s.text.strip() for s in quiet).strip(), self_nsp
 
-    def _run(self, audio: np.ndarray, lang: str, prompt: str | None) -> list:
+    def _run(self, audio: np.ndarray, lang: str, prompt: str | dict | None) -> list:
+        if isinstance(prompt, dict):  # per-language vocabulary hint (voice/call.py builds it from the campaign)
+            prompt = prompt.get(lang)
         segments, _ = self.model.transcribe(
-            audio, language=lang, beam_size=5,  # beam 1 turned a clear "हाँ" into "हुआ है" on a live call
+            normalise(audio), language=lang, beam_size=5,  # beam 1 turned a clear "हाँ" into "हुआ है" on a live call
             vad_filter=False, condition_on_previous_text=False,
             without_timestamps=True, temperature=0.0, initial_prompt=prompt or None,
         )
