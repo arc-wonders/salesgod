@@ -1,0 +1,47 @@
+{
+ "id": "price_basic-price-en",
+ "class": "price_basic",
+ "campaign": "claude-pro",
+ "lang": "en",
+ "opening_language": "en",
+ "source": "plain price question in English",
+ "turns": [
+  {
+   "say": "yes",
+   "tags": [
+    "interest"
+   ]
+  },
+  {
+   "say": "how much does it cost?",
+   "tags": [
+    "asks_price",
+    "interest"
+   ],
+   "must": {
+    "must": {
+     "contains_any": [
+      "8",
+      "20"
+     ]
+    }
+   }
+  },
+  {
+   "say": "and what do I get for that?",
+   "tags": [
+    "interest"
+   ],
+   "must": {
+    "must": {
+     "contains_any": [
+      "usage",
+      "models",
+      "Projects",
+      "projects"
+     ]
+    }
+   }
+  }
+ ]
+}

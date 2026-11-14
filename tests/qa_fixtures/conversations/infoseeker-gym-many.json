@@ -1,0 +1,46 @@
+{
+ "id": "infoseeker-gym-many",
+ "class": "infoseeker",
+ "campaign": "fitzone-gym",
+ "lang": "hinglish",
+ "opening_language": "hinglish",
+ "source": "same, gym",
+ "turns": [
+  {
+   "say": "haan",
+   "tags": [
+    "interest"
+   ]
+  },
+  {
+   "say": "kya milta hai?",
+   "tags": [
+    "interest"
+   ]
+  },
+  {
+   "say": "aur?",
+   "tags": [
+    "interest"
+   ]
+  },
+  {
+   "say": "timing kya hai",
+   "tags": [
+    "interest"
+   ]
+  },
+  {
+   "say": "aur kuch?",
+   "tags": [
+    "interest"
+   ]
+  },
+  {
+   "say": "kuch aur bata sakte ho",
+   "tags": [
+    "interest"
+   ]
+  }
+ ]
+}

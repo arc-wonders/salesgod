@@ -1,0 +1,71 @@
+{
+ "id": "reasked_question-goal-twice",
+ "class": "reasked_question",
+ "campaign": "fitzone-gym",
+ "lang": "hinglish",
+ "opening_language": "hinglish",
+ "source": "real: asked the goal / area again after the caller answered",
+ "turns": [
+  {
+   "say": "haan bolo",
+   "tags": [
+    "interest"
+   ]
+  },
+  {
+   "say": "weight loss karna hai mujhe",
+   "tags": [
+    "interest",
+    "answered_goal"
+   ]
+  },
+  {
+   "say": "kitne ka padega",
+   "tags": [
+    "asks_price",
+    "interest",
+    "answered_goal"
+   ],
+   "must": {
+    "must": {
+     "contains_any": [
+      "2999",
+      "6000"
+     ]
+    }
+   }
+  },
+  {
+   "say": "Gurgaon mein rehta hoon, wahan branch hai?",
+   "tags": [
+    "interest",
+    "answered_goal"
+   ],
+   "must": {
+    "must": {
+     "not_contains_any": [
+      "goal kya",
+      "kis area",
+      "kaunse area",
+      "main goal"
+     ]
+    }
+   }
+  },
+  {
+   "say": "theek hai aur kya milta hai",
+   "tags": [
+    "interest",
+    "answered_goal"
+   ],
+   "must": {
+    "must": {
+     "not_contains_any": [
+      "main goal",
+      "kis area mein"
+     ]
+    }
+   }
+  }
+ ]
+}

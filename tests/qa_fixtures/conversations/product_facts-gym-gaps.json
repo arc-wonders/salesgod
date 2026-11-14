@@ -1,0 +1,69 @@
+{
+ "id": "product_facts-gym-gaps",
+ "class": "product_facts",
+ "campaign": "fitzone-gym",
+ "lang": "hinglish",
+ "opening_language": "hinglish",
+ "source": "facts not in the record must not be invented",
+ "turns": [
+  {
+   "say": "haan bolo",
+   "tags": [
+    "interest"
+   ]
+  },
+  {
+   "say": "joining fee alag se lagti hai kya?",
+   "tags": [
+    "interest"
+   ],
+   "must": {
+    "must": {
+     "end_call": false
+    }
+   }
+  },
+  {
+   "say": "freeze kar sakte hain membership agar bahar jaana pade?",
+   "tags": [
+    "interest"
+   ],
+   "must": {
+    "must": {
+     "end_call": false
+    }
+   }
+  },
+  {
+   "say": "6000 wala part kitne mahine ka hai? samjha nahi",
+   "tags": [
+    "asks_price",
+    "interest"
+   ],
+   "must": {
+    "must": {
+     "contains_any": [
+      "3 mahine",
+      "teen mahine",
+      "3 months",
+      "तीन महीने",
+      "3 महीने",
+      "6000"
+     ]
+    }
+   }
+  },
+  {
+   "say": "monthly plan hai kya?",
+   "tags": [
+    "asks_price",
+    "interest"
+   ],
+   "must": {
+    "must": {
+     "end_call": false
+    }
+   }
+  }
+ ]
+}

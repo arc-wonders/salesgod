@@ -1,0 +1,47 @@
+{
+ "id": "flipflop-no-then-yes",
+ "class": "flipflop",
+ "campaign": "claude-pro",
+ "lang": "hinglish",
+ "opening_language": "hinglish",
+ "source": "real: caller said no, then wanted to join; agent must follow",
+ "turns": [
+  {
+   "say": "haan bolo",
+   "tags": [
+    "interest"
+   ]
+  },
+  {
+   "say": "nahi nahi abhi nahi chahiye",
+   "tags": [
+    "refuse"
+   ]
+  },
+  {
+   "say": "achha ruko, price kya hai uska?",
+   "tags": [
+    "asks_price",
+    "interest",
+    "accept"
+   ],
+   "must": {
+    "must": {
+     "contains_any": [
+      "8",
+      "20"
+     ],
+     "end_call": false
+    }
+   }
+  },
+  {
+   "say": "theek hai bhej do link",
+   "tags": [
+    "accept",
+    "ask_link",
+    "end_ok"
+   ]
+  }
+ ]
+}

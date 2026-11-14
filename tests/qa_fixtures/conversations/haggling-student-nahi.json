@@ -1,0 +1,46 @@
+{
+ "id": "haggling-student-nahi",
+ "class": "haggling",
+ "campaign": "claude-pro",
+ "lang": "hinglish",
+ "opening_language": "hinglish",
+ "source": "real: student discount asked, then 'nahi' inside the question",
+ "turns": [
+  {
+   "say": "haan",
+   "tags": [
+    "interest"
+   ]
+  },
+  {
+   "say": "student discount nahi milta kya?",
+   "tags": [
+    "asks_price"
+   ],
+   "must": {
+    "must": {
+     "end_call": false,
+     "contains_any": [
+      "student",
+      "discount",
+      "already",
+      "pehle se",
+      "60"
+     ]
+    }
+   }
+  },
+  {
+   "say": "par mere paas itne paise nahi hain, aur kam nahi hoga?",
+   "tags": [
+    "asks_price",
+    "hardship"
+   ],
+   "must": {
+    "must": {
+     "end_call": false
+    }
+   }
+  }
+ ]
+}

@@ -1,0 +1,50 @@
+{
+ "id": "reasked_question-answered-area-en",
+ "class": "reasked_question",
+ "campaign": "fitzone-gym",
+ "lang": "en",
+ "opening_language": "en",
+ "source": "caller answered the location question; do not ask again",
+ "turns": [
+  {
+   "say": "yes go ahead",
+   "tags": [
+    "interest"
+   ]
+  },
+  {
+   "say": "I live in the north side of the city, near the market",
+   "tags": [
+    "interest"
+   ]
+  },
+  {
+   "say": "is there a branch near me?",
+   "tags": [
+    "interest"
+   ]
+  },
+  {
+   "say": "I told you, near the market",
+   "tags": [
+    "interest"
+   ],
+   "must": {
+    "must": {
+     "not_contains_any": [
+      "which area",
+      "what area",
+      "where do you live",
+      "kis area"
+     ]
+    }
+   }
+  },
+  {
+   "say": "ok and the timings?",
+   "tags": [
+    "interest"
+   ]
+  }
+ ]
+}

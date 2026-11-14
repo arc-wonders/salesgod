@@ -1,0 +1,42 @@
+{
+ "id": "question_not_consent-uncertain-yes",
+ "class": "question_not_consent",
+ "campaign": "claude-pro",
+ "lang": "hinglish",
+ "opening_language": "hinglish",
+ "source": "'haan' to a question about features is not consent for the link",
+ "turns": [
+  {
+   "say": "haan bolo",
+   "tags": [
+    "interest"
+   ]
+  },
+  {
+   "say": "kya ye hindi mein bhi kaam karta hai?",
+   "tags": [
+    "interest"
+   ],
+   "must": {
+    "must": {
+     "intent_not_in": [
+      "link_sent"
+     ]
+    }
+   }
+  },
+  {
+   "say": "aur cancel kar sakta hoon?",
+   "tags": [
+    "interest"
+   ],
+   "must": {
+    "must": {
+     "intent_not_in": [
+      "link_sent"
+     ]
+    }
+   }
+  }
+ ]
+}

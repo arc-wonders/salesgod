@@ -1,0 +1,32 @@
+{
+ "id": "busy-meeting-en",
+ "class": "busy",
+ "campaign": "fitzone-gym",
+ "lang": "en",
+ "opening_language": "en",
+ "source": "in a meeting",
+ "turns": [
+  {
+   "say": "hello?"
+  },
+  {
+   "say": "I'm in a meeting, can you call tomorrow?",
+   "tags": [
+    "refuse",
+    "end_ok"
+   ],
+   "must": {
+    "must": {
+     "contains_any": [
+      "tomorrow",
+      "later",
+      "call",
+      "time",
+      "sorry",
+      "sure"
+     ]
+    }
+   }
+  }
+ ]
+}

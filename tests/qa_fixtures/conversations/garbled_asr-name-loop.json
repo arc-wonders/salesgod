@@ -1,0 +1,40 @@
+{
+ "id": "garbled_asr-name-loop",
+ "class": "garbled_asr",
+ "campaign": "claude-pro",
+ "lang": "hi",
+ "opening_language": "hi",
+ "source": "real: a repeated name got the pitch each time",
+ "turns": [
+  {
+   "say": "हाँ जी हाँ जी",
+   "tags": [
+    "garbled"
+   ]
+  },
+  {
+   "say": "क्या क्या",
+   "tags": [
+    "garbled"
+   ]
+  },
+  {
+   "say": "आवाज़ नहीं आ रही",
+   "tags": [
+    "garbled"
+   ]
+  },
+  {
+   "say": "हेलो",
+   "tags": [
+    "garbled"
+   ]
+  },
+  {
+   "say": "फिर से बताइए",
+   "tags": [
+    "repeat_ask"
+   ]
+  }
+ ]
+}

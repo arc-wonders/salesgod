@@ -1,0 +1,62 @@
+{
+ "id": "price_basic-price-hinglish",
+ "class": "price_basic",
+ "campaign": "fitzone-gym",
+ "lang": "hinglish",
+ "opening_language": "hinglish",
+ "source": "straight price question",
+ "turns": [
+  {
+   "say": "haan bolo",
+   "tags": [
+    "interest"
+   ]
+  },
+  {
+   "say": "price kya hai?",
+   "tags": [
+    "asks_price",
+    "interest"
+   ],
+   "must": {
+    "must": {
+     "contains_any": [
+      "2999",
+      "2,999"
+     ]
+    }
+   }
+  },
+  {
+   "say": "aur uske baad?",
+   "tags": [
+    "asks_price",
+    "interest"
+   ],
+   "must": {
+    "must": {
+     "contains_any": [
+      "6000",
+      "6,000"
+     ]
+    }
+   }
+  },
+  {
+   "say": "kya kya milta hai isme?",
+   "tags": [
+    "interest"
+   ],
+   "must": {
+    "must": {
+     "contains_any": [
+      "trainer",
+      "yoga",
+      "zumba",
+      "class"
+     ]
+    }
+   }
+  }
+ ]
+}

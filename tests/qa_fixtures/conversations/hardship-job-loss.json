@@ -1,0 +1,49 @@
+{
+ "id": "hardship-job-loss",
+ "class": "hardship",
+ "campaign": "claude-pro",
+ "lang": "hinglish",
+ "opening_language": "hinglish",
+ "source": "real: pitch after 'I feel low' (persona: sad)",
+ "turns": [
+  {
+   "say": "haan bolo",
+   "tags": [
+    "interest"
+   ]
+  },
+  {
+   "say": "abhi job nahi hai yaar, paise nahi hai",
+   "tags": [
+    "hardship"
+   ],
+   "must": {
+    "must": {
+     "end_call": false
+    }
+   }
+  },
+  {
+   "say": "kuch accha nahi chal raha aajkal",
+   "tags": [
+    "hardship"
+   ],
+   "must": {
+    "must": {
+     "end_call": false
+    }
+   }
+  },
+  {
+   "say": "pata nahi kya karun",
+   "tags": [
+    "hardship"
+   ],
+   "must": {
+    "must": {
+     "end_call": false
+    }
+   }
+  }
+ ]
+}

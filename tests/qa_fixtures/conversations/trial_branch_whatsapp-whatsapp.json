@@ -1,0 +1,36 @@
+{
+ "id": "trial_branch_whatsapp-whatsapp",
+ "class": "trial_branch_whatsapp",
+ "campaign": "claude-pro",
+ "lang": "hinglish",
+ "opening_language": "hinglish",
+ "source": "wants WhatsApp, not SMS",
+ "turns": [
+  {
+   "say": "haan bolo",
+   "tags": [
+    "interest"
+   ]
+  },
+  {
+   "say": "link WhatsApp pe bhej do, SMS nahi dekhta main",
+   "tags": [
+    "ask_link",
+    "interest"
+   ],
+   "must": {
+    "must": {
+     "contains_any": [
+      "sms",
+      "SMS",
+      "एसएमएस",
+      "whatsapp",
+      "WhatsApp",
+      "व्हाट्सऐप"
+     ],
+     "end_call": false
+    }
+   }
+  }
+ ]
+}

@@ -1,0 +1,47 @@
+{
+ "id": "language_switch-to-hindi",
+ "class": "language_switch",
+ "campaign": "claude-pro",
+ "lang": "en",
+ "opening_language": "en",
+ "source": "English caller asks for Hindi",
+ "turns": [
+  {
+   "say": "yes",
+   "tags": [
+    "interest"
+   ]
+  },
+  {
+   "say": "Hindi mein baat karo please, English mushkil lagti hai",
+   "tags": [
+    "interest"
+   ],
+   "lang": "hinglish",
+   "expect_lang": "hinglish",
+   "must": {
+    "must": {
+     "lang": "hinglish"
+    }
+   }
+  },
+  {
+   "say": "kitne ka hai",
+   "tags": [
+    "asks_price",
+    "interest"
+   ],
+   "lang": "hinglish",
+   "expect_lang": "hinglish",
+   "must": {
+    "must": {
+     "lang": "hinglish",
+     "contains_any": [
+      "8",
+      "20"
+     ]
+    }
+   }
+  }
+ ]
+}

@@ -1,0 +1,37 @@
+{
+ "id": "flipflop-yes-then-no",
+ "class": "flipflop",
+ "campaign": "fitzone-gym",
+ "lang": "en",
+ "opening_language": "en",
+ "source": "interested then pulls back",
+ "turns": [
+  {
+   "say": "yes",
+   "tags": [
+    "interest"
+   ]
+  },
+  {
+   "say": "how much?",
+   "tags": [
+    "asks_price",
+    "interest"
+   ]
+  },
+  {
+   "say": "hmm that's too much, no thanks",
+   "tags": [
+    "refuse",
+    "end_ok"
+   ]
+  },
+  {
+   "say": "no, please don't send anything",
+   "tags": [
+    "refuse",
+    "end_ok"
+   ]
+  }
+ ]
+}

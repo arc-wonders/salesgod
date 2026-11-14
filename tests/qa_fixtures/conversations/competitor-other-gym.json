@@ -1,0 +1,49 @@
+{
+ "id": "competitor-other-gym",
+ "class": "competitor",
+ "campaign": "fitzone-gym",
+ "lang": "en",
+ "opening_language": "en",
+ "source": "persona competitor: already at a bigger chain",
+ "turns": [
+  {
+   "say": "yes go on",
+   "tags": [
+    "interest"
+   ]
+  },
+  {
+   "say": "I'm already at a bigger chain nearby, why should I switch?",
+   "tags": [
+    "interest"
+   ],
+   "must": {
+    "must": {
+     "end_call": false
+    }
+   }
+  },
+  {
+   "say": "they have a steam room and a pool, do you?",
+   "tags": [
+    "interest"
+   ],
+   "must": {
+    "must": {
+     "end_call": false
+    }
+   }
+  },
+  {
+   "say": "so what exactly is better here?",
+   "tags": [
+    "interest"
+   ],
+   "must": {
+    "must": {
+     "end_call": false
+    }
+   }
+  }
+ ]
+}

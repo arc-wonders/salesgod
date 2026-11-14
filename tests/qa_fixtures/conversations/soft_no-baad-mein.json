@@ -1,0 +1,36 @@
+{
+ "id": "soft_no-baad-mein",
+ "class": "soft_no",
+ "campaign": "claude-pro",
+ "lang": "hinglish",
+ "opening_language": "hinglish",
+ "source": "'later' must not get a link or the price again",
+ "turns": [
+  {
+   "say": "hello",
+   "tags": [
+    "interest"
+   ]
+  },
+  {
+   "say": "abhi time nahi hai, baad mein baat karte hain",
+   "tags": [
+    "refuse",
+    "end_ok"
+   ],
+   "must": {
+    "must": {
+     "contains_any": [
+      "baad",
+      "later",
+      "kabhi",
+      "theek",
+      "koi baat nahi",
+      "no problem",
+      "thank"
+     ]
+    }
+   }
+  }
+ ]
+}

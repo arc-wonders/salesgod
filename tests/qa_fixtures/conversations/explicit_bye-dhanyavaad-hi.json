@@ -1,0 +1,24 @@
+{
+ "id": "explicit_bye-dhanyavaad-hi",
+ "class": "explicit_bye",
+ "campaign": "fitzone-gym",
+ "lang": "hi",
+ "opening_language": "hi",
+ "source": "Hindi goodbye",
+ "turns": [
+  {
+   "say": "हाँ"
+  },
+  {
+   "say": "ठीक है धन्यवाद, रखता हूँ",
+   "tags": [
+    "end_ok"
+   ],
+   "must": {
+    "must": {
+     "end_call": true
+    }
+   }
+  }
+ ]
+}

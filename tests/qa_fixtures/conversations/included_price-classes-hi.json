@@ -1,0 +1,65 @@
+{
+ "id": "included_price-classes-hi",
+ "class": "included_price",
+ "campaign": "fitzone-gym",
+ "lang": "hi",
+ "opening_language": "hi",
+ "source": "real: included classes priced separately",
+ "turns": [
+  {
+   "say": "हाँ बोलिए",
+   "tags": [
+    "interest"
+   ]
+  },
+  {
+   "say": "योगा क्लास का अलग से कितना है?",
+   "tags": [
+    "asks_price",
+    "interest"
+   ],
+   "must": {
+    "must": {
+     "contains_any": [
+      "included",
+      "shamil",
+      "शामिल",
+      "alag keemat nahi",
+      "अलग कीमत नहीं",
+      "no separate",
+      "milta",
+      "मिलता",
+      "milti",
+      "मिलती"
+     ]
+    }
+   }
+  },
+  {
+   "say": "और ज़ुम्बा का?",
+   "tags": [
+    "asks_price",
+    "interest"
+   ],
+   "must": {
+    "must": {
+     "contains_any": [
+      "included",
+      "shamil",
+      "शामिल",
+      "alag keemat nahi",
+      "अलग कीमत नहीं",
+      "no separate",
+      "milta",
+      "मिलता",
+      "milti",
+      "मिलती"
+     ],
+     "not_contains_any": [
+      "2999"
+     ]
+    }
+   }
+  }
+ ]
+}

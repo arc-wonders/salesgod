@@ -1,0 +1,58 @@
+{
+ "id": "infoseeker-many-questions",
+ "class": "infoseeker",
+ "campaign": "claude-pro",
+ "lang": "hinglish",
+ "opening_language": "hinglish",
+ "source": "persona infoseeker: long run of questions, no repeats allowed",
+ "turns": [
+  {
+   "say": "haan",
+   "tags": [
+    "interest"
+   ]
+  },
+  {
+   "say": "pehle ye batao ye kya hai exactly",
+   "tags": [
+    "interest"
+   ]
+  },
+  {
+   "say": "kisne banaya hai?",
+   "tags": [
+    "interest"
+   ]
+  },
+  {
+   "say": "kaise use karte hain?",
+   "tags": [
+    "interest"
+   ]
+  },
+  {
+   "say": "phone pe chalega?",
+   "tags": [
+    "interest"
+   ]
+  },
+  {
+   "say": "aur laptop pe?",
+   "tags": [
+    "interest"
+   ]
+  },
+  {
+   "say": "kya kya kar sakta hai ye",
+   "tags": [
+    "interest"
+   ]
+  },
+  {
+   "say": "aur kya?",
+   "tags": [
+    "interest"
+   ]
+  }
+ ]
+}

@@ -1,0 +1,40 @@
+{
+ "id": "garbled_asr-noise-hello",
+ "class": "garbled_asr",
+ "campaign": "fitzone-gym",
+ "lang": "hinglish",
+ "opening_language": "hinglish",
+ "source": "real: noise turns got the same 'say again' five times",
+ "turns": [
+  {
+   "say": "Hello",
+   "tags": [
+    "garbled"
+   ]
+  },
+  {
+   "say": "हैलो हैलो",
+   "tags": [
+    "garbled"
+   ]
+  },
+  {
+   "say": "uh... hmm",
+   "tags": [
+    "garbled"
+   ]
+  },
+  {
+   "say": "अजय को अजय को",
+   "tags": [
+    "garbled"
+   ]
+  },
+  {
+   "say": "haan bolo",
+   "tags": [
+    "interest"
+   ]
+  }
+ ]
+}

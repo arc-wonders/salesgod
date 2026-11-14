@@ -1,0 +1,45 @@
+{
+ "id": "sceptic-proof-en",
+ "class": "sceptic",
+ "campaign": "claude-pro",
+ "lang": "en",
+ "opening_language": "en",
+ "source": "wants proof",
+ "turns": [
+  {
+   "say": "okay",
+   "tags": [
+    "interest"
+   ]
+  },
+  {
+   "say": "how do I know this is legit and not a scam?",
+   "tags": [
+    "interest"
+   ],
+   "must": {
+    "must": {
+     "contains_any": [
+      "official",
+      "anthropic.com",
+      "claude.ai",
+      "website",
+      "sms",
+      "legit"
+     ]
+    }
+   }
+  },
+  {
+   "say": "why should I trust a phone call?",
+   "tags": [
+    "interest"
+   ],
+   "must": {
+    "must": {
+     "end_call": false
+    }
+   }
+  }
+ ]
+}

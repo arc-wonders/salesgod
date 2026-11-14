@@ -1,0 +1,80 @@
+{
+ "id": "product_facts-claude-limits",
+ "class": "product_facts",
+ "campaign": "claude-pro",
+ "lang": "hinglish",
+ "opening_language": "hinglish",
+ "source": "facts in the product record",
+ "turns": [
+  {
+   "say": "haan bolo",
+   "tags": [
+    "interest"
+   ]
+  },
+  {
+   "say": "kya ye images bana deta hai?",
+   "tags": [
+    "interest"
+   ],
+   "must": {
+    "must": {
+     "contains_any": [
+      "nahi",
+      "not",
+      "cannot",
+      "can't",
+      "image",
+      "tasveer"
+     ]
+    }
+   }
+  },
+  {
+   "say": "internet ke bina chalega?",
+   "tags": [
+    "interest"
+   ],
+   "must": {
+    "must": {
+     "contains_any": [
+      "internet",
+      "online",
+      "offline"
+     ]
+    }
+   }
+  },
+  {
+   "say": "auto renew hota hai kya, paise apne aap kat jaate hain?",
+   "tags": [
+    "interest"
+   ],
+   "must": {
+    "must": {
+     "contains_any": [
+      "20",
+      "renew",
+      "automatically",
+      "apne aap"
+     ]
+    }
+   }
+  },
+  {
+   "say": "cancel kar sakte hain kabhi bhi?",
+   "tags": [
+    "interest"
+   ],
+   "must": {
+    "must": {
+     "contains_any": [
+      "cancel",
+      "band",
+      "renew"
+     ]
+    }
+   }
+  }
+ ]
+}

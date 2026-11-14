@@ -1,0 +1,45 @@
+{
+ "id": "confused-repeat-please",
+ "class": "confused",
+ "campaign": "claude-pro",
+ "lang": "hinglish",
+ "opening_language": "hinglish",
+ "source": "caller asks to repeat: a copy is allowed but it must not drag on",
+ "turns": [
+  {
+   "say": "haan bolo",
+   "tags": [
+    "interest"
+   ]
+  },
+  {
+   "say": "samajh nahi aaya, phir se bolo",
+   "tags": [
+    "repeat_ask",
+    "interest"
+   ],
+   "must": {
+    "must": {
+     "end_call": false
+    }
+   }
+  },
+  {
+   "say": "abhi bhi samajh nahi aaya, simple mein batao",
+   "tags": [
+    "interest"
+   ],
+   "must": {
+    "must": {
+     "end_call": false
+    }
+   }
+  },
+  {
+   "say": "ok ab samjha",
+   "tags": [
+    "interest"
+   ]
+  }
+ ]
+}

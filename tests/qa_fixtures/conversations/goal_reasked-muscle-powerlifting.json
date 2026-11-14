@@ -1,0 +1,49 @@
+{
+ "id": "goal_reasked-muscle-powerlifting",
+ "class": "goal_reasked",
+ "campaign": "fitzone-gym",
+ "lang": "en",
+ "opening_language": "en",
+ "source": "live cac0: asked the goal AGAIN after 'muscle and power lifting'",
+ "turns": [
+  {
+   "say": "Sure, but make it fast.",
+   "tags": [
+    "interest"
+   ]
+  },
+  {
+   "say": "I'm majorly into muscle and power lifting, what benefits will I get?",
+   "tags": [
+    "interest",
+    "answered_goal"
+   ]
+  },
+  {
+   "say": "I think it would be building more muscle, power lifting. Any provisions for competitions?",
+   "tags": [
+    "interest",
+    "answered_goal"
+   ]
+  },
+  {
+   "say": "around four to five days, can you recommend how many days I should come?",
+   "tags": [
+    "interest",
+    "answered_goal"
+   ]
+  },
+  {
+   "say": "I already told you my goal, did you forget your own context?",
+   "tags": [
+    "interest",
+    "answered_goal"
+   ],
+   "must": {
+    "must": {
+     "end_call": false
+    }
+   }
+  }
+ ]
+}

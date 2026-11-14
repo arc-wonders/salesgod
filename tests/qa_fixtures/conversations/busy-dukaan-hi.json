@@ -1,0 +1,42 @@
+{
+ "id": "busy-dukaan-hi",
+ "class": "busy",
+ "campaign": "claude-pro",
+ "lang": "hi",
+ "opening_language": "hi",
+ "source": "shop owner serving customers",
+ "turns": [
+  {
+   "say": "हाँ"
+  },
+  {
+   "say": "अभी दुकान पर ग्राहक हैं, जल्दी बताओ क्या है",
+   "tags": [
+    "interest"
+   ],
+   "must": {
+    "must": {
+     "end_call": false
+    }
+   }
+  },
+  {
+   "say": "अच्छा शाम को फ़ोन करना",
+   "tags": [
+    "refuse",
+    "end_ok"
+   ],
+   "must": {
+    "must": {
+     "contains_any": [
+      "शाम",
+      "बाद",
+      "कॉल",
+      "फ़ोन",
+      "फोन"
+     ]
+    }
+   }
+  }
+ ]
+}

@@ -1,0 +1,60 @@
+{
+ "id": "reasked_question-use-case-twice",
+ "class": "reasked_question",
+ "campaign": "claude-pro",
+ "lang": "hinglish",
+ "opening_language": "hinglish",
+ "source": "real: asked what they use it for after being told",
+ "turns": [
+  {
+   "say": "haan boliye",
+   "tags": [
+    "interest"
+   ]
+  },
+  {
+   "say": "mujhe coding ke liye chahiye, DSA practice",
+   "tags": [
+    "interest"
+   ]
+  },
+  {
+   "say": "ye samjhata bhi hai step by step?",
+   "tags": [
+    "interest"
+   ],
+   "must": {
+    "must": {
+     "contains_any": [
+      "step",
+      "samjha",
+      "explain",
+      "समझा"
+     ]
+    }
+   }
+  },
+  {
+   "say": "main coding hi karta hoon bas",
+   "tags": [
+    "interest"
+   ],
+   "must": {
+    "must": {
+     "not_contains_any": [
+      "kis kaam",
+      "kaun si cheez",
+      "what do you use",
+      "kis chiz"
+     ]
+    }
+   }
+  },
+  {
+   "say": "ok aur batao",
+   "tags": [
+    "interest"
+   ]
+  }
+ ]
+}

@@ -1,0 +1,75 @@
+{
+ "id": "haggling-sasta-nahi-hi",
+ "class": "haggling",
+ "campaign": "fitzone-gym",
+ "lang": "hi",
+ "opening_language": "hi",
+ "source": "real: 'और सस्ता नहीं हो सकता' read as a decline, call ended",
+ "turns": [
+  {
+   "say": "हाँ बोलिए",
+   "tags": [
+    "interest"
+   ]
+  },
+  {
+   "say": "कीमत बताइए",
+   "tags": [
+    "asks_price",
+    "interest"
+   ],
+   "must": {
+    "must": {
+     "contains_any": [
+      "2999",
+      "2,999"
+     ]
+    }
+   }
+  },
+  {
+   "say": "और सस्ता नहीं हो सकता?",
+   "tags": [
+    "asks_price"
+   ],
+   "must": {
+    "must": {
+     "end_call": false,
+     "intent_not_in": [
+      "declined"
+     ],
+     "contains_any": [
+      "fixed",
+      "तय",
+      "kam nahi",
+      "कम नहीं",
+      "can't reduce",
+      "cannot reduce",
+      "nahi kar sakta",
+      "नहीं कर सकता",
+      "no discount",
+      "already",
+      "pehle se"
+     ]
+    }
+   }
+  },
+  {
+   "say": "थोड़ा तो कम कर दीजिए ना",
+   "tags": [
+    "asks_price"
+   ],
+   "must": {
+    "must": {
+     "end_call": false
+    }
+   }
+  },
+  {
+   "say": "ठीक है सोचता हूँ",
+   "tags": [
+    "end_ok"
+   ]
+  }
+ ]
+}

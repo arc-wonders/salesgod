@@ -1,0 +1,35 @@
+{
+ "id": "rude_optout-rude-mid",
+ "class": "rude_optout",
+ "campaign": "fitzone-gym",
+ "lang": "hinglish",
+ "opening_language": "hinglish",
+ "source": "rude in the middle then bye",
+ "turns": [
+  {
+   "say": "haan",
+   "tags": [
+    "interest"
+   ]
+  },
+  {
+   "say": "kitna time waste karoge yaar, chutiya kaam hai ye",
+   "tags": [
+    "refuse",
+    "end_ok"
+   ]
+  },
+  {
+   "say": "bye",
+   "tags": [
+    "refuse",
+    "end_ok"
+   ],
+   "must": {
+    "must": {
+     "end_call": true
+    }
+   }
+  }
+ ]
+}

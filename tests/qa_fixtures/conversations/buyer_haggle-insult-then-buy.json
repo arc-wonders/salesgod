@@ -1,0 +1,43 @@
+{
+ "id": "buyer_haggle-insult-then-buy",
+ "class": "buyer_haggle",
+ "campaign": "claude-pro",
+ "lang": "en",
+ "opening_language": "en",
+ "source": "caller insults after a bad answer, then buys; no grovelling loop",
+ "turns": [
+  {
+   "say": "ok",
+   "tags": [
+    "interest"
+   ]
+  },
+  {
+   "say": "you keep repeating yourself, are you stupid?",
+   "tags": [
+    "interest"
+   ],
+   "must": {
+    "must": {
+     "end_call": false
+    }
+   }
+  },
+  {
+   "say": "fine, I'll take it, send the link",
+   "tags": [
+    "accept",
+    "ask_link"
+   ],
+   "must": {
+    "must": {
+     "contains_any": [
+      "link",
+      "sms",
+      "SMS"
+     ]
+    }
+   }
+  }
+ ]
+}

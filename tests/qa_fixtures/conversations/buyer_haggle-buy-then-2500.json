@@ -1,0 +1,143 @@
+{
+ "id": "buyer_haggle-buy-then-2500",
+ "class": "buyer_haggle",
+ "campaign": "fitzone-gym",
+ "lang": "en",
+ "opening_language": "en",
+ "source": "live cac0: buyer says 'send the link' then wants 2,500; refusals were identical, 'I am listening', hung up on 'stop repeating'",
+ "turns": [
+  {
+   "say": "Sure, but make it fast please.",
+   "tags": [
+    "interest"
+   ]
+  },
+  {
+   "say": "okay I want to buy it, please send me the link",
+   "tags": [
+    "accept",
+    "ask_link",
+    "interest"
+   ]
+  },
+  {
+   "say": "can you tell me the price again?",
+   "tags": [
+    "asks_price",
+    "accept"
+   ]
+  },
+  {
+   "say": "I want it for 2500. Can you make it a bit lower?",
+   "tags": [
+    "asks_price",
+    "accept"
+   ],
+   "must": {
+    "must": {
+     "end_call": false,
+     "contains_any": [
+      "fixed",
+      "तय",
+      "kam nahi",
+      "कम नहीं",
+      "can't reduce",
+      "cannot reduce",
+      "nahi kar sakta",
+      "नहीं कर सकता",
+      "no discount",
+      "already",
+      "pehle se"
+     ]
+    }
+   }
+  },
+  {
+   "say": "I'm not sold at 2,999. I want to buy it for 2,500.",
+   "tags": [
+    "asks_price",
+    "accept"
+   ],
+   "must": {
+    "must": {
+     "end_call": false
+    }
+   }
+  },
+  {
+   "say": "Can you lower the price for me?",
+   "tags": [
+    "asks_price",
+    "accept"
+   ],
+   "must": {
+    "must": {
+     "end_call": false
+    }
+   }
+  },
+  {
+   "say": "Can you lower the price for me?",
+   "tags": [
+    "asks_price",
+    "accept",
+    "repeat_ask"
+   ],
+   "must": {
+    "must": {
+     "end_call": false
+    }
+   }
+  },
+  {
+   "say": "how much lower can you go?",
+   "tags": [
+    "asks_price",
+    "accept"
+   ],
+   "must": {
+    "must": {
+     "end_call": false
+    }
+   }
+  },
+  {
+   "say": "I want the price lower. More lower. Give me a discount.",
+   "tags": [
+    "asks_price",
+    "accept"
+   ],
+   "must": {
+    "must": {
+     "end_call": false
+    }
+   }
+  },
+  {
+   "say": "Stop repeating. If you can't give me the discount, just cut the call.",
+   "tags": [
+    "end_ok"
+   ],
+   "must": {
+    "must": {
+     "end_call": false,
+     "contains_any": [
+      "last",
+      "one more",
+      "also",
+      "instead",
+      "sms",
+      "link",
+      "callback",
+      "call you back",
+      "team",
+      "someone",
+      "monthly",
+      "free trial",
+      "trainer"
+     ]
+    }
+   }
+  }
+ ]
+}

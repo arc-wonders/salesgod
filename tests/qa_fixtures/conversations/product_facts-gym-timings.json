@@ -1,0 +1,67 @@
+{
+ "id": "product_facts-gym-timings",
+ "class": "product_facts",
+ "campaign": "fitzone-gym",
+ "lang": "en",
+ "opening_language": "en",
+ "source": "timings and classes",
+ "turns": [
+  {
+   "say": "go on",
+   "tags": [
+    "interest"
+   ]
+  },
+  {
+   "say": "what are the timings?",
+   "tags": [
+    "interest"
+   ],
+   "must": {
+    "must": {
+     "contains_any": [
+      "5",
+      "11",
+      "am",
+      "pm",
+      "morning",
+      "night"
+     ]
+    }
+   }
+  },
+  {
+   "say": "and which classes do I get?",
+   "tags": [
+    "interest"
+   ],
+   "must": {
+    "must": {
+     "contains_any": [
+      "yoga",
+      "zumba",
+      "Yoga",
+      "Zumba",
+      "group"
+     ]
+    }
+   }
+  },
+  {
+   "say": "is the trainer session every week?",
+   "tags": [
+    "interest"
+   ],
+   "must": {
+    "must": {
+     "contains_any": [
+      "week",
+      "every",
+      "hafte",
+      "हर हफ"
+     ]
+    }
+   }
+  }
+ ]
+}

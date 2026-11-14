@@ -1,0 +1,35 @@
+{
+ "id": "garbled_asr-half-words-en",
+ "class": "garbled_asr",
+ "campaign": "claude-pro",
+ "lang": "en",
+ "opening_language": "en",
+ "source": "STT cut-offs in English",
+ "turns": [
+  {
+   "say": "sorry what, you're breaking",
+   "tags": [
+    "garbled"
+   ]
+  },
+  {
+   "say": "can't hear... go on",
+   "tags": [
+    "garbled"
+   ]
+  },
+  {
+   "say": "mm yes yes",
+   "tags": [
+    "garbled"
+   ]
+  },
+  {
+   "say": "what was that again",
+   "tags": [
+    "garbled",
+    "repeat_ask"
+   ]
+  }
+ ]
+}

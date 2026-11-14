@@ -1,0 +1,43 @@
+{
+ "id": "offtopic-time-cricket",
+ "class": "offtopic",
+ "campaign": "claude-pro",
+ "lang": "hinglish",
+ "opening_language": "hinglish",
+ "source": "time and cricket",
+ "turns": [
+  {
+   "say": "hello",
+   "tags": [
+    "interest"
+   ]
+  },
+  {
+   "say": "abhi time kya hua hai?",
+   "must": {
+    "must": {
+     "end_call": false
+    }
+   }
+  },
+  {
+   "say": "kal ka match kaun jeeta?",
+   "must": {
+    "must": {
+     "end_call": false
+    }
+   }
+  },
+  {
+   "say": "ok chhodo, aap kya bech rahe ho",
+   "tags": [
+    "interest"
+   ],
+   "must": {
+    "must": {
+     "end_call": false
+    }
+   }
+  }
+ ]
+}

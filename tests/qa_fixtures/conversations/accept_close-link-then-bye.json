@@ -1,0 +1,55 @@
+{
+ "id": "accept_close-link-then-bye",
+ "class": "accept_close",
+ "campaign": "claude-pro",
+ "lang": "hinglish",
+ "opening_language": "hinglish",
+ "source": "real: closing line said twice after the link went out",
+ "turns": [
+  {
+   "say": "haan bolo",
+   "tags": [
+    "interest"
+   ]
+  },
+  {
+   "say": "theek hai link bhej do",
+   "tags": [
+    "accept",
+    "ask_link",
+    "end_ok"
+   ]
+  },
+  {
+   "say": "haan isi number pe bhej do",
+   "tags": [
+    "accept",
+    "ask_link",
+    "end_ok"
+   ]
+  },
+  {
+   "say": "ok thanks, kab tak aayega",
+   "tags": [
+    "accept"
+   ],
+   "must": {
+    "must": {
+     "end_call": false
+    }
+   }
+  },
+  {
+   "say": "theek hai bye",
+   "tags": [
+    "accept",
+    "end_ok"
+   ],
+   "must": {
+    "must": {
+     "end_call": true
+    }
+   }
+  }
+ ]
+}

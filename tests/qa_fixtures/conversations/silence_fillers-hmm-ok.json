@@ -1,0 +1,40 @@
+{
+ "id": "silence_fillers-hmm-ok",
+ "class": "silence_fillers",
+ "campaign": "fitzone-gym",
+ "lang": "hinglish",
+ "opening_language": "hinglish",
+ "source": "caller gives only fillers",
+ "turns": [
+  {
+   "say": "haan",
+   "tags": [
+    "interest"
+   ]
+  },
+  {
+   "say": "hmm",
+   "tags": [
+    "interest"
+   ]
+  },
+  {
+   "say": "ok",
+   "tags": [
+    "interest"
+   ]
+  },
+  {
+   "say": "hmm ok",
+   "tags": [
+    "interest"
+   ]
+  },
+  {
+   "say": "acha",
+   "tags": [
+    "interest"
+   ]
+  }
+ ]
+}

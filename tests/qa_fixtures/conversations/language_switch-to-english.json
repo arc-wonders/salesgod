@@ -1,0 +1,60 @@
+{
+ "id": "language_switch-to-english",
+ "class": "language_switch",
+ "campaign": "fitzone-gym",
+ "lang": "hinglish",
+ "opening_language": "hinglish",
+ "source": "real: caller who could not follow Hindi got the price line in Hindi again",
+ "turns": [
+  {
+   "say": "haan bolo",
+   "tags": [
+    "interest"
+   ]
+  },
+  {
+   "say": "Can you please speak in English? I don't understand Hindi",
+   "tags": [
+    "interest"
+   ],
+   "lang": "en",
+   "expect_lang": "en",
+   "must": {
+    "must": {
+     "lang": "en"
+    }
+   }
+  },
+  {
+   "say": "what is the price?",
+   "tags": [
+    "asks_price",
+    "interest"
+   ],
+   "lang": "en",
+   "expect_lang": "en",
+   "must": {
+    "must": {
+     "lang": "en",
+     "contains_any": [
+      "2999",
+      "2,999"
+     ]
+    }
+   }
+  },
+  {
+   "say": "and what do I get?",
+   "tags": [
+    "interest"
+   ],
+   "lang": "en",
+   "expect_lang": "en",
+   "must": {
+    "must": {
+     "lang": "en"
+    }
+   }
+  }
+ ]
+}
