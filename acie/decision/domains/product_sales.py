@@ -1065,6 +1065,13 @@ class ProductSalesDomain:
         if (rep_ := self._repeat_request_step(text, d, ctx, lang)) is not None:
             return rep_
 
+        # ---------------- a counter that comes with consent ("okay 2,600 then, send the link"): their number is a counter, never a yes to ours
+        if negotiation.ladder_enabled(self.p) and d.get("pending") in ("neg_close", "confirm", "close") and not _FIRM_NO.search(text) and d.get("terms_confirmed") != "1":
+            nn = negotiation.counter_number(text)
+            if nn is not None and nn >= 100 and not negotiation._NOT_A_PRICE.search(text) and not self._names_offered_price(text, d) \
+                    and (negotiation.NegState.load(d).price or 0) > 0 and (neg2 := self._negotiate_step(text, d, ctx, lang, force_kind="counter_offer")) is not None:
+                return neg2
+
         # ---------------- "yes" to a negotiated price: lock it in the terms, then the usual confirmation (terms + link) with the agreed price
         if d.get("pending") == "neg_close" and not _is_question(text) and (self._yes(text, intent, d) or _clean_yes(text) or intent == "affirm") \
                 and not _FIRM_NO.search(text) and not _THINKING.search(text) and (negotiation.detect(text) != "counter_offer" or self._names_offered_price(text, d)):
@@ -1754,7 +1761,7 @@ class ProductSalesDomain:
         return TurnPlan(intent="answer", llm_allowed=False, end_call=bye, decision="honest answer: cannot send that", fallback=lines,
                         objective="Say honestly you can only send the payment link by SMS; do not turn their request into a payment-link offer")
 
-    def _negotiate_step(self, text: str, d: dict, ctx, lang: str) -> TurnPlan | None:
+    def _negotiate_step(self, text: str, d: dict, ctx, lang: str, force_kind: str | None = None) -> TurnPlan | None:
         """Price talk (haggling, a counter-offer, a competitor, budget, value doubt, a group discount, a free trial) goes through the
         deterministic negotiation state machine (acie/decision/negotiation.py): the floor once, then only the levers the product config
         allows, then a warm walk-away. State lives in dialog["_neg"] so it never loops or repeats."""
@@ -1770,7 +1777,7 @@ class ProductSalesDomain:
                     if faq is not None and not faq.not_eligible else None)
         committed = d.get("requested_link") == "1" or d.get("terms_confirmed") == "1" or (ctx is not None and ctx.has("payment_link"))
         tone = tone_rules.effective_tone(getattr(self.p, "tone_level", "mid"), d, text, self.customer.age if self.customer else self.customer_age)
-        r = negotiation.step(self.p, text, negotiation.NegState.load(d), d.get("need_known", ""), faq_line, committed=committed, tone=tone)
+        r = negotiation.step(self.p, text, negotiation.NegState.load(d), d.get("need_known", ""), faq_line, committed=committed, tone=tone, force_kind=force_kind)
         if r is None:
             return None
         if r.toned:
