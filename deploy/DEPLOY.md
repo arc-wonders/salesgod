@@ -56,3 +56,17 @@ the branch you deploy, re-run `--dry-run`. Use `--accept` only for junk (e.g. a 
 
 ## Manual rollback
 `sudo -u salesgod tar xzf /opt/salesgod/backup-app-<...>.tgz -C /opt/salesgod && sudo systemctl restart salesgod-voice`
+
+## Data files (added 15 Nov)
+
+Deploys ship code; `data/` stays on the server (calls, recordings, profiles, console edits). The 3e6c1f9 deploy left
+the live `products.json` without FitZone's negotiation range, so live haggling stopped. Now every deploy also ships the
+build's seed data (`data/voice/products.json`, `knowledge/`, `playbooks/`, `calltypes.json`) and runs
+`deploy/data_sync.py` on the server after the code is extracted and before the restart:
+
+- products.json: missing products / keys / FAQ items are added; every live value (console edits) is kept.
+- knowledge, playbooks, calltypes.json: copied only where the live file does not exist; never replaced.
+- Check: every product must validate against the deployed code, and a product the build gives a negotiation range
+  must have a usable one live. If not, the deploy stops, the code is rolled back and nothing is restarted.
+- Backups of every changed file: `data/voice/.sync-backup-<ts>/`; a later rollback restores them too.
+- Dry run on the server: `sudo -u salesgod /opt/salesgod/venv/bin/python /opt/salesgod/app/deploy/data_sync.py --app /opt/salesgod/app --build-data <dir> --dry-run`

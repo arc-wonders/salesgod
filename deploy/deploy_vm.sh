@@ -126,6 +126,14 @@ SHORT="$(git -C "$REPO" rev-parse --short "$FULL")"
 log "exporting $REF ($SHORT) without data/..."
 git -C "$REPO" archive --format=tar -o "$WORK/build.tar" "$FULL" -- . ':(exclude)data' || die "git archive failed"
 mkdir "$WORK/build" && tar xf "$WORK/build.tar" -C "$WORK/build"
+# data/ seed files travel separately and are merged on the VM by deploy/data_sync.py (add-only, never overwrite)
+DATA_PATHS=()
+for p in data/voice/products.json data/voice/knowledge data/voice/playbooks data/voice/calltypes.json; do
+  git -C "$REPO" cat-file -e "$FULL:$p" 2>/dev/null && DATA_PATHS+=("$p")
+done
+if [ "${#DATA_PATHS[@]}" -gt 0 ]; then
+  git -C "$REPO" archive --format=tar -o "$WORK/data.tar" "$FULL" -- "${DATA_PATHS[@]}" || die "git archive (data) failed"
+fi
 local_manifest "$WORK/build" > "$WORK/build.txt"
 log "build has $(wc -l < "$WORK/build.txt") files"
 
@@ -187,9 +195,16 @@ log "backing up $APP (excluding data/) to $BACKUP"
 
 log "uploading build"
 scp -q -o BatchMode=yes "$WORK/build.tar" "$HOST:/tmp/salesgod-build-$TS.tar" || die "upload failed; nothing changed"
+if [ -s "$WORK/data.tar" ]; then
+  scp -q -o BatchMode=yes "$WORK/data.tar" "$HOST:/tmp/salesgod-data-$TS.tar" || die "upload (data) failed; nothing changed"
+fi
+DATA_BACKUP=""
 
 restore() {  # $1 = restart? (1/0)
   log "ROLLBACK: restoring $BACKUP"
+  if [ -n "$DATA_BACKUP" ]; then
+    "${SSH[@]}" "sudo -u salesgod /opt/salesgod/venv/bin/python $APP/deploy/data_sync.py --app $APP --restore $DATA_BACKUP" || echo "[deploy] data restore failed: restore by hand from $DATA_BACKUP" >&2
+  fi
   if [ -s "$WORK/lists/added.txt" ]; then
     "${SSH[@]}" "cd $APP && sudo -u salesgod xargs -d '\n' -r rm -f --" < "$WORK/lists/added.txt"
   fi
@@ -205,6 +220,15 @@ restore() {  # $1 = restart? (1/0)
 log "extracting as salesgod"
 "${SSH[@]}" "sudo -u salesgod tar xf /tmp/salesgod-build-$TS.tar -C $APP --no-same-owner --no-same-permissions --touch; rc=\$?; rm -f /tmp/salesgod-build-$TS.tar; exit \$rc" \
   || { restore 0; die "extract failed"; }
+
+if [ -s "$WORK/data.tar" ]; then
+  log "merging data (add-only: products.json keys, missing knowledge/playbooks/calltypes; console edits kept)"
+  out=$("${SSH[@]}" "D=/tmp/salesgod-data-$TS; sudo rm -rf \$D; sudo -u salesgod mkdir -p \$D && sudo -u salesgod tar xf /tmp/salesgod-data-$TS.tar -C \$D && rm -f /tmp/salesgod-data-$TS.tar && sudo -u salesgod /opt/salesgod/venv/bin/python $APP/deploy/data_sync.py --app $APP --build-data \$D/data; rc=\$?; sudo rm -rf \$D; exit \$rc" 2>&1)
+  rc=$?
+  echo "$out" | sed 's/^/[data] /'
+  DATA_BACKUP=$(echo "$out" | sed -n 's/^BACKUP=//p' | tail -1)
+  [ "$rc" = 0 ] || { restore 0; die "data check/merge failed (rc=$rc): code rolled back, nothing restarted"; }
+fi
 
 if ! why=$(wait_idle "$LIVE_TIMEOUT"); then
   restore 0; die "a call started during the deploy and is still live ($why); files rolled back, no restart"
