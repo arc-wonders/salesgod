@@ -596,6 +596,8 @@ def register(api: FastAPI, require: Callable[[Request], None], data: Path, calls
         if cust.consent.dnc or cust.stage == "do_not_call" or cust.phone in store.dnc():
             raise HTTPException(409, "on the do-not-call list: not calling")
         link = {"project_id": c.project_id, "customer_id": cust.id, "campaign_id": c.id, "call_type": call_type}
+        if c.id and getattr(c, "tone_level", ""):
+            link["tone_level"] = c.tone_level  # the campaign's tone overrides the product's (voice/server.make_pipeline)
         res = await dialer(cust.phone, c.product_id, language or cust.language or c.language, cust.name, link)
         now = clock()
         if res.get("call_id"):

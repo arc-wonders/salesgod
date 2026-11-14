@@ -120,7 +120,7 @@ def test_operator_call_goes_through_dialer_and_links(tmp_path):
     r = c.post(f"/api/campaigns/{cp['id']}/call/{cu['id']}", json={}, headers=H)
     assert r.status_code == 200 and r.json()["call_id"] == "call0001"
     assert d.calls == [{"to": "+919000000001", "product": "p1", "language": "en",
-                        "link": {"project_id": "acme", "customer_id": cu["id"], "campaign_id": cp["id"], "call_type": "lead_qualification"}}]
+                        "link": {"project_id": "acme", "customer_id": cu["id"], "campaign_id": cp["id"], "call_type": "lead_qualification", "tone_level": "mid"}}]
     assert out["store"].call_link("call0001")["campaign_id"] == cp["id"]
     tl = c.get(f"/api/customers/{cu['id']}/timeline", headers=H).json()["timeline"]
     assert tl[0]["type"] == "call_started" and tl[0]["map_url"] == "/api/calls/call0001/map"

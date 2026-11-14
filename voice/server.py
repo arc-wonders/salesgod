@@ -104,6 +104,9 @@ class App:
             domain, prompt = BankDemoDomain(), "बैलेंस, ट्रांसफर, लिमिट, क्रेडिट कार्ड, हाँ, नहीं, ठीक है"
         else:
             product = self.products()[call.campaign]
+            tone = getattr(call, "tone_level", "") or ""
+            if tone in ("professional", "mid", "casual") and tone != getattr(product, "tone_level", "mid"):
+                product = product.model_copy(update={"tone_level": tone})  # a campaign/sim tone overrides the product's
             from acie import playbook as pbm
             ct = getattr(call, "call_type", "") or ""  # call types (acie/calltypes): "" / sales_pitch = today's flow
             if ct and ct != "sales_pitch":
@@ -405,6 +408,7 @@ def build_app() -> tuple[FastAPI, App]:
                           customer_age=_age(body.get("customer_age")))
         call.customer_id = f"sim-{call.call_id}"
         call.call_type = str(body.get("call_type") or "")[:40]  # the wizard's test call runs the chosen call type
+        call.tone_level = str(body.get("tone_level") or "")[:12]
         call.project_id = str(body.get("project_id") or "")[:40]
         pipe, _ = state.make_pipeline(call)
         sid = call.call_id
@@ -764,6 +768,7 @@ def build_app() -> tuple[FastAPI, App]:
         call.crm = {"project_id": link["project_id"], "crm_customer_id": link["customer_id"], "campaign_id": link["campaign_id"],
                     "call_type": link["call_type"]}
         call.call_type = link["call_type"]  # read by make_pipeline (acie.calltypes.factory.build_domain)
+        call.tone_level = link.get("tone_level", "")  # campaign tone: make_pipeline overrides the product's tone_level
         call.project_id = link["project_id"]  # the call-type registry looks up this project's own call types
         state.calls[call.call_id] = call
         try:
