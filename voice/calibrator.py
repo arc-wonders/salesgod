@@ -236,7 +236,7 @@ class VoiceCalibrator:
     def same_voice(self, feats: dict | None, voice_sim: float | None) -> bool:
         """Borderline voice-print score: does pitch + loudness say it is still the caller? A background
         voice (live call 8) sat ~5 dB quieter; a different person usually sits 3+ semitones away."""
-        if feats is None or voice_sim is None or voice_sim < 0.25 or len(self.base) < 2:
+        if feats is None or voice_sim is None or voice_sim < 0.15 or len(self.base) < 2:
             return False
         base = self.baseline()
         return (abs(feats["pitch"] - base["pitch"][0]) <= 3.0

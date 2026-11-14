@@ -64,8 +64,11 @@ class SpeakerLock:
 
     SAME = 0.5
 
-    def __init__(self, drop_below: float = 0.4):  # real caller turns scored >= 0.49 on live calls
+    def __init__(self, drop_below: float = 0.25):
+        # 0.4 dropped the real caller on degraded lines (live 2c4ec7a4ff: his own turns at 0.29-0.40 thrown away as
+        # "background", six "can you hear me?" prompts). Background voices seen so far scored 0.08-0.24.
         self.drop_below = drop_below
+        self.dropped: list[np.ndarray] = []  # recent rejected voices: two that agree = the caller's voice changed
         self.embs: list[np.ndarray] = []
 
     def _caller(self) -> np.ndarray | None:
@@ -90,6 +93,19 @@ class SpeakerLock:
         caller = self._caller()
         sim = None if caller is None else round(float(e @ caller), 3)
         return e, (sim is None or sim >= self.drop_below), sim
+
+    def voice_changed(self, e: np.ndarray | None, n_samples: int) -> bool:
+        """A rejected turn that sounds like an earlier rejected turn: the caller's voice print changed (new line,
+        switched language, moved rooms), not a second person. Re-learn from the agreeing turns and keep it."""
+        if e is None or n_samples < 16000:
+            return False
+        if any(float(e @ x) >= self.SAME for x in self.dropped):
+            agree = [x for x in self.dropped if float(e @ x) >= self.SAME] + [e]
+            self.embs = (self.embs + agree)[-24:]
+            self.dropped = []
+            return True
+        self.dropped = (self.dropped + [e])[-4:]
+        return False
 
     def learn(self, e: np.ndarray | None, n_samples: int) -> None:
         if e is not None and n_samples >= 16000:  # >= 1 s: reliable enough to learn from

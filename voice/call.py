@@ -50,6 +50,10 @@ SILENCE_HANGUP_S = 25.0
 # live try (call 7dbfc951d4) and we hung up on them. So by default it is only logged; the
 # transcript check (VOICEMAIL above) still hangs up on real voicemail greetings.
 AMD_HANGUP = os.getenv("PLIVO_AMD_HANGUP", "0") == "1"
+HEARD_RECENTLY_S = 20.0  # any speech this recent (used or not) means the line is alive
+REPEAT_PLEASE = {"hi": "माफ़ कीजिए, आवाज़ थोड़ी साफ़ नहीं आई। एक बार फिर बोलेंगे?",
+                 "en": "Sorry, I didn't catch that clearly. Could you say it once more?",
+                 "hinglish": "Sorry, awaaz thodi saaf nahi aayi. Ek baar phir bolenge?"}
 NO_RESPONSE_S = 8.0  # quiet this long after the agent finished -> "can you hear me?" (voice_platform watchdog)
 MAX_NO_RESPONSE_PROMPTS = 2
 OPENING_PROTECTED_S = 4.0  # the opening's "AI assistant / recorded" disclosure can't be barged off
@@ -65,6 +69,8 @@ GOODBYE_MAX_S = 8.0  # after our goodbye, noise / half-heard words never keep th
 # Whisper's stock outputs on line noise (diag of live calls 6bb1ca00ad / 9d69a31bae / 7920edcd26: these came
 # out of pure noise while the agent spoke, caller-voice similarity 0.07-0.2, and "कर दो" + "करते हैं" from
 # noise sent a payment link). They are only believed when the voice is the caller's.
+# fillers Whisper wraps around its noise phrases ("कर दो कि अ", "हुआ है ना"); stripped, with repeats, before matching
+NOISE_FILLERS = {"कि", "अ", "आ", "उम", "हम्म", "हम", "ना", "जी", "तो", "और", "uh", "um", "hmm", "so", "and", "oh"}
 STOCK_NOISE = {"कर दो", "कर दो कर दो", "हुआ है", "हुआ है हुआ है", "करते हैं", "कि अ", "कर दो कि अ", "thank you",
                "thank you very much", "thanks for watching", "okay", "ok", "you", "bye", "we'll be on", "we're ready",
                "हां", "हाँ", "जी", "कि", "अ", "हम्म", "hmm", "yes", "yeah", "उनको लेकर", "कि उनको लेकर"}
@@ -141,6 +147,8 @@ class CallSession:
         self.barge_checked_run = -1  # VAD run already voice-checked for barge-in
         self.barge_stage = 0
         self.accepted_turns = 0
+        self.last_dropped_speech = 0.0  # a caller utterance with words that we dropped or could not use
+        self.last_replied_at = 0.0
         self.primary: list = []  # prosody of the caller's accepted turns (speaker lock)
         self.speaker = SpeakerLock()
         # learns this line's noise floor and the caller's normal voice from pickup (voice/calibrator.py)
@@ -351,7 +359,24 @@ class CallSession:
     async def no_response(self) -> None:
         sess = self.pipeline.sessions.get(self.session_id)
         lang = sess.expression.language if sess else self.call.language
+        heard = time.monotonic() - max(getattr(self, "last_dropped_speech", 0.0), self.last_activity) < HEARD_RECENTLY_S
+        if getattr(self, "last_dropped_speech", 0.0) > self.last_replied_at:
+            # the caller DID speak but we could not use it (unclear / dropped): ask them to repeat, never
+            # "can you hear me?" and never a hang-up (live 2c4ec7a4ff: six prompts and a hang-up while he talked)
+            self.last_replied_at = time.monotonic()
+            text = REPEAT_PLEASE.get(lang, REPEAT_PLEASE["hi"])
+            self.event("no_response", {"count": self.no_response_count, "why": "speech heard but unusable"})
+            turn = {"role": "agent", "text": text, "intent": "repeat_request", "t": time.time()}
+            self.call.turns.append(turn)
+            self.event("turn", turn)
+            if sess:
+                sess.history.append(Utterance(role="agent", text=text))
+            self.last_activity = time.monotonic()
+            await self.speak([text], lang)
+            return
         self.no_response_count += 1
+        if heard and self.no_response_count > MAX_NO_RESPONSE_PROMPTS - 1:
+            self.no_response_count = MAX_NO_RESPONSE_PROMPTS - 1  # someone spoke recently: never hang up as silent
         last = self.no_response_count > MAX_NO_RESPONSE_PROMPTS - 1
         text = NO_RESPONSE.get(lang, NO_RESPONSE["hi"])[1 if last else 0]
         self.event("no_response", {"count": self.no_response_count})
@@ -454,6 +479,8 @@ class CallSession:
             self.event("noise", {"duration_s": round(dur_s, 2), "why": "echo of the agent's own voice", "text": text})
             return
         if not text or len(text.strip(" .?!,।")) < 1:
+            if dur_s >= 1.0 and voice_sim is not None and voice_sim >= 0.4:
+                self.last_dropped_speech = time.monotonic()  # the caller spoke, we got no words: ask to repeat
             self.event("noise", {"stt_ms": round(stt_ms), "duration_s": round(dur_s, 2), "why": "no words",
                                  "voice_similarity": voice_sim, "quiet_text": quiet or None})
             return
@@ -485,7 +512,11 @@ class CallSession:
             self.event("noise", {"duration_s": round(dur_s, 2), "why": "after goodbye, not clearly the caller",
                                  "text": text, "voice_similarity": voice_sim})
             return
+        if not is_caller and self.speaker.voice_changed(emb, len(audio)):
+            self.event("kept_caller", {"voice_similarity": voice_sim, "text": text, "why": "caller's voice changed"})
+            is_caller = True
         if not is_caller:
+            self.last_dropped_speech = time.monotonic()
             self.event("noise", {"duration_s": round(dur_s, 2), "why": "different voice (background)",
                                  "text": text, "voice_similarity": voice_sim})
             return
@@ -539,6 +570,7 @@ class CallSession:
             "trace": trace(result, sess.dialog if sess else None),
         }
         self.call.turns += [cust, agent]
+        self.last_replied_at = time.monotonic()
         self.event("turn", cust)
         self.event("turn", agent)
         self.hangup_after_speaking = False  # a new reply supersedes an earlier goodbye
@@ -553,7 +585,18 @@ class CallSession:
         # punctuation only: \w does not cover Devanagari vowel signs ("कर दो" became "कर द")
         t = re.sub(r"[.,!?।॥…\"“”‘’()\[\]:;~-]", " ", text.lower())
         t = re.sub(r"\s+", " ", t).strip()
-        return t in STOCK_NOISE
+        if t in STOCK_NOISE:
+            return True
+        # near-variants: fillers around it and repeats ("कर दो कि अ", "कर दो कर दो कर दो कर दो", "करते हैं।")
+        words = [w for w in t.split() if w not in NOISE_FILLERS]
+        if not words:
+            return bool(t)
+        for n in (1, 2, 3):  # collapse a repeated 1-3 word unit
+            unit = words[:n]
+            if len(words) % n == 0 and unit * (len(words) // n) == words:
+                words = unit
+                break
+        return " ".join(words) in STOCK_NOISE
 
     @staticmethod
     def wants_to_buy(sess) -> bool:
