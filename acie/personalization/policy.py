@@ -242,9 +242,14 @@ class AdaptationPolicy:
 
 
 def make_default_policy():
-    """Rule policy unless ACIE_POLICY=bandit (learned policy with the rule policy as its prior)."""
+    """Rule policy unless ACIE_POLICY=bandit (deterministic LinUCB posterior-mean policy) or ACIE_POLICY=xgb
+    (offline-trained XGBoost policy); both use the rule policy as prior and never explore."""
     import os
-    if os.environ.get("ACIE_POLICY", "").lower() == "bandit":
+    kind = os.environ.get("ACIE_POLICY", "").lower()
+    if kind == "bandit":
         from .bandit import BanditPolicy
         return BanditPolicy()
+    if kind == "xgb":
+        from .xgb_style import XGBStylePolicy
+        return XGBStylePolicy()
     return AdaptationPolicy()
