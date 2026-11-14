@@ -642,6 +642,7 @@ function render() {
       h('header', { class: 'topbar' },
         h('div', { class: 'crumbs' }, h('span', {}, 'SalesGod'), h('i', {}, '/'), h('span', {}, t.name), h('i', {}, '/'), h('b', {}, TITLES[S.page] || '')),
         h('span', { class: 'conn ' + S.conn, id: 'conn', title: 'Live event stream' }, h('i'), h('span', {}, S.conn === 'ok' ? 'LIVE' : S.conn === 'bad' ? 'RECONNECTING' : 'CONNECTING')),
+        h('a', { class: 'btn ghost sm', href: '/productgen' }, 'Add product'),
         h('a', { class: 'btn ghost sm', href: '/classic' }, 'Classic view'),
         h('button', { class: 'icon-btn', title: dark ? 'Light theme' : 'Dark theme', onclick: () => { const l = document.documentElement.classList.toggle('light'); store.set('sg_theme', l ? 'light' : 'dark'); render(); } }, ic(dark ? 'sun' : 'moon'))),
       h('main', { class: 'content', id: 'page' }))));
