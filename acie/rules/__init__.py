@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from .banking import BankingPack
 from .base import RulePack
+from .claims import AgentGenderPack, ClaimsPack
 from .hindi_register import HindiRegisterPack
 from .sales_compliance import SalesCompliancePack
 
@@ -11,6 +12,9 @@ REGISTRY: dict[str, type] = {
     "sales_compliance": SalesCompliancePack,
     "banking": BankingPack,
     "hindi_register": HindiRegisterPack,
+    "claims": ClaimsPack,
+    "agent_male": lambda: AgentGenderPack("male"),
+    "agent_female": lambda: AgentGenderPack("female"),
 }
 
 
@@ -27,4 +31,4 @@ def load_packs(names) -> list[RulePack]:
     return out
 
 
-__all__ = ["RulePack", "REGISTRY", "load_packs", "SalesCompliancePack", "BankingPack", "HindiRegisterPack"]
+__all__ = ["RulePack", "REGISTRY", "load_packs", "SalesCompliancePack", "BankingPack", "HindiRegisterPack", "ClaimsPack", "AgentGenderPack"]

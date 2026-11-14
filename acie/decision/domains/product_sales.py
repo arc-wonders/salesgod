@@ -15,12 +15,14 @@ import json
 import os
 import re
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from ...business import Customer, MockBusinessAPI
 from ...context import _OUTCOMES
 from ...schemas import Fact, SessionState, TurnInput, TurnPlan
 from .. import constraints as cons
+from .. import honest
+from .. import negotiation
 from .. import nba
 from ..engine import KeywordIntentClassifier
 from ..hybrid import HybridIntentClassifier, load_turn_model
@@ -31,11 +33,44 @@ class FAQ(BaseModel):
     keywords: list[str] = Field(default_factory=list)  # any of these in the customer's words
     answer: str = ""
     answer_hi: str = ""  # if given, Hindi calls speak this as written (fast); else the LLM translates
+    answer_hinglish: str = ""  # same for Hinglish (Roman script); never speak the English answer in a Hindi/Hinglish call
     not_eligible: bool = False  # this answer means the offer doesn't apply to them: stop selling
+
+
+class Step(BaseModel):
+    """One rung of the concession ladder: a value perk (kind="perk", operator-written text) or a lower price (kind="price")."""
+    kind: str = Field("perk", pattern="^(perk|price)$")
+    id: str = ""
+    price: float = 0.0           # price steps: the new price of one offer unit (must be at or above the profit floor)
+    text: dict[str, str] = Field(default_factory=dict)   # perk sentence per language (price steps are worded by the state machine)
+    short: dict[str, str] = Field(default_factory=dict)  # perk as a short phrase for the final terms ("plus one extra month free")
+
+
+class Economics(BaseModel):
+    """Per-product economics behind the concession ladder (acie/decision/negotiation.py). All zero = no concessions at all."""
+    currency: str = "₹"
+    unit: str = ""               # what one price covers, for the wording ("3 months")
+    list_price: float = 0.0      # the price the call opens with (the offer price)
+    cost: float = 0.0
+    min_margin_pct: float = 0.0
+    price_terms: dict[str, str] = Field(default_factory=dict)  # the full offer at a new price, per language, with {price}
+    ladder: list[Step] = Field(default_factory=list)           # value perks first, then price steps; each price at or above the floor
+
+    @property
+    def profit_floor(self) -> float:
+        return round(self.cost * (1 + self.min_margin_pct / 100.0), 2)
+
+
+class Negotiation(BaseModel):
+    """What the operator allows when a caller bargains (acie/decision/negotiation.py). Default: nothing, the price is the floor.
+    levers: any of trial_pass, cheaper_plan, annual_saving, referral -> {en, hi, hinglish} text the agent may say. They are
+    offered in that fixed order, each once, and only if configured here."""
+    levers: dict[str, dict[str, str]] = Field(default_factory=dict)
 
 
 class Product(BaseModel):
     id: str = "claude-pro"
+    description: str = ""  # who wrote the facts: e.g. "operator demo facts" (authored by the operator for a demo; see docs/PRODUCT_FACTS_TODO.md)
     seller_name: str = "Anthropic"
     agent_name: str = "Arjun"
     product_name: str = "Claude Pro"
@@ -50,6 +85,53 @@ class Product(BaseModel):
         "Projects to organise your documents and chats",
     ])
     call_to_action: str = "send you a payment link on SMS"
+    # The benefits above in Hindi / Hinglish (same order). Spoken as written; if a language has none, the LLM
+    # paraphrases the English fact instead (an English fragment is never pasted into a Hindi or Hinglish reply).
+    benefits_hi: list[str] = Field(default_factory=lambda: [
+        "फ्री प्लान से कहीं ज़्यादा इस्तेमाल", "सबसे अच्छे Claude मॉडल्स का एक्सेस",
+        "Projects, जिनमें आप अपने documents और chats एक जगह रख सकते हैं"])
+    benefits_hinglish: list[str] = Field(default_factory=lambda: [
+        "free plan se kahin zyada usage", "sabse capable Claude models ka access",
+        "Projects, jisme aap apne documents aur chats ek jagah rakh sakte hain"])
+    # The agent's gender decides the first-person verb forms in Hindi ("चाहता हूँ", never "चाहती हूँ"). Arjun is male.
+    agent_gender: str = Field("male", pattern="^(male|female)$")
+    # Where the customer finds a detail the agent does not have (spoken after "I don't have that detail"), per language
+    info_source: dict[str, str] = Field(default_factory=lambda: {
+        "en": "it will be shown on the payment page or the official website",
+        "hi": "वो पेमेंट पेज या ऑफिशियल वेबसाइट पर दिख जाएगा",
+        "hinglish": "wo payment page ya official website par dikh jaayega"})
+    # Can the customer cancel any time? None = only if the product's own facts (FAQ answers, background) say so.
+    cancel_any_time: bool | None = None
+    # the official site, named when the agent can't send something ("the free plan: sign up yourself on claude.ai")
+    official_site: str = "claude.ai"
+    negotiation: Negotiation = Field(default_factory=Negotiation)
+    economics: Economics = Field(default_factory=Economics)
+
+    @model_validator(mode="after")
+    def _no_borrowed_content(self):
+        """A product that is not the Claude demo never inherits the Claude demo's content: every content field its own config
+        does not set is emptied (so a missing field goes down the honest "I don't have that" path, never into another product's
+        words). `Product()` with nothing set is still the Claude Pro demo (`Product.claude_demo()`)."""
+        given = self.model_fields_set
+        if not given or self.product_name == "Claude Pro" and "product_name" not in given and "seller_name" not in given:
+            return self
+        if "product_name" not in given and "seller_name" not in given:
+            return self
+        neutral = {"one_liner": "", "benefits": [], "benefits_hi": [], "benefits_hinglish": [], "faqs": [], "knowledge": "", "pitch_hi": "",
+                   "pitch_hinglish": "", "pitch_en": "", "price_note": "", "rupee_terms": {}, "renewal_note": {}, "annual_note": {},
+                   "pronunciations": {}, "payment_link": "", "official_site": "", "topic_words": [], "call_to_action": "send you a payment link on SMS",
+                   "discovery_question": {"en": "What would you mainly like it for?", "hi": "आप इसे मुख्य रूप से किस लिए चाहते हैं?",
+                                          "hinglish": "Aap ise mukhya roop se kis liye chahte hain?"},
+                   "info_source": {"en": "the official website will have it", "hi": "ऑफिशियल वेबसाइट पर मिल जाएगा", "hinglish": "official website par mil jaayega"}}
+        for k, v in neutral.items():
+            if k not in given:
+                object.__setattr__(self, k, v)
+        return self
+
+    @classmethod
+    def claude_demo(cls) -> "Product":
+        """The Claude Pro demo product (what `Product()` is with nothing set)."""
+        return cls()
     # One-sentence pitch written by the operator, per language. Spoken as-is (fast, natural);
     # if empty the LLM writes the pitch from the benefits.
     pitch_hi: str = ("Claude Pro एक AI असिस्टेंट है जो लिखने, कोडिंग और रिसर्च में मदद करता है, "
@@ -118,30 +200,53 @@ class Product(BaseModel):
                       "pro le rakha", "pro पहले से", r"re:already .{0,25}(claude|pro|क्लॉड|प्रो)", r"re:(claude|pro|क्लॉड|प्रो) .{0,25}(use|यूज़|यूज|इस्तेमाल) (kar|कर)", "pehle se pro", "पहले से pro", "पहले से प्रो", "claude use kar raha", "क्लॉड इस्तेमाल कर रहा", "क्लॉड यूज़ कर रहा"],
             answer="Thanks for using Claude! This offer is for new Pro subscriptions; if you already pay for Pro, your plan stays as it is",
             answer_hi="Claude इस्तेमाल करने के लिए शुक्रिया! ये ऑफर नए Pro सब्सक्रिप्शन के लिए है; अगर आप पहले से Pro लेते हैं, तो आपका प्लान वैसा ही रहेगा",
+            answer_hinglish="Claude use karne ke liye shukriya! Ye offer naye Pro subscriptions ke liye hai; agar aap pehle se Pro lete hain, to aapka plan waisa hi rahega",
             not_eligible=True),
         # objection heard on live call 4, asked three times and never answered
         FAQ(keywords=["fake", "nakli", "नकली", "scam", "fraud", "फ्रॉड", "genuine", "असली", "asli", "real hai",
                       "so cheap", "सस्ता", "sasta", "itna kam", "इतना कम", "धोखा", "dhokha"],
             answer="Fair question. It's a genuine intro discount for the first 3 months; you pay only through a secure link, and can cancel any time",
-            answer_hi="अच्छा सवाल है। ये पहले तीन महीने का असली intro डिस्काउंट है, पेमेंट सिर्फ़ सुरक्षित लिंक से होता है, और आप कभी भी cancel कर सकते हैं"),
+            answer_hi="अच्छा सवाल है। ये पहले तीन महीने का असली intro डिस्काउंट है, पेमेंट सिर्फ़ सुरक्षित लिंक से होता है, और आप कभी भी cancel कर सकते हैं",
+            answer_hinglish="Achha sawal hai. Ye pehle teen mahine ka asli intro discount hai, payment sirf secure link se hota hai, aur aap kabhi bhi cancel kar sakte hain"),
         FAQ(keywords=["how to pay", "how do i pay", "how can i pay", "how to buy", "how do i buy", "kaise kharid",
                       "कैसे खरीद", "कैसे पेमेंट", "पेमेंट कैसे", "पेवेंट कैसे", "kaise pay", "payment kaise", "kaise le"],
             answer="I'll send a secure payment link by SMS to this number; you open it and pay on the official page with the methods shown there, usually a card; nothing is taken on this call",
-            answer_hi="मैं इसी नंबर पर SMS से एक सुरक्षित पेमेंट लिंक भेजूँगा, उसे खोलकर ऑफिशियल पेज पर वहाँ दिखाए गए तरीके से, आमतौर पर कार्ड से, पेमेंट होता है; इस कॉल पर कुछ नहीं लिया जाता"),
+            answer_hi="मैं इसी नंबर पर SMS से एक सुरक्षित पेमेंट लिंक भेजूँगा, उसे खोलकर ऑफिशियल पेज पर वहाँ दिखाए गए तरीके से, आमतौर पर कार्ड से, पेमेंट होता है; इस कॉल पर कुछ नहीं लिया जाता",
+            answer_hinglish="Main isi number par SMS se ek secure payment link bhejunga, use kholkar official page par wahan dikhaye gaye tareeke se, aamtaur par card se, payment hota hai; is call par kuch nahi liya jaata"),
         FAQ(keywords=["train", "training", "my data", "privacy", "प्राइवेसी", "डेटा", "डाटा", "data use", "chats use"],
             answer="Only if you allow it: your privacy settings have an option that controls whether your chats are used to improve the models, and you can switch it off any time",
-            answer_hi="सिर्फ़ तब, जब आप इजाज़त दें: आपकी privacy settings में एक option है जिससे तय होता है कि आपकी chats मॉडल सुधारने में इस्तेमाल हों या नहीं, और आप उसे कभी भी बंद कर सकते हैं"),
+            answer_hi="सिर्फ़ तब, जब आप इजाज़त दें: आपकी privacy settings में एक option है जिससे तय होता है कि आपकी chats मॉडल सुधारने में इस्तेमाल हों या नहीं, और आप उसे कभी भी बंद कर सकते हैं",
+            answer_hinglish="Sirf tab, jab aap ijazat dein: aapki privacy settings mein ek option hai jisse tay hota hai ki aapki chats model sudharne mein use hon ya nahi, aur aap use kabhi bhi band kar sakte hain"),
         FAQ(keywords=["cancel", "band kar", "बंद कर", "रद्द", "कैंसल"],
             answer="You can cancel any time in your claude.ai settings, under billing; you keep access until the end of the month you've paid for, and nothing more is charged",
-            answer_hi="आप कभी भी claude.ai की settings में billing से cancel कर सकते हैं; जिस महीने का पैसा दिया है उसके आख़िर तक इस्तेमाल चलता रहेगा, और आगे कुछ नहीं कटेगा"),
+            answer_hi="आप कभी भी claude.ai की settings में billing से cancel कर सकते हैं; जिस महीने का पैसा दिया है उसके आख़िर तक इस्तेमाल चलता रहेगा, और आगे कुछ नहीं कटेगा",
+            answer_hinglish="Aap kabhi bhi claude.ai ki settings mein billing se cancel kar sakte hain; jis mahine ka paisa diya hai uske aakhir tak use chalta rahega, aur aage kuch nahi katega"),
         FAQ(keywords=["re:(student|स्टूडेंट|छात्र).{0,25}(discount|डिस्काउंट|offer|ऑफर|छूट|sasta|सस्ता|kam|कम)",
                       "re:(discount|डिस्काउंट|छूट).{0,25}(student|स्टूडेंट|छात्र)"],
             answer="There's no separate student discount; this offer is the same for everyone, and it's already 60% off for the first 3 months",
-            answer_hi="अलग से student discount नहीं है; ये ऑफर सबके लिए एक जैसा है, और पहले 3 महीने पहले से 60% off है"),
+            answer_hi="अलग से student discount नहीं है; ये ऑफर सबके लिए एक जैसा है, और पहले 3 महीने पहले से 60% off है",
+            answer_hinglish="Alag se student discount nahi hai; ye offer sabke liye ek jaisa hai, aur pehle 3 mahine pehle se 60% off hai"),
         FAQ(keywords=["hindi", "हिंदी", "language", "bhasha", "भाषा"], answer="It understands and replies in Hindi and many other languages",
-            answer_hi="ये हिंदी समेत कई भाषाएँ समझता है और उनमें जवाब देता है"),
+            answer_hi="ये हिंदी समेत कई भाषाएँ समझता है और उनमें जवाब देता है",
+            answer_hinglish="Ye Hindi samet kai bhashayein samajhta hai aur unmein jawab deta hai"),
         FAQ(keywords=["free", "फ्री", "muft", "मुफ्त"], answer="There is a free plan, but Pro gives much more usage and the best models",
-            answer_hi="फ्री प्लान भी है, पर Pro में कहीं ज़्यादा इस्तेमाल और सबसे अच्छे मॉडल मिलते हैं"),
+            answer_hi="फ्री प्लान भी है, पर Pro में कहीं ज़्यादा इस्तेमाल और सबसे अच्छे मॉडल मिलते हैं",
+            answer_hinglish="Free plan bhi hai, par Pro mein kahin zyada usage aur sabse achhe models milte hain"),
+        # persona test 14 Nov: UPI / refund / "why switch from ChatGPT" were answered with filler or invented values
+        FAQ(keywords=["upi", "यूपीआई", "यू पी आई", "gpay", "phonepe", "paytm", "netbanking", "net banking", "payment method", "payment methods"],
+            answer="The payment page shows which payment methods work; a card works, but I can't promise UPI or any other method",
+            answer_hi="पेमेंट पेज पर दिखेगा कि कौन-से तरीके चलते हैं; कार्ड चलता है, पर UPI या किसी और तरीके का मैं वादा नहीं कर सकता",
+            answer_hinglish="Payment page par dikhega ki kaun se tareeke chalte hain; card chalta hai, par UPI ya kisi aur tareeke ka main vaada nahi kar sakta"),
+        FAQ(keywords=["refund", "रिफंड", "रिफण्ड", "money back", "paise wapas", "पैसे वापस", "पैसा वापस", "paisa wapas"],
+            answer="Refunds follow the policy on the website; I don't have the exact terms with me",
+            answer_hi="रिफंड वेबसाइट की पॉलिसी के हिसाब से होता है; उसकी सही शर्तें मेरे पास नहीं हैं",
+            answer_hinglish="Refund website ki policy ke hisaab se hota hai; uski sahi sharten mere paas nahi hain"),
+        FAQ(keywords=[r"re:(chatgpt|gemini|copilot|gpt).{0,40}(better|vs|versus|compar|differen|alag|अलग|फर्क|फ़र्क|बेहतर|switch|kyun|क्यों)",
+                      r"re:(better|vs|versus|compar|differen|alag|अलग|फर्क|फ़र्क|बेहतर|switch).{0,40}(chatgpt|gemini|copilot|gpt)",
+                      "plus se", "kyun switch", "क्यों switch"],
+            answer="Many people use Claude alongside other assistants such as ChatGPT; people often pick Claude for careful writing, working with long documents and coding help. I can't say it is better for everyone, that depends on what you do",
+            answer_hi="बहुत से लोग Claude को ChatGPT जैसे दूसरे असिस्टेंट्स के साथ भी इस्तेमाल करते हैं; लोग अक्सर careful writing, लंबे documents और coding की मदद के लिए Claude चुनते हैं। मैं ये नहीं कह सकता कि ये सबके लिए बेहतर है, ये आपके काम पर निर्भर करता है",
+            answer_hinglish="Bahut se log Claude ko ChatGPT jaise dusre assistants ke saath bhi use karte hain; log aksar careful writing, lambe documents aur coding ki madad ke liye Claude chunte hain. Main ye nahi keh sakta ki ye sabke liye behtar hai, ye aapke kaam par nirbhar karta hai"),
     ])
     max_reoffers: int = Field(1, ge=0, le=1)  # compliance: at most one soft re-offer after a "no"
     # natural: the LLM phrases every turn to fit the conversation (the decision layer still sets
@@ -296,6 +401,10 @@ _FIRM_NO = re.compile(r"नहीं चाहिए|नही चाहिए|n
                       r"नहीं लेना|nahi lena|ज़रूरत नहीं|जरूरत नहीं|zarurat nahi", re.I)
 _TIME_WORDS = re.compile(r"\d|tomorrow|tonight|evening|morning|afternoon|monday|tuesday|wednesday|thursday|friday|saturday|sunday|"
                          r"kal\b|parso|shaam|subah|dopahar|baje|कल|परसों|शाम|सुबह|दोपहर|बजे|रात", re.I)
+# a time to call back ("tomorrow at 5", "शाम को", "in two hours"); "20 seconds" or "one minute" is how long THEY have, not when to call
+_CB_TIME = re.compile(r"tomorrow|tonight|today|evening|morning|afternoon|night|monday|tuesday|wednesday|thursday|friday|saturday|sunday|\bkal\b|parso|shaam|subah|dopahar|"
+                      r"baje|बजे|कल|परसों|शाम|सुबह|दोपहर|रात|\b\d{1,2}(:\d\d)?\s?(am|pm)\b|\bat \d|\bin \d+ (minutes?|mins?|hours?|hrs?|days?)|\b\d+\s*(hours?|hrs?|घंटे|ghante|din|days?|दिन)\b|"
+                      r"after \d|\d+ (ke )?baad|\d+ बजे के बाद|\d+ के बाद|after (office|lunch|dinner|work)|next week|weekend|सोमवार|मंगलवार|बुधवार|गुरुवार|शुक्रवार|शनिवार|रविवार|somvar|mangalvar|budhvar|guruvar|shukravar|shanivar|ravivar", re.I)
 _LATER = re.compile(r"baad|later|kal\b|abhi nahi|बाद|कल |अभी नहीं|अभी मत", re.IGNORECASE)
 _ARE_YOU_AI = re.compile(
     r"are you (a |an )?(bot|robot|ai|human|real|machine|computer|recording|person)|is this (a )?(bot|robot|recording|recorded)|"
@@ -328,8 +437,9 @@ _BUY = re.compile(r"\bsend\b|bhej|भेज|le (lunga|lenge|leta|leti|lo)|ले
                   r"\bdeal\b|\bdone\b|yes please|let.?s do it|let.?s go|go for it|i.?ll take it|sounds good|"
                   r"try (it|kar)|ट्राई कर|कोशिश कर|join (karna|kar|krna)|जॉइन (करना|कर)|join करना|join कर|"
                   r"lena hai|लेना है|le leta|sign up", re.IGNORECASE)
-_PRICE_ASK = re.compile(r"price|cost|how much|kitn|fees?\b|rate\b|कितन|कीमत|दाम|पैसे|paise|paisa|rupe|rupay|रुपए|रुपये|रुपया|dollar|डॉलर|डालर|\$|"
-                        r"permanent|हमेशा|hamesha|kat(ega|ta|enge)|कट|auto.?(renew|charge|debit)|60|साठ|off\b|छूट|"
+_PRICE_CORE = re.compile(r"price|cost|how much|kitn|कितन|कीमत|दाम|\brate\b|रेट|\bfees?\b|paise kitne|पैसे कितने", re.I)
+_PRICE_ASK = re.compile(r"price|cost|how much|kitn|\bfees?\b|\brate\b|कितन|कीमत|दाम|पैसे|paise|paisa|rupe|rupay|रुपए|रुपये|रुपया|dollar|डॉलर|डालर|\$|"
+                        r"permanent|हमेशा|hamesha|\bkat(ega|ta|enge)\b|कट|auto.?(renew|charge|debit)|60|साठ|\boff\b|छूट|"
                         r"(after|baad|बाद).{0,12}(3|three|teen|तीन)|(3|three|teen|तीन).{0,20}(after|baad|बाद)", re.I)
 _RENEWAL_ASK = re.compile(r"permanent|हमेशा|hamesha|kat(ega|ta|enge)|कट|auto|renew|deduct|after|baad|बाद|always|forever|"
                           r"(20|बीस|twenty).{0,20}(bhi|भी|too|also)", re.I)  # not "why is it 60% off?" (live call: a wall of terms)
@@ -343,6 +453,12 @@ _NOT_NOW_LINK = re.compile(r"(link|लिंक) (abhi )?(mat|मत|ना|nahi
 _PRICE_DETAIL = re.compile(r"annual|yearly|\byear|saal|साल|student|स्टूडेंट|after|baad|बाद|rupee|rupay|रुपए|रुपये|₹|kab tak|"
                            r"permanent|forever|hamesha|हमेशा|refund|रिफंड|team|share|शेयर|compare|chatgpt|existing|switch|"
                            r"कैसे|kaise|how (do|to|can)|otp|ओटीपी", re.I)
+_PAID_WORDS = re.compile(r"\b(paid|pro|premium|plus|subscribe|subscription)\b|पेड|प्रो|सब्सक्", re.I)
+_REPEAT_ASK = re.compile(r"(फिर|दोबारा|दुबारा|एक बार और|एक बार फिर)\s*(से )?\s*(बोल|बता|सुना|कह)|(phir|dobara|dubara|ek baar aur|ek baar phir)\s*(se )?\s*(bol|bata|suna|kah)|"
+                         r"\bsay (that |it )?again|\brepeat\b|once more|kya bola|क्या बोला|क्या कहा|सुनाई नहीं|sunai nahi|(धीरे|dheere|dhire|slowly|slow)\s*(से )?\s*(बोल|bol|speak|say|बता|bata)|"
+                         r"(speak|talk) (more )?slowly|ठीक से सुनाई|can.?t hear", re.I)
+_WEATHER_Q = re.compile(r"weather|temperature|mausam|मौसम|तापमान|baarish|बारिश|garmi|गर्मी|thand|ठंड", re.I)
+_NOT_ARRIVED = re.compile(r"(nahi|नहीं|not|didn.?t).{0,20}(aaya|आया|received|mila|मिला|come|got|arrive)|where is (the |my )?link|link kahan|लिंक कहाँ", re.I)
 _CLEAN_YES = _WEAK_YES | {"please", "sure", "bilkul", "बिल्कुल", "zaroor", "जरूर", "ज़रूर", "theek", "ठीक", "hai",
                           "है", "yes", "yup", "haanji", "हांजी"}
 
@@ -613,8 +729,12 @@ class ProductSalesDomain:
         A question is never consent ("UPI se ho jayega?"), nor a filler while asking something else."""
         if _HYPOTHETICAL.search(text):
             return None
-        if _is_question(text) and not re.search(r"send|bhej|भेज", text, re.I):
+        if _is_question(text) and not honest.SEND_REQ.search(text):
             return None  # a question is never consent (the model's question_topic alone is too eager)
+        if honest.FREE_WANT.search(text) and not _PAID_WORDS.search(text) and not honest.SEND_REQ.search(text):
+            return None  # "I'll try the free one": that is the free plan, never a yes to the payment link
+        if d.get("no_link") == "1" and not honest.SEND_REQ.search(text):
+            return None  # they said no links (can't use them / not now): only an explicit "send it" brings them back
         if _BUY.search(text) and intent != "deny" and not _CANCEL.search(text):
             return "explicit"
         if _clean_yes(text) and intent in ("affirm", "tell_more", "unknown", "goodbye"):
@@ -641,11 +761,17 @@ class ProductSalesDomain:
         d.pop("pb_node_turn", None)
         d.pop("pb_title_turn", None)
         plan = await self._guarded_plan(intent, turn, session)
+        plan = await self._answer_before_goodbye(plan, intent, turn, session)
         u = self._nlu(d)
         if u is not None and u.objection != "none":
             d.setdefault("_objection", u.objection)
         if plan.llm_allowed:
-            plan.persona = ((self.p.tone + ". ") if self.p.tone else "") + self._audience()
+            male = self.p.agent_gender != "female"
+            plan.persona = ((self.p.tone + ". ") if self.p.tone else "") + self._audience() + (
+                f"You ({self.p.agent_name}) are {'a man' if male else 'a woman'}: in Hindi always speak about yourself in the "
+                f"{'masculine' if male else 'feminine'} form (e.g. "
+                f"{'चाहता हूँ, कर सकता हूँ, बताऊँगा, माफ़ी चाहता हूँ' if male else 'चाहती हूँ, कर सकती हूँ, बताऊँगी, माफ़ी चाहती हूँ'}). ")
+            plan.rule_packs = ["sales_compliance", "claims", "agent_male" if male else "agent_female"]
         d["last_intent"] = plan.intent
         d["last_customer"] = turn.text
         self._outcome(plan, session)
@@ -760,7 +886,8 @@ class ProductSalesDomain:
         t.add_done_callback(self._tasks.discard)
 
     async def _plan(self, intent: str, turn: TurnInput, session: SessionState) -> TurnPlan:
-        d, text, p = session.dialog, turn.text, self.p
+        d, p = session.dialog, self.p
+        text = honest.NOT_SENDING.sub(" ", turn.text)  # "वो ऑनलाइन भेज देगा" (he will send the money) is not "send me the link"
         ctx = getattr(session, "context", None)
         lang = d.get("_lang", "hi")
         pending = d.get("pending")
@@ -793,6 +920,28 @@ class ProductSalesDomain:
             d.pop("pending", None)
             return await self._converse(text, intent, d, ctx, lang, float(d.get("_frustration", "0") or 0))
 
+        # ---------------- the caller can't use links / wants the free plan / is having a hard time / asks for something we can't send
+        if honest.NO_LINKS.search(text):
+            d["no_link"] = "1"  # "I can't use links": never offer the link again unless they ask for it
+        if (sad := self._sad_step(text, intent, d, lang)) is not None:
+            return sad
+        if (info := self._info_request_step(text, d, ctx, lang)) is not None:
+            return info
+        if (rep_ := self._repeat_request_step(text, d, ctx, lang)) is not None:
+            return rep_
+
+        # ---------------- "yes" to a negotiated price: lock it in the terms, then the usual confirmation (terms + link) with the agreed price
+        if d.get("pending") == "neg_close" and not _is_question(text) and (self._yes(text, intent, d) or _clean_yes(text) or intent == "affirm") \
+                and not _FIRM_NO.search(text):
+            self._apply_neg_offer(d)
+            d["pending"] = "confirm"
+            d["requested_link"] = "0"
+            return self._confirm_plan(lang, d)
+
+        # ---------------- a counter-offer ("2,500 mein de do") is price talk, never a yes to the link: the negotiation flow answers it
+        if negotiation.detect(text) == "counter_offer" and (neg0 := self._negotiate_step(text, d, ctx, lang)) is not None:
+            return neg0
+
         # ---------------- policy: consent and closing
         u_ = self._nlu(d)
         if u_ is not None and u_.garbled:
@@ -818,6 +967,8 @@ class ProductSalesDomain:
                 and (not _BUY.search(text) or re.search(r"go ahead|tell|bata|bol", text, re.I)) and not re.search(r"send|bhej|भेज|\bbuy\b|kharid|खरीद|subscribe|sign me up|i.?ll take|le (lunga|lenge|leti|leta)|"
                                   r"ले (लूँगा|लूंगा|लेंगे|लेती|लेता)", text, re.I):
             yes = None  # "yes, go ahead" to "shall I tell you the price?" means tell me, not buy
+        if yes and ctx is not None and (ctx.has("payment_link") or d.get("sad_hold") == "1"):
+            yes = None  # the link already went out (never confirm or offer it again), or they are in a hard time: nothing to close
         if yes and ctx is not None and not _NOT_NOW_LINK.search(text):
             strong = bool(_BUY.search(text))
             asked_link = d.get("link_asked_last") == "1" or d.get("last_intent") in ("price", "reoffer")
@@ -832,7 +983,7 @@ class ProductSalesDomain:
                                     fallback=_tpl("Just to be sure: would you like to buy it? It's completely fine to talk to your family first.",
                                                   "बस पक्का कर लूँ: क्या आप सच में इसे लेना चाहते हैं? पहले घर में किसी से बात करनी हो तो कोई बात नहीं।",
                                                   "Bas pakka kar loon: kya aap sach mein ise lena chahte hain? Pehle ghar mein kisi se baat karni ho to koi baat nahi."))
-                return self._link_plan(d, lang)
+                return self._link_plan(d, lang, question=text if honest.is_question(text) else "")
             just_asked = d.get("last_intent") in ("price", "reoffer") or d.get("link_asked_last") == "1"
             if not strong and not just_asked and (_weak_yes(text) or _clean_yes(text)):
                 pass  # "हाँ हाँ" after "sorry, say again?" is a filler, not a yes to buying
@@ -845,18 +996,37 @@ class ProductSalesDomain:
                         d["requested_link"] = "1" if strong else "0"
                         return self._confirm_plan(lang, d)
 
-        if intent == "callback" and not _FIRM_NO.search(text) and (not self._asks(text, d) or (re.search(r"call|कॉल|phone|फ़ोन|फोन", text, re.I)
-                                                             and (_LATER.search(text) or _TIME_WORDS.search(text)))):
+        timed = bool(_CB_TIME.search(text))
+        callback_reply = d.get("pending") == "callback_time" and timed and not _FIRM_NO.search(text)  # their answer to "when should I call?"
+        if callback_reply or (intent == "callback" and not _FIRM_NO.search(text) and (not self._asks(text, d) or (re.search(r"call|कॉल|phone|फ़ोन|फोन", text, re.I)
+                                                             and (_LATER.search(text) or _TIME_WORDS.search(text))))):
             d.pop("pending", None)
-            if _TIME_WORDS.search(text) or not d.get("callback_note"):
+            if timed or not d.get("callback_note"):
                 d["callback_note"] = text[:120]
+            if timed:
+                d["callback_time"] = "1"
+            if not timed and d.get("callback_asked") != "1" and d.get("callback_time") != "1":
+                # "I'm in a meeting": not a goodbye. Ask when to call back (the answer is recorded), offer the link, then close
+                d["callback_asked"] = "1"
+                d["pending"] = "callback_time"
+                return TurnPlan(intent="callback_time", llm_allowed=False, decision="ask when to call back",
+                                objective="Say of course; ask what time to call back; offer to send the link by SMS instead; no pitch",
+                                fallback=(_tpl("Of course. What time should I call you back?", "ज़रूर। आपको किस समय वापस कॉल करूँ?",
+                                               "Zaroor. Aapko kis time wapas call karoon?") if d.get("no_link") == "1" else
+                                          _tpl("Of course, I'll keep it short. What time should I call you back? Or, if it's easier, I can send the link by SMS.",
+                                               "ज़रूर, मैं छोटा रखूँगा। आपको किस समय वापस कॉल करूँ? या आसान हो तो SMS से लिंक भेज दूँ।",
+                                               "Zaroor, main chhota rakhunga. Aapko kis time wapas call karoon? Ya aasaan ho to SMS se link bhej doon.")))
+            when = d["callback_note"].strip(" .!?।") if timed and len(d["callback_note"].split()) <= 6 else ""  # the time they said, repeated back
             return TurnPlan(intent="callback", end_call=True, decision="schedule callback",
                             context=f"Customer said: {text}\nWhen they asked to be called: {d['callback_note']}",
                             objective="Say of course; if they mentioned a time or day, repeat it to confirm you'll call then "
                                       "(otherwise say you'll call later); then a short goodbye",
-                            fallback=_tpl("Of course, I'll call you back later. Have a good day!",
-                                          "ज़रूर, मैं बाद में कॉल करूँगा। आपका दिन शुभ हो!",
-                                          "Zaroor, main baad mein call karunga. Aapka din accha ho!"))
+                            fallback=(_tpl(f"Of course, I'll call you back then: {when}. Have a good day!",
+                                           f"ज़रूर, मैं तभी वापस कॉल करूँगा: {when}। आपका दिन शुभ हो!",
+                                           f"Zaroor, main tabhi wapas call karunga: {when}. Aapka din accha ho!") if when else
+                                      _tpl("Of course, I'll call you back later. Have a good day!",
+                                           "ज़रूर, मैं बाद में कॉल करूँगा। आपका दिन शुभ हो!",
+                                           "Zaroor, main baad mein call karunga. Aapka din accha ho!")))
 
         u = self._nlu(d)
         if d.get("_language_request") and not _OPT_OUT.search(text) and len(text.split()) <= 12 \
@@ -885,22 +1055,17 @@ class ProductSalesDomain:
                                           "ठीक है, आपके समय के लिए धन्यवाद। आपका दिन शुभ हो!",
                                           "Theek hai, aapke time ke liye thank you. Aapka din accha ho!"))
 
-        if _NEGOTIATE.search(text) and not _FIRM_NO.search(text) and not _OPT_OUT.search(text) and d.get("existing_user") != "1":
-            # "can't you reduce it a little?" (live call 7abf60: taken as a decline, the agent said goodbye and the
-            # caller came back wanting to join). Be honest the price is fixed, keep listening, never end the call.
-            d["pending"] = "close"
-            return TurnPlan(intent="price_floor", llm_allowed=False, decision="price is fixed; keep listening",
-                            facts={"offer": Fact(value=self._terms(lang), description="the offer as one phrase")},
-                            objective="Say honestly that the price is fixed and you can't lower it; no pressure; keep listening",
-                            fallback=_tpl("I understand. I can't lower it, the offer is fixed at {offer}. No pressure at all; tell me if you'd like to go ahead, or ask me anything about it.",
-                                          "मैं समझता हूँ। मैं इसे कम नहीं कर सकता, ऑफर {offer} पर तय है। कोई दबाव नहीं है; आप चाहें तो बताइए, या इसके बारे में कुछ भी पूछिए।",
-                                          "Main samajhta hoon. Main ise kam nahi kar sakta, offer {offer} par fixed hai. Koi pressure nahi hai; aap chahein to bataiye, ya kuch bhi poochiye."))
+        if (neg := self._negotiate_step(text, d, ctx, lang)) is not None:
+            return neg
 
         frustration = float(d.get("_frustration", "0") or 0)
         mv = self._psyche_move(d)
+        if mv is not None and mv.name == "soft_check":  # "not now" is not "never": one gentle check before closing
+            return self._move_plan(mv, d)
         if self._no(text, intent, d):
             reoffers = int(d.get("reoffers", "0"))
             if mv is None and reoffers < p.max_reoffers and frustration < 0.5 and pending in ("intro", "pitch", "close", "confirm") \
+                    and negotiation.NegState.load(d).rounds == 0 \
                     and d.get("existing_user") != "1":
                 d["reoffers"] = str(reoffers + 1)
                 d["pending"] = "reoffer"
@@ -909,9 +1074,9 @@ class ProductSalesDomain:
                                 objective="Respect their answer. Mention once, gently, the offer (say it as one phrase), and ask "
                                           "if they'd like to try it. No pressure",
                                 ask="would you like to try it?", must_not_say=["pressure", "urgency", "guilt"],
-                                fallback=_tpl("I understand. Just so you know, it's {offer}, and you can cancel any time. Would you like to try it?",
-                                              "समझ सकता हूँ। बस बता दूँ, ये {offer} है, और कभी भी cancel कर सकते हैं। क्या आप ट्राई करना चाहेंगे?",
-                                              "Samajh sakta hoon. Bas bata doon, ye {offer} hai, aur kabhi bhi cancel kar sakte hain. Try karna chahenge?"))
+                                fallback=self._cx(_tpl("I understand. Just so you know, it's {offer}@@. Would you like to try it?",
+                                                       "समझ सकता हूँ। बस बता दूँ, ये {offer} है@@। क्या आप ट्राई करना चाहेंगे?",
+                                                       "Samajh sakta hoon. Bas bata doon, ye {offer} hai@@. Try karna chahenge?")))
             d.pop("pending", None)
             d["outcome"] = "declined"
             return TurnPlan(intent="declined", llm_allowed=False, decision="customer declined", end_call=True,
@@ -932,11 +1097,15 @@ class ProductSalesDomain:
         if intent == "slow_down":
             d["pending"] = "discovery"
             return TurnPlan(intent="slow_down", decision="stop pitching; ask about their needs",
-                            objective="Apologise for rushing in a few words and ask ONE open question about what they use AI or "
-                                      "similar tools for today; do not mention price or the link",
-                            fallback=_tpl("You're right, sorry for rushing. Can I ask, do you use any AI tools today, for work or study?",
-                                          "आप सही कह रहे हैं, माफ़ कीजिए मैं जल्दी कर रहा था। एक बात बताइए, क्या आप काम या पढ़ाई में कोई AI टूल इस्तेमाल करते हैं?",
-                                          "Aap sahi keh rahe hain, sorry main jaldi kar raha tha. Kya aap kaam ya padhai mein koi AI tool use karte hain?"))
+                            objective="Apologise for rushing in a few words and ask ONE open question about what they are looking for; "
+                                      "do not mention price or the link",
+                            fallback={l: v + " " + p.discovery_question.get(l, "") for l, v in _tpl(
+                                "You're right, sorry for rushing.", "आप सही कह रहे हैं, माफ़ कीजिए मैं जल्दी कर रहा था।",
+                                "Aap sahi keh rahe hain, sorry main jaldi kar raha tha.").items()})
+
+        # ---------------- a question the facts do not cover (refund, UPI, parking, a branch near them, a health condition): honest
+        if (hq := self._honest_step(text, d, lang)) is not None:
+            return hq
 
         # ---------------- a price question about something the offer includes ("trainer कितने का?"): from the facts
         from ...psyche.moves import item_price_answer
@@ -948,7 +1117,7 @@ class ProductSalesDomain:
                             fallback=_tpl(*(item_price_answer(p, text, l)[1] for l in ("en", "hi", "hinglish"))))
 
         # ---------------- psyche (ACIE_PSYCHE=1): the move that serves the caller's need, never a repeat
-        if mv is not None and mv.name not in ("no_detail",):
+        if mv is not None and mv.name.split(":")[0] != "no_detail":
             return self._move_plan(mv, d)
 
         # ---------------- fast scripted steps for the plain cases
@@ -968,14 +1137,23 @@ class ProductSalesDomain:
                                           p.pitch_hi + " अभी इस पर {discount} चल रहा है। कीमत बताऊँ?",
                                           (p.pitch_hinglish or p.pitch_hi) + " Abhi is pe {discount} chal raha hai. Price bataun?"))
         decided = ctx is not None and (ctx.has("payment_link") or ctx.decision != "undecided")
-        pure_price = (intent == "price" and len(text.split()) <= 6 and bool(_PRICE_ASK.search(text))
+        price_core = bool(_PRICE_CORE.search(text)) and asks
+        pure_price = ((intent == "price" or price_core) and len(text.split()) <= 6 and bool(_PRICE_ASK.search(text)) and self._faq_match(text) is None
                       and d.get("last_intent") != "price"  # asked again = about something else (trainer cost)
                       and not decided and not _PRICE_DETAIL.search(text)
                       and not self._other_topic(text, u, intent)  # "personal trainer session कितने का?" is about the trainer
                       and (u is None or u.question_topic in ("offer_terms", "none")))
         if pure_price or (pending == "pitch" and plain_go_on):
             d["pending"] = "discovery"
-            return self._price_plan(lang)
+            return self._price_plan(lang, known=bool(d.get("need_known")))
+        if price_core and quoted and len(text.split()) <= 10 and not decided and self._faq_match(text) is None and not _PRICE_DETAIL.search(text) and not _NEGOTIATE.search(text) \
+                and not _HAGGLE.search(text) and not self._other_topic(text, u, intent) and (u is None or u.question_topic in ("offer_terms", "none")):
+            # asked for the price again ("आपने बताया था, कितना था?"): the same fact, a new shape each time, never "I don't have it"
+            n = int(d.get("price_again", "0"))
+            d["price_again"] = str(n + 1)
+            variants = self._tpl3(lambda l: (honest.price_variants(p, l) + honest.end_variants(p, l))[min(n, len(honest.price_variants(p, l)) + 3)])
+            return TurnPlan(intent="price", llm_allowed=False, decision="the price again, in other words", fallback=variants,
+                            objective="They asked for the price again: say it again in different words; no new question")
 
         # ---------------- conversation: everything else
         return await self._converse(text, intent, d, ctx, lang, frustration)
@@ -1004,7 +1182,7 @@ class ProductSalesDomain:
         elif mv.end_call:
             intent = "goodbye"
         else:
-            intent = {"ack": "acknowledge", "simplify": "clarify", "ask_repeat": "clarify", "ask_unclear": "clarify",
+            intent = {"soft_check": "acknowledge", "ack": "acknowledge", "simplify": "clarify", "ask_repeat": "clarify", "ask_unclear": "clarify",
                       "offer_stop": "clarify", "reassure": "answer", "connect": "personal"}.get(mv.name, "answer")
         if mv.name == "respect_close":
             d["outcome"] = d.get("outcome") or "declined"
@@ -1026,6 +1204,13 @@ class ProductSalesDomain:
                 await self.interim({"en": "One second, let me check.", "hi": "एक सेकंड, देखकर बताता हूँ।",
                                     "hinglish": "Ek second, dekh ke batata hoon."})
             ref = await self.world.lookup(text)
+        if general and _WEATHER_Q.search(text) and "weather now" not in ref.lower() and "no city" not in ref.lower():
+            # nothing was looked up (no world service, a timeout, no result): never invent the weather ("दिल्ली में मौसम साफ़")
+            return TurnPlan(intent="small_talk", llm_allowed=False, decision="cannot check the weather: say so",
+                            objective="Say honestly you can't check the weather right now",
+                            fallback=_tpl("I can't check the weather right now, sorry; your phone will show it faster.",
+                                          "मैं अभी मौसम चेक नहीं कर पा रहा, माफ़ कीजिए; आपके फ़ोन पर जल्दी दिख जाएगा।",
+                                          "Main abhi mausam check nahi kar paa raha, sorry; aapke phone par jaldi dikh jaayega."))
 
         if d.get("pending") == "discovery" and not _NOT_NOW_LINK.search(text):  # they just told us what they use: tie the product to that
             d["pending"] = "close" if ctx is not None and "offer_price" in ctx.quoted else "pitch"
@@ -1043,6 +1228,11 @@ class ProductSalesDomain:
             knowledge.append("Approved answers you can use:\n" + "\n".join(approved))
         if p.price_note:
             knowledge.append(f"Price in rupees: {p.price_note}")
+        gaps = sorted({t.name["en"] for t in honest.TOPICS if (t.applies is None or t.applies(p)) and not (t.id == "offer_end" and re.search(r"week|today", p.offer_validity, re.I))})
+        knowledge.append("You do NOT have these details, so if asked say honestly that you don't have them (and where to look: "
+                         + honest.source(p, "en") + "); never guess or invent a value, a yes or a no for them: " + "; ".join(gaps)
+                         + ". You also cannot say what is safe or good for anyone's health, and you never claim a facility, policy or "
+                         "cancellation/refund term that is not in the background above.")
         if u is not None and u.gist:
             knowledge.append(f"What the customer most likely means: {u.gist}")
         if d.get("callback_note"):
@@ -1067,6 +1257,7 @@ class ProductSalesDomain:
         haggle = _HAGGLE.search(text) or re.search(r"student|स्टूडेंट|(mein|me|में|for) (do|de do|दो|दे दो)\b|do na\b|दो ना|"
                                                    r"zyada hai|jyada hai|ज़्यादा है|ज्यादा है|mehenga|mehnga|महंगा|expensive|too much", text, re.I)
         if _PRICE_ASK.search(text) and not other_plan and not complaint and not haggle and (explicit_terms or not quoted_last) \
+                and self._faq_match(text) is None \
                 and not self._other_topic(text, u, intent) \
                 and (u is None or u.question_topic in ("offer_terms", "none", "product") or intent == "price"):
             lead = self._price_lead(text, lang)
@@ -1077,7 +1268,10 @@ class ProductSalesDomain:
             for k in ("offer", "validity", "rupees"):
                 facts.pop(k, None)
         elif ctx is not None and "offer_price" in ctx.quoted and not _PRICE_ASK.search(text):
-            facts.pop("validity", None)  # keep {offer} (the model reaches for it in objections); padding is checked
+            facts.pop("validity", None)
+            if not (haggle or other_plan or complaint):
+                for k in ("offer", "rupees"):
+                    facts.pop(k, None)  # the price was told: no price line in a turn that did not ask for it (the sceptic got it four times)
         d["quoted_last"] = "1" if lead else "0"
         node_note = self._playbook_turn(text, intent, d, u, frustration)
         if node_note:
@@ -1090,18 +1284,26 @@ class ProductSalesDomain:
             if faq.not_eligible:
                 d["existing_user"] = "1"
         # when the LLM is down or its reply fails a check: the approved answer if there is one
+        asked = honest.is_question(text)
+        if (ctx is None or "what_the_product_is" not in ctx.told) and p.pitch_en and p.pitch_hi and int(d.get("answers", "0")) <= 1:
+            generic = _tpl(p.pitch_en + " Shall I tell you the price?", p.pitch_hi + " कीमत बताऊँ?",
+                           (p.pitch_hinglish or p.pitch_hi) + " Price bataun?")
+        elif asked:  # a real question: the catalog item it matches, else the honest line; never "I didn't get that"
+            from ...psyche.moves import build_catalog, _matches
+            hit = next((i for i in build_catalog(p) if i.kind != "faq" and _matches(i, text)), None)
+            generic = self._tpl3(lambda l: (hit.text.get(l) if hit is not None else None) or honest.unknown_variants(p, l)[0])
+        else:
+            generic = _tpl("Sorry, I didn't quite get that. Could you say it once more?",
+                           "माफ़ कीजिए, मैं ठीक से समझ नहीं पाया। एक बार फिर से बताएँगे?",
+                           "Sorry, main theek se samajh nahi paya. Ek baar phir se bataenge?")
         if faq is None and node_note and node_note[2]:
             fb = _tpl(node_note[2], node_note[2], node_note[2])  # the playbook's own line beats "say that again?"
         elif faq is not None:
-            fb = _tpl(faq.answer + ".", (faq.answer_hi or faq.answer) + "।", faq.answer + ".")
-        elif (ctx is None or "what_the_product_is" not in ctx.told) and p.pitch_en and p.pitch_hi \
-                and int(d.get("answers", "0")) <= 1:
-            fb = _tpl(p.pitch_en + " Shall I tell you the price?", p.pitch_hi + " कीमत बताऊँ?",
-                      (p.pitch_hinglish or p.pitch_hi) + " Price bataun?")
+            texts = {"en": faq.answer + ".", "hi": faq.answer_hi + "।" if faq.answer_hi else "",
+                     "hinglish": faq.answer_hinglish + "." if faq.answer_hinglish else ""}
+            fb = {l: texts[l] or generic[l] for l in texts}  # never the English answer in a Hindi/Hinglish call
         else:
-            fb = _tpl("Sorry, I didn't quite get that. Could you say it once more?",
-                      "माफ़ कीजिए, मैं ठीक से समझ नहीं पाया। एक बार फिर से बताएँगे?",
-                      "Sorry, main theek se samajh nahi paya. Ek baar phir se bataenge?")
+            fb = generic
         objective = (
             "Reply to what the customer just said FIRST, directly and truthfully, like a helpful person on the phone: "
             "answer their question from the background, approved answers and offer facts (use {offer} for anything about price "
@@ -1118,11 +1320,19 @@ class ProductSalesDomain:
             + stage
             + (f" {psy.note} Do not sell in this reply." if (psy := self._psyche_move(d)) is not None and psy.need in
                ("autonomy", "space", "reassurance", "be_heard", "connection", "clarity") else "")
+            + (f" They already told you what they need or use it for: \"{d['need_known']}\". NEVER ask again what they use it for or "
+               "what their goal is." if d.get("need_known") else "")
+            + " Never repeat a question you already asked earlier in the call. Speak only in the reply language: never an English "
+              "sentence in a Hindi or Hinglish reply."
+            + (" The lookup returned nothing: if the question needs live information (today's weather, news, a score, a price) say "
+               "you can't check it right now; never guess it." if general and not ref else "")
         )
         if faq is not None and not lead:
             # the operator-approved answer is spoken word for word (the 14B model paraphrased "only if you allow
             # it" into "we never train on your data", and ignored "you already have Pro")
-            lead = {"hi": (faq.answer_hi or faq.answer) + "।"}.get(lang, faq.answer + ".")
+            lead = {"hi": faq.answer_hi + "।" if faq.answer_hi else "", "hinglish": faq.answer_hinglish + "." if faq.answer_hinglish else "",
+                    "en": faq.answer + "."}.get(lang) or None
+            # a language with no written answer: the LLM paraphrases the approved English answer (it is in the background)
         if lead and lead == d.get("last_lead") and not _RUPEE_ASK.search(text):
             lead = None  # said it word for word last turn: don't paste it again
             facts["offer"] = Fact(value=self._terms(lang), description="the monthly offer as one phrase", must_mention=False)
@@ -1131,14 +1341,16 @@ class ProductSalesDomain:
             objective = (f"You have ALREADY said this exact sentence: \"{lead}\". Do NOT state any price, discount or duration "
                          "again. Answer only the OTHER parts of what they asked, briefly and truthfully from the background; "
                          "if there is nothing else, reply with one short friendly question (or nothing more than 'Okay?'). " + stage)
-            fb = (_tpl(faq.answer + ".", (faq.answer_hi or faq.answer) + "।", faq.answer + ".") if faq is not None
+            fb = ({"en": faq.answer + ".", "hi": faq.answer_hi + "।" if faq.answer_hi else ANYTHING_ELSE[1],
+                   "hinglish": faq.answer_hinglish + "." if faq.answer_hinglish else ANYTHING_ELSE[2]} if faq is not None
                   else _tpl(ANYTHING_ELSE[0], ANYTHING_ELSE[1], ANYTHING_ELSE[2]))
         return TurnPlan(intent="small_talk" if general else ("personal" if sad else "answer"),
                         facts=facts, context="\n\n".join(knowledge) or None, reference=ref or None,
                         general_knowledge=general, objective=objective,
                         lead={lang: lead} if lead else None,
                         must_not_say=["that a team will send details", "made-up features or prices", "'lowest price ever' or other superlatives not in the background", "'up to' discounts",
-                                      "claims not in the background"],
+                                      "claims not in the background", "'limited time' (no end date is known)", "promises about health or safety",
+                                      "facilities, policies, refunds or cancellation terms that are not in the background"],
                         fallback=fb)
 
     def _stage(self, text: str, d: dict, ctx, frustration: float, u) -> str:
@@ -1151,6 +1363,9 @@ class ProductSalesDomain:
         if d.get("existing_user") == "1":
             return ("They already pay for Pro, so this offer (new subscriptions only) does not apply to them: say so plainly "
                     "if relevant, never offer the link or the price, and don't ask what they'd use it for.")
+        if d.get("sad_hold") == "1":
+            return ("They are going through a hard time (job, money, mood): answer warmly and briefly, and do NOT sell at all: no price, "
+                    "no link, no question about what they need. You may say they can take their time or you can call another day.")
         asked_link_last = d.get("last_intent") in ("price", "confirm_close", "reoffer") or d.get("link_asked_last") == "1"
         d["link_asked_last"] = "0"
         if ctx is not None and ctx.has("payment_link"):
@@ -1190,6 +1405,182 @@ class ProductSalesDomain:
         d["link_asked_last"] = "1"
         d["since_link_ask"] = "0"
         return "Then, since you've shown how it helps them, you may ask once, lightly, whether they'd like to try it."
+
+    # ------------------------------------------------------------------ honest answers, hard times, requests we can't serve
+
+    def _tpl3(self, fn) -> dict[str, str]:
+        return {l: fn(l) for l in ("en", "hi", "hinglish")}
+
+    def _answer_text(self, text: str, lang: str, n: int = 0) -> str | None:
+        """What the agent says to this question when the facts decide it: the operator's approved FAQ answer, or the honest
+        "I don't have that detail" for a topic the facts do not cover. None = the conversation turn (LLM) answers."""
+        p = self.p
+        if honest.health_question(text):
+            return honest.health_variants(p, lang)[0]
+        topics = honest.find_topics(p, text)
+        if topics and topics[0].id == "payer":
+            return honest.payer_variants(p, lang)[n % 2]
+        if topics and (topics[0].beats_faq or not honest.covered_by_faq(p, text)):
+            return honest.unknown_combo(p, lang, topics, min(n, 2))  # a different wording each time the call hits a gap
+        faq = self._faq_match(text)
+        if faq is not None and not faq.not_eligible:
+            return ({"hi": faq.answer_hi, "hinglish": faq.answer_hinglish}.get(lang) or (faq.answer if lang == "en" else "")) or None
+        if re.search(r"kab tak|कब तक|how long|valid", text, re.I) and re.search(r"offer|ऑफर|discount|डिस्काउंट|price|कीमत", text, re.I):
+            line = honest.offer_end_variants(p, lang)[0]
+            if _RUPEE_ASK.search(text) and p.rupee_terms.get(lang):
+                line += " " + re.sub(r"^(यानी|yaani|that's)\s*", "", p.rupee_terms[lang]).strip().capitalize() + ("।" if lang == "hi" else ".")
+            return line
+        return None
+
+    def _honest_step(self, text: str, d: dict, lang: str) -> TurnPlan | None:
+        """A question about something the facts do not cover (refund, UPI, parking, a branch near them ...) or a health
+        condition: the honest line, deterministic, never a guess and never "shall I let you go?"."""
+        if not honest.is_question(text) or d.get("existing_user") == "1":
+            return None
+        p = self.p
+        health = honest.health_question(text)
+        topics = honest.find_topics(p, text)
+        unknown = bool(topics) and (topics[0].beats_faq or not honest.covered_by_faq(p, text))
+        ended = bool(re.search(r"kab tak|कब तक|how long|valid", text, re.I)) and bool(re.search(r"offer|ऑफर|discount|डिस्काउंट|price|कीमत", text, re.I)) \
+            and not honest.covered_by_faq(p, text) and not topics
+        if not (health or unknown or ended):
+            return None
+        n = int(d.get("unk_n", "0"))
+        d["unk_n"] = str(n + 1)
+        line = self._tpl3(lambda l: self._answer_text(text, l, n) or "")
+        d["pending"] = d.get("pending") or "close"
+        return TurnPlan(intent="answer", llm_allowed=False, decision="honest answer: the facts do not cover it", fallback=line,
+                        objective=("Never promise what is safe for a health condition; send them to their doctor" if health
+                                   else "Say honestly you do not have that detail and where they will find it; do not guess"))
+
+    def _info_request_step(self, text: str, d: dict, ctx, lang: str) -> TurnPlan | None:
+        """"Send me the trial link / the branch address / WhatsApp it / the free sign-up link": answered honestly. The only SMS
+        this agent sends is the payment link, so these are never turned into "shall I send the payment link?"."""
+        kind = honest.info_request(text)
+        if kind is None or (ctx is not None and ctx.has("payment_link")):
+            return None
+        if kind != "whatsapp":
+            d["no_link"] = "1"  # they did not ask for the payment link: do not push it
+        d["pending"] = d.get("pending") or "close"
+        lines = self._tpl3(lambda l: honest.info_request_variants(self.p, kind, l)[0])
+        bye = bool(_GOODBYE_NOW.search(text))
+        if bye:
+            d.pop("pending", None)
+            d["outcome"] = d.get("outcome") or "declined"
+        return TurnPlan(intent="answer", llm_allowed=False, end_call=bye, decision="honest answer: cannot send that", fallback=lines,
+                        objective="Say honestly you can only send the payment link by SMS; do not turn their request into a payment-link offer")
+
+    def _negotiate_step(self, text: str, d: dict, ctx, lang: str) -> TurnPlan | None:
+        """Price talk (haggling, a counter-offer, a competitor, budget, value doubt, a group discount, a free trial) goes through the
+        deterministic negotiation state machine (acie/decision/negotiation.py): the floor once, then only the levers the product config
+        allows, then a warm walk-away. State lives in dialog["_neg"] so it never loops or repeats."""
+        if d.get("existing_user") == "1" or d.get("sad_hold") == "1" or _FIRM_NO.search(text) or _OPT_OUT.search(text):
+            return None
+        if ctx is not None and ctx.has("payment_link"):
+            return None
+        faq = self._faq_match(text)
+        faq_line = ((lambda l: {"hi": faq.answer_hi, "hinglish": faq.answer_hinglish, "en": faq.answer}.get(l) or "")
+                    if faq is not None and not faq.not_eligible else None)
+        r = negotiation.step(self.p, text, negotiation.NegState.load(d), d.get("need_known", ""), faq_line)
+        if r is None:
+            return None
+        r.state.save(d)
+        d["pending"] = "neg_close" if r.offer else "close"
+        if r.offer:
+            d["neg_offer"] = json.dumps(r.offer)
+        return TurnPlan(intent=r.intent, llm_allowed=False, decision="negotiation: " + r.state.last, end_call=False, fallback=r.text,
+                        facts={"offer": Fact(value=self._terms(lang), description="the offer as one phrase", must_mention=False)},
+                        objective=r.note or "Answer the price talk honestly; no pressure, no invented discount")
+
+    def _apply_neg_offer(self, d: dict) -> None:
+        """The caller said yes to a concession: the agreed price goes into the terms, and into the ledger (closed price vs the profit floor)."""
+        try:
+            o = json.loads(d.get("neg_offer") or "{}")
+        except ValueError:
+            return
+        eco = self.p.economics
+        price = float(o.get("price") or eco.list_price or 0)
+        if eco.list_price and price < eco.profit_floor:
+            price = eco.profit_floor  # never below the floor, whatever was said
+        upd = {}
+        if eco.price_terms and price and price != eco.list_price:
+            upd["terms"] = {l: eco.price_terms[l].format(price=f"{eco.currency}{int(round(price)):,}") for l in eco.price_terms}
+        perk = next((x for x in eco.ladder if x.id == o.get("perk") and x.kind == "perk"), None)
+        if perk is not None:
+            base = upd.get("terms") or {l: honest.terms_text(self.p, l) for l in ("en", "hi", "hinglish")}
+            upd["terms"] = {l: base[l] + ", " + (perk.short.get(l) or perk.text.get(l, "")) for l in base}
+        if upd:
+            self.p = self.p.model_copy(update=upd)
+        if price:
+            d["closed_price"] = f"{price:.2f}"
+            d["list_price"] = f"{eco.list_price:.2f}"
+            d["profit_floor"] = f"{eco.profit_floor:.2f}"
+            d["margin_pct"] = f"{(price - eco.cost) / price * 100:.1f}" if eco.cost and price else ""
+
+    def _repeat_request_step(self, text: str, d: dict, ctx, lang: str) -> TurnPlan | None:
+        """"फिर से बोलिए / धीरे बोलो / say that again": the AGENT says the last thing again, shorter and slower, in plain words
+        (it used to say "I'll tell it again" and then not tell it)."""
+        if not _REPEAT_ASK.search(text) or len(text.split()) > 16 or _OPT_OUT.search(text):
+            return None
+        if self._psyche_move(d) is not None and self._psyche_move(d).need == "be_heard" and re.search(r"repeat|रिपीट|रिपेट|बार बार|bar bar", text, re.I):
+            return None  # "stop repeating yourself" is a complaint, handled by the be_heard move
+        p = self.p
+        quoted = ctx is not None and "offer_price" in ctx.quoted
+        told = ctx is not None and "what_the_product_is" in ctx.told
+        if quoted and (_PRICE_ASK.search(text) or d.get("last_intent") in ("price", "reoffer", "confirm_close", "answer")):
+            n = int(d.get("repeat_n", "0"))
+            d["repeat_n"] = str(n + 1)
+            lines = self._tpl3(lambda l: (honest.price_variants(p, l) + honest.end_variants(p, l))[min(n, len(honest.price_variants(p, l)) + 3)])
+            intent = "price"
+        elif not told and not quoted:
+            lines = _tpl("Sure, slowly. I'm {agent}, an AI assistant from {seller}. I'm calling about an offer on {product}. Is this a good time for two minutes?",
+                         "जी, धीरे बताता हूँ। मैं {agent} हूँ, {seller} से एक AI असिस्टेंट। {product} के एक ऑफर के बारे में फ़ोन किया है। क्या दो मिनट बात हो सकती है?",
+                         "Ji, dheere batata hoon. Main {agent} hoon, {seller} se ek AI assistant. {product} ke ek offer ke baare mein phone kiya hai. Kya do minute baat ho sakti hai?")
+            intent = "clarify"
+        else:
+            lines = _tpl(p.pitch_en, p.pitch_hi or p.pitch_en, p.pitch_hinglish or p.pitch_hi or p.pitch_en)
+            intent = "clarify"
+        facts = {"agent": Fact(value=p.agent_name, description="your name", must_mention=False),
+                 "seller": Fact(value=p.seller_name, description="your company", must_mention=False),
+                 "product": Fact(value=p.product_name, description="product name", must_mention=False)}
+        return TurnPlan(intent=intent, llm_allowed=False, facts=facts, decision="say the last thing again, slowly and simply", fallback=lines,
+                        objective="They could not follow: say the last thing again, slowly, in plain words")
+
+    def _sad_step(self, text: str, intent: str, d: dict, lang: str) -> TurnPlan | None:
+        """Lost a job / no money / tired: pause the selling for the rest of the call (no price, no link, no re-offer, no
+        discovery question), be warm and short, answer what they ask, offer another time. Explicit buying words re-open it."""
+        now = bool(honest.SAD.search(text)) or d.get("_row") == "sad"
+        if now:
+            d["sad_hold"] = "1"
+            d["reoffers"] = str(max(int(d.get("reoffers", "0")), self.p.max_reoffers))  # no soft re-offer to someone in trouble
+        if d.get("sad_hold") != "1":
+            return None
+        if not now and (_BUY.search(text) and not honest.FREE_WANT.search(text)) and not _HYPOTHETICAL.search(text):
+            d.pop("sad_hold", None)  # they re-opened it themselves
+            return None
+        if _GOODBYE_NOW.search(text) or _FIRM_NO.search(text) or _OPT_OUT.search(text) or (
+                not now and intent in ("deny", "goodbye", "callback", "human_agent")):
+            return None  # the caller is closing: the normal goodbye (never a re-offer) handles it
+        if honest.is_question(text) and not now:
+            return None  # a real question: the conversation answers it (its stage says: no selling)
+        n = int(d.get("sad_n", "0"))
+        d["sad_n"] = str(n + 1)
+        variants = [self._tpl3(lambda l: honest.empathy_variants(self.p, l, True)[0])] + \
+            [dict(zip(("en", "hi", "hinglish"), t)) for t in zip(*(honest.empathy_variants(self.p, l, False) for l in ("en", "hi", "hinglish")))]
+        return TurnPlan(intent="personal", llm_allowed=False, decision="hard time: pause selling", fallback=variants[min(n, len(variants) - 1)],
+                        objective="Be warm, short and human; no selling at all; offer to call another time")
+
+    async def _answer_before_goodbye(self, plan: TurnPlan, intent: str, turn: TurnInput, session: SessionState) -> TurnPlan:
+        """Never say goodbye with an unanswered question pending ("कितने दिन में activate होगा?" got a goodbye)."""
+        d, text = session.dialog, turn.text
+        if not (plan.end_call and plan.intent in ("goodbye", "declined", "link_sent")):
+            return plan
+        if not honest.is_question(text) or _FIRM_NO.search(text) or _OPT_OUT.search(text) or _GOODBYE_NOW.search(text) \
+                or re.search(r"cancel|mat bhej|मत भेज|rehne do|रहने दो", text, re.I):
+            return plan
+        ctx = getattr(session, "context", None)
+        lang = d.get("_lang", "hi")
+        return await self._converse(text, intent, d, ctx, lang, float(d.get("_frustration", "0") or 0))
 
     # ------------------------------------------------------------------ policy pieces
 
@@ -1278,7 +1669,7 @@ class ProductSalesDomain:
                                 fallback=_tpl("No problem, I won't send the link. Thanks for your time, have a good day!",
                                               "कोई बात नहीं, मैं लिंक नहीं भेजूँगा। आपके समय के लिए धन्यवाद, आपका दिन शुभ हो!",
                                               "Koi baat nahi, main link nahi bhejunga. Aapke time ke liye thank you!"))
-            if self._asks(text, d) or self._faq_match(text) or re.search(r"link|लिंक", text, re.I) or intent == "price":
+            if self._asks(text, d) or self._faq_match(text) or intent == "price" or _NOT_ARRIVED.search(text):
                 return None  # answered by the conversation turn ("the link is on its way")
             d["outcome"] = "sold"
             return TurnPlan(intent="goodbye", end_call=True, llm_allowed=False, objective="Link is on its way; goodbye",
@@ -1315,9 +1706,9 @@ class ProductSalesDomain:
         return TurnPlan(intent="confirm_close", llm_allowed=False,
                         facts={"offer": Fact(value=self._terms(lang), description="the full offer")},
                         objective="Confirm once, with the full terms, before sending the payment link", ask="confirm?",
-                        fallback=_tpl("Just to confirm: it's {offer}, and you can cancel any time. Shall I send the payment link to this number?",
-                                      "बस कन्फ़र्म कर दूँ: ये {offer} है, और कभी भी cancel कर सकते हैं। क्या मैं इसी नंबर पर पेमेंट लिंक भेज दूँ?",
-                                      "Bas confirm kar doon: ye {offer} hai, aur kabhi bhi cancel kar sakte hain. Kya main isi number pe payment link bhej doon?"))
+                        fallback=self._cx(_tpl("Just to confirm: it's {offer}@@. Shall I send the payment link to this number?",
+                                               "बस कन्फ़र्म कर दूँ: ये {offer} है@@। क्या मैं इसी नंबर पर पेमेंट लिंक भेज दूँ?",
+                                               "Bas confirm kar doon: ye {offer} hai@@. Kya main isi number pe payment link bhej doon?")))
 
     def _link_plan(self, d: dict, lang: str, question: str = "") -> TurnPlan:
         d.pop("pending", None)
@@ -1333,24 +1724,38 @@ class ProductSalesDomain:
                             objective="You've ALREADY said the payment link is being sent by SMS. Now answer their question in "
                                       "one or two short sentences from the background, and ask if there's anything else. "
                                       "Don't mention any price",
-                            fallback=_tpl(ANYTHING_ELSE[0], ANYTHING_ELSE[1], ANYTHING_ELSE[2]))
-        return TurnPlan(intent="link_sent", decision="payment link sent", end_call=True, llm_allowed=False,
+                            # the template speaks the answer (approved FAQ line, or the honest "I don't have that"), never a bare "anything else?"
+                            fallback={l: self._answer_text(question, l) or ANYTHING_ELSE[i] for i, l in enumerate(("en", "hi", "hinglish"))})
+        site = self.p.official_site
+        return TurnPlan(intent="link_sent", decision="payment link sent", end_call=False, llm_allowed=False,
                         facts={},
                         objective="Confirm the link is coming by SMS to this number; thank them",
-                        fallback=_tpl("Great! I'm sending the payment link by SMS to this number now. Open it to pay securely; if it doesn't arrive in a few minutes, the offer is also on claude.ai. Thank you, have a great day!",
-                                      "बढ़िया! मैं अभी इसी नंबर पर SMS से पेमेंट लिंक भेज रहा हूँ। उसे खोलकर सुरक्षित पेमेंट कर सकते हैं। धन्यवाद, आपका दिन शुभ हो!",
-                                      "Badhiya! Main abhi isi number pe SMS se payment link bhej raha hoon. Use khol ke secure payment kar sakte hain. Thank you, aapka din accha ho!"))
+                        fallback=_tpl("Great! I'm sending the payment link by SMS to this number now. Open it to pay securely" + (f"; if it doesn't arrive in a few minutes, the offer is also on {site}" if site else "") + ". Take your time, I'm here if you have a question.",
+                                      "बढ़िया! मैं अभी इसी नंबर पर SMS से पेमेंट लिंक भेज रहा हूँ। उसे खोलकर सुरक्षित पेमेंट कर सकते हैं। आराम से देखिए, कोई सवाल हो तो मैं यहीं हूँ।",
+                                      "Badhiya! Main abhi isi number pe SMS se payment link bhej raha hoon. Use khol ke secure payment kar sakte hain. Aaram se dekhiye, koi sawal ho to main yahin hoon."))
 
-    def _price_plan(self, lang: str = "en") -> TurnPlan:
+    def _price_plan(self, lang: str = "en", known: bool = False) -> TurnPlan:
+        """The full offer, then (only if we still don't know) what they'd use it for. `known`: they already told us."""
         p = self.p
+        q = (lambda l: "" if known else " " + p.discovery_question.get(l, ""))
+        if p.terms.get(lang):  # the operator's phrase already says the normal price after the offer: don't say it twice
+            fb = self._cx(_tpl("It's {offer}, that's {discount}@@." + q("en"), "ये {offer} है, यानी {discount}@@।" + q("hi"),
+                               "Ye {offer} hai, yaani {discount}@@." + q("hinglish")))
+        else:
+            fb = self._cx(_tpl("Normally it's " + p.original_price + ", but for you it's {offer}, that's {discount}@@." + q("en"),
+                               "वैसे ये " + p.original_price + " का है, पर आपके लिए {offer}, यानी {discount}@@।" + q("hi"),
+                               "Waise ye " + p.original_price + " ka hai, par aapke liye {offer}, yaani {discount}@@." + q("hinglish")))
         return TurnPlan(
             intent="price", facts={"offer": Fact(value=self._terms(lang), description="the full offer"),
                                    "discount": self._offer()["discount"]},
             decision="quote offer price with its full terms, then learn what they need", llm_allowed=False,
-            objective="Give the full offer terms and ask what they'd use it for", ask="what would you use it for?",
+            objective="Give the full offer terms" + ("" if known else " and ask what they'd use it for"),
+            ask=None if known else "what would you use it for?",
             must_not_say=["prices not in the facts", "hidden charges"],
             # live call: it kept asking "shall I send the link?" without ever saying what you get. Ask about
             # their needs instead; the next turns tie a benefit to that, and the link comes after.
-            fallback=_tpl("Normally it's " + p.original_price + ", but for you it's {offer}, that's {discount}, and you can cancel any time. " + p.discovery_question.get("en", ""),
-                          "वैसे ये " + p.original_price + " का है, पर आपके लिए {offer}, यानी {discount}, और कभी भी cancel कर सकते हैं। " + p.discovery_question.get("hi", ""),
-                          "Waise ye " + p.original_price + " ka hai, par aapke liye {offer}, yaani {discount}, aur kabhi bhi cancel kar sakte hain. " + p.discovery_question.get("hinglish", "")))
+            fallback=fb)
+
+    def _cx(self, tpl: dict[str, str]) -> dict[str, str]:
+        """Fill the '@@' marker with ', and you can cancel any time' only when the product's own facts say so."""
+        return {l: v.replace("@@", honest.cancel_tail(self.p, l)) for l, v in tpl.items()}
