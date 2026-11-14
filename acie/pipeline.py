@@ -73,6 +73,10 @@ _UNKNOWN = re.compile(r"don.?t have (that|any)|won.?t guess|not sure about that|
                       r"nothing more on that|that is really all|rather not guess|jaankari mere paas nahi|pakka nahi|nahi bata sakta|bas itna hi|"
                       r"जानकारी मेरे पास नहीं|पक्का नहीं|नहीं बता सकता|बस इतना ही|अंदाज़ा नहीं", re.I)
 _FAREWELL = re.compile(r"धन्यवाद|शुक्रिया|दिन शुभ|thank you|thanks for|have a (nice|good|great) day|take care|goodbye|bye\b|dhanyavaad|din accha|din achha|alvida", re.I)
+_REASSURED = re.compile(
+    r"ठीक\s*(हूँ|हूं|हु|है)|theek\s*(hoon|hun|hu|hai)|thik\s*(hoon|hun|hu|hai)|\bi\s*'?a?m\s+(fine|ok|okay|good|alright|all right)\b|"
+    r"\b(just|only)\s+(asking|wanted|want|checking)|\bbas\s+\w+\s+(puch|pooch|bata|jaan)|\bbas\s+(fees|price|rate|kimat)|बस\s+\S+\s+(पूछ|बता|जान)|"
+    r"बस\s+(फ़ीस|फीस|कीमत|रेट)|कोई\s+(दिक्कत|परेशानी)\s+नहीं|no\s+problem|nothing\s+(wrong|like that)|koi\s+(dikkat|problem|baat)\s+nahi", re.I)
 _NO_SELL_ROWS = ("sad", "anxious", "angry", "crisis")
 
 
@@ -467,7 +471,13 @@ class ACIEPipeline:
         hist = [u.text for u in session.history if u.role == "customer"][-2:]
         d_score, d_ev = distress_score(turn.text, hist, getattr(turn, "voice", None))
         nlu_crisis = session.dialog.pop("_nlu_crisis", None)
-        flagged = bool(session.dialog.get("safety_flag")) or bool(nlu_crisis) or d_score >= DISTRESS_T
+        # The NLU flag alone is never a crisis (gate run 4: "मेरे पास पहले से cloud है" and "मैं ठीक हूँ, बस fees पूछ रहा हूँ" ended calls).
+        # Full distress needs lexical/phonetic evidence >= DISTRESS_T, or concern-band evidence plus the NLU flag. A caller who
+        # reassures ("मैं ठीक हूँ") or asks about the product is released: back to normal, no sticky flag, no re-check.
+        reassured = bool(_REASSURED.search(turn.text)) or is_question(turn.text)
+        flagged = bool(session.dialog.get("safety_flag")) or d_score >= DISTRESS_T \
+            or (bool(nlu_crisis) and d_score >= CONCERN_T and not reassured)
+        nlu_only_concern = bool(nlu_crisis) and d_score < CONCERN_T and not reassured
         if d_ev or nlu_crisis:
             session.dialog["_distress"] = json.dumps({"score": round(d_score, 2), "evidence": d_ev[:4], "nlu": nlu_crisis})
         strat = emotion_policy.decide(state, turn.text, turn.voice, flagged=flagged, signals=session.dialog)
@@ -490,7 +500,7 @@ class ACIEPipeline:
                 session.dialog["safety_flag"] = "1"
                 session.dialog.pop("pending", None)
                 profile.outcomes.append("safety_distress")
-        elif CONCERN_T <= d_score < DISTRESS_T and not session.dialog.get("safety_flag") \
+        elif (CONCERN_T <= d_score < DISTRESS_T or nlu_only_concern) and not session.dialog.get("safety_flag") \
                 and not session.dialog.get("concern_asked"):
             plan = concern_plan()  # middle band: a gentle check-in instead of selling; a clearer answer reaches crisis
             session.dialog["concern_asked"] = "1"

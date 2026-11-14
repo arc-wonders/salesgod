@@ -73,7 +73,7 @@ def test_value_before_cash_shrinking_steps_and_commitment_wording():
     assert [o.offer["price"] for o in out[2:4]] == [2800, 2700]
     assert "free" in out[1].text["en"] and "फ्री" in out[1].text["hi"] and "free" in out[1].text["hinglish"]
     for l in LANGS:
-        assert re.search(r"now|today|अभी|आज|abhi|aaj|ready", out[2].text[l], re.I)
+        assert not re.search(r"if (we|you).{0,25}(now|today)|अगर अभी|अगर आप आज|agar abhi|agar aap aaj|ready to join", out[2].text[l], re.I)  # no false urgency (gate run 4)
         assert not re.search(r"last chance|only \d+ left|hurry|expires", out[2].text[l], re.I)
 
 
