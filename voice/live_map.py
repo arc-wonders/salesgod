@@ -339,7 +339,7 @@ def validate_economics(eco: Any, product: Any = None) -> None:
         raise ValueError("List price must be above 0.")
     if cost < 0 or not 0 <= margin < 100:
         raise ValueError("Cost cannot be negative and the minimum margin must be between 0% and 99%.")
-    floor = round(cost * (1 + margin / 100.0), 2)
+    floor = round(max(cost * (1 + margin / 100.0), _num(_get(eco, "floor_price")) or 0.0), 2)
     if floor > lp:
         raise ValueError(f"The floor ({floor:g}) is above the list price ({lp:g}); lower the cost or margin, or raise the list price.")
     seen: set[str] = set()
@@ -375,14 +375,13 @@ def perk_count(eco: Any) -> int:
 
 
 def validate_max_perks(eco: Any, max_perks: Any) -> int:
+    """Perks the agent may give in ONE sale (the ladder may list more; the engine picks them in order)."""
     try:
         n = int(max_perks)
     except (TypeError, ValueError):
         raise ValueError("Max perks per sale must be a whole number.")
-    if n < 0 or n > 10:
-        raise ValueError("Max perks per sale must be between 0 and 10.")
-    if perk_count(eco) > n:
-        raise ValueError(f"The ladder has {perk_count(eco)} perk steps but max perks per sale is {n}.")
+    if n < 0 or n > 5:
+        raise ValueError("Max perks per sale must be between 0 and 5.")
     return n
 
 

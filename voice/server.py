@@ -428,11 +428,9 @@ def build_app() -> tuple[FastAPI, App]:
     async def list_products(request: Request) -> dict:
         _require(request)
         from . import live_map
-        extras = live_map.load_extras(DATA)
         out = []
         for p in state.products().values():
-            d = p.model_dump()
-            d["economics"]["max_perks"] = extras.get(p.id, {}).get("max_perks", max(1, live_map.perk_count(p.economics)))
+            d = p.model_dump()  # economics.max_perks is the engine's own field (acie Economics)
             d["real_company"] = live_map.is_real_company(p)
             out.append(d)
         return {"products": out}
@@ -445,26 +443,23 @@ def build_app() -> tuple[FastAPI, App]:
         if not product_id.replace("-", "").replace("_", "").isalnum() or len(product_id) > 40:
             raise HTTPException(400, "id: letters, digits, - and _ only")
         from . import live_map
-        max_perks = (body.get("economics") or {}).pop("max_perks", None) if isinstance(body.get("economics"), dict) else None
+        raw_eco = body.get("economics") if isinstance(body.get("economics"), dict) else None
         body.pop("real_company", None)
         try:
             product = Product.model_validate(body)
         except Exception as e:
             raise HTTPException(400, str(e)[:300])
         try:  # negotiation range: floor <= every step <= list, no concessions on a real company's product
-            live_map.validate_economics(product.economics, product)
-            if max_perks is not None:
-                max_perks = live_map.validate_max_perks(product.economics, max_perks)
+            # validate what the operator SENT: the Economics model drops out-of-range steps silently on load
+            live_map.validate_economics(raw_eco if raw_eco is not None else product.economics, product)
+            if raw_eco is not None and "max_perks" in raw_eco:
+                live_map.validate_max_perks(product.economics, raw_eco["max_perks"])
         except ValueError as e:
             raise HTTPException(400, str(e))
         products = state.products()
         products[product_id] = product
         state.save_products(products)
-        if max_perks is not None:
-            live_map.save_extra(DATA, product_id, {"max_perks": max_perks})
-        out = product.model_dump()
-        out["economics"]["max_perks"] = live_map.load_extras(DATA).get(product_id, {}).get("max_perks", max(1, live_map.perk_count(product.economics)))
-        return {"product": out}
+        return {"product": product.model_dump()}
 
     @api.get("/api/playbooks/{product_id}")
     async def get_playbook(product_id: str, request: Request):

@@ -105,10 +105,12 @@ def test_from_record_fallback():
 # ---------------------------------------------------------------- economics validation
 
 def eco(**kw):
+    # raw operator input (what the console PUTs), validated before the Economics model trims it
     base = dict(currency="₹", unit="3 months", list_price=3000, cost=2000, min_margin_pct=20,
                 ladder=[Step(kind="price", price=2800), Step(kind="price", price=2500)])
     base.update(kw)
-    return Economics(**base)
+    base["ladder"] = [st.model_dump() if hasattr(st, "model_dump") else st for st in base["ladder"]]
+    return base
 
 
 def bad(e, product=FZ, match=""):
@@ -136,8 +138,9 @@ def test_max_perks():
     ok = {"en": "a", "hi": "b", "hinglish": "c"}
     e = eco(ladder=[Step(kind="perk", id="a", text=ok), Step(kind="perk", id="b", text=ok)])
     assert live_map.validate_max_perks(e, 2) == 2
-    with pytest.raises(ValueError, match="2 perk steps"):
-        live_map.validate_max_perks(e, 1)
+    assert live_map.validate_max_perks(e, 1) == 1  # a ladder may list more perks than one sale may get
+    with pytest.raises(ValueError):
+        live_map.validate_max_perks(e, 9)
     with pytest.raises(ValueError):
         live_map.validate_max_perks(e, "x")
 
@@ -211,7 +214,7 @@ def test_save_stores_map_and_hook_broadcasts(client):
 def test_put_product_economics(client):
     prods = {p["id"]: p for p in client.get("/api/products").json()["products"]}
     fz, cp = prods["fitzone-gym"], prods["claude-pro"]
-    assert fz["real_company"] is False and cp["real_company"] is True and fz["economics"]["max_perks"] == 2
+    assert fz["real_company"] is False and cp["real_company"] is True and fz["economics"]["max_perks"] >= 1
     r = client.put("/api/products/fitzone-gym", json=fz)
     assert r.status_code == 200, r.text
     fz["economics"]["ladder"][2]["price"] = 2100  # below the 2400 floor
@@ -220,14 +223,14 @@ def test_put_product_economics(client):
     fz["economics"]["ladder"][2]["price"] = 2800
     fz["economics"]["ladder"][3]["price"] = 2700
     fz["economics"]["ladder"][4]["price"] = 2500
-    fz["economics"]["max_perks"] = 1
+    fz["economics"]["max_perks"] = 9
     r = client.put("/api/products/fitzone-gym", json=fz)
-    assert r.status_code == 400 and "max perks" in r.json()["detail"]
-    fz["economics"]["max_perks"] = 3
+    assert r.status_code == 400 and "max_perks" in r.json()["detail"].lower().replace(" ", "_")
+    fz["economics"]["max_perks"] = 2
     r = client.put("/api/products/fitzone-gym", json=fz)
-    assert r.status_code == 200 and r.json()["product"]["economics"]["max_perks"] == 3
+    assert r.status_code == 200 and r.json()["product"]["economics"]["max_perks"] == 2
     saved = json.loads((client.data / "products.json").read_text(encoding="utf-8"))["fitzone-gym"]["economics"]
-    assert saved["ladder"][4]["price"] == 2500 and "max_perks" not in saved
+    assert saved["ladder"][4]["price"] == 2500 and saved["max_perks"] == 2
     cp["economics"] = {"list_price": 8, "cost": 1, "min_margin_pct": 10, "ladder": []}
     r = client.put("/api/products/claude-pro", json=cp)
     assert r.status_code == 400 and "real company" in r.json()["detail"]
