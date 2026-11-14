@@ -199,7 +199,16 @@ _BENIGN_RAW = frozenset(normalize(w) for w in (
     "प्लान plan पैकेज package पास pass बैच batch बोल बोलो बोला बोली बोलना bol bolo bola boli bolna बात baat बाद baad बार bar baar "
     "खुद khud sector सेक्टर सिस्टम system बिल bill ट्रायल trial फ्री free पोज़िशन position एक्सेस access कार्ड card कैश cash "
     "वीज़ा visa ऐप app ऐपल apple स्कूल school पूल pool फील feel फ़ील मॉल mall सेशन session लेसन lesson मिल mil पल pal "
-    "पुल्स पुश push पुश-अप पीएफ pf").split())
+    "पुल्स पुश push पुश-अप पीएफ pf").split()) | frozenset((
+    # everyday ENGLISH words whose phonetic skeletons collide with Hindi method words (kud/kood = jump, pul = bridge,
+    # zehar...): live call 1e2a92c585 "So can't you just give me a GOOD discount FOR me?" -> KUJ~kud + PUR~pul -> a false
+    # helpline. English method words are matched raw (_JUMP_RAW etc.), never through these skeletons.
+    "good goods god gold could cool coat code card cards kid kids cut cute cat get got give gave go goes going gone "
+    "for four far fur fair fare fear pure poor pour pull pulled full fool fall fell fill feel few five fine phone "
+    "put pot but bit bad bed bud bat boot book look like lake take make made need deal deals discount discounts price "
+    "please plus pay paid per day days rate rates offer offers better best lower less cheap cheaper cost costs "
+    "can cant can't just you your me my mine for from with this that then than there they them what when where why how "
+    "sure yes yeah okay ok well will would should shall do does did done").split())
 _METHOD_SKEL_CONCEPTS_NEED_RAW = True
 
 

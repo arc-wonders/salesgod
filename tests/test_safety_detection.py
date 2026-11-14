@@ -265,3 +265,14 @@ def test_concern_plan_template():
     assert p.intent == "safety_concern" and not p.llm_allowed and not p.end_call
     assert set(p.fallback) == {"en", "hi", "hinglish"} and "14416" in p.facts["helpline"].value
     assert all("{helpline}" in v for v in p.fallback.values())
+
+
+def test_english_everyday_words_never_trigger_methods():
+    """Live call 1e2a92c585: "good" (KUJ ~ kud/kood) + "for" (PUR ~ pul) gave a false helpline on a discount ask."""
+    from acie.safety import distress_score
+    for t in ["So can't you just give me a good discount for me?", "okay 2,600 then, send the link",
+              "i want a discount for joining as i'm leaving the current gym", "is that your best price for four months",
+              "could you give me a better deal", "good food and a pool for the kids"]:
+        assert distress_score(t, [])[0] < 0.45, t
+    for t in ["i will jump off the bridge", "I want to jump from the roof", "chhat se kood jaunga"]:
+        assert distress_score(t, [])[0] >= 0.75, t
