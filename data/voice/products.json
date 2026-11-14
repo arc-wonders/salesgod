@@ -247,6 +247,24 @@
     "answer_hi": "बहुत से लोग Claude को ChatGPT जैसे दूसरे असिस्टेंट्स के साथ भी इस्तेमाल करते हैं; लोग अक्सर careful writing, लंबे documents और coding की मदद के लिए Claude चुनते हैं। मैं ये नहीं कह सकता कि ये सबके लिए बेहतर है, ये आपके काम पर निर्भर करता है",
     "answer_hinglish": "Bahut se log Claude ko ChatGPT jaise dusre assistants ke saath bhi use karte hain; log aksar careful writing, lambe documents aur coding ki madad ke liye Claude chunte hain. Main ye nahi keh sakta ki ye sabke liye behtar hai, ye aapke kaam par nirbhar karta hai",
     "not_eligible": false
+   },
+   {
+    "keywords": [
+     "app store",
+     "play store",
+     "google play",
+     "apple",
+     "ios",
+     "iphone",
+     "android",
+     "kahan se le",
+     "where do i buy",
+     "kahan se kharid"
+    ],
+    "answer": "You can subscribe on claude.ai or in the iPhone and Android apps, and you cancel any time from settings",
+    "answer_hi": "आप claude.ai पर या iPhone और Android ऐप में सब्सक्राइब कर सकते हैं, और settings से कभी भी cancel कर सकते हैं",
+    "answer_hinglish": "Aap claude.ai par ya iPhone aur Android app mein subscribe kar sakte hain, aur settings se kabhi bhi cancel kar sakte hain",
+    "not_eligible": false
    }
   ],
   "max_reoffers": 1,
@@ -306,7 +324,8 @@
    "hinglish": "wo payment page ya official website par dikh jaayega"
   },
   "cancel_any_time": null,
-  "official_site": "claude.ai"
+  "official_site": "claude.ai",
+  "description": "Real company name: facts here are limited to publicly stated ones (Pro is $20/month, about $17/month billed yearly, subscribe on claude.ai or in the iPhone/Android app, cancel any time in settings, a free plan exists). The $8 intro offer and anything else not verifiable stays an honest 'I don't have that detail' (see docs/PRODUCT_FACTS_TODO.md)."
  },
  "fitzone-gym": {
   "id": "fitzone-gym",
@@ -327,7 +346,7 @@
   "pitch_hi": "FitZone एक जिम है जहाँ ट्रेनर, योगा और ज़ुम्बा क्लासेस मिलती हैं, और ये सुबह पाँच से रात ग्यारह बजे तक खुला रहता है।",
   "pitch_hinglish": "FitZone ek gym hai jahan trainer, yoga aur zumba classes milti hain, aur ye subah paanch baje se raat gyaarah baje tak khula rehta hai.",
   "pitch_en": "FitZone is a gym with trainers and yoga and zumba classes, open from 5 in the morning to 11 at night.",
-  "knowledge": "FitZone is a neighbourhood gym chain (demo product). Membership includes gym floor access, cardio and weights, group classes (yoga, zumba, HIIT), one free personal trainer session per week, lockers and showers. Members can freeze the membership for up to 15 days. There is no joining fee in this offer. Equipment: cardio machines (treadmills, cycles, cross-trainers), free weights (dumbbells, barbells, plates), benches for bench press, a squat rack, cable machines and leg press. Personal training beyond the one free session a week is charged separately; the exact rate is shown at the front desk (never invent a price). Joining: open the link sent by SMS or walk into the nearest branch; the trainer does a free fitness assessment on day one.",
+  "knowledge": "FitZone is a neighbourhood gym chain (operator demo facts, not a real company). Membership includes gym floor access, cardio and weights, group classes (yoga, zumba, HIIT), one free personal trainer session per week, lockers and showers. All branches are air-conditioned; there is no steam room or sauna. Equipment: cardio machines (treadmills, cycles, cross-trainers), free weights (dumbbells, barbells, plates), benches for bench press, a squat rack, cable machines and leg press. Branches (Delhi NCR): Saket (Delhi), Sector 29 (Gurugram) and Sector 62 (Noida); there is no branch in Sector 49 Gurugram, the nearest is Sector 29. Open every day 5 am to 11 pm. Women-only batch at every branch, every day 10 am to 12 noon and 4 pm to 6 pm, with a woman trainer. Free parking for cars and bikes at all branches. Plans: monthly 2,200 rupees, quarterly (3 months) 6,000 rupees, annual 21,000 rupees (about 1,750 rupees a month). The launch offer is 2,999 rupees for the first 3 months if you join this week, then the quarterly rate. Payment: UPI, debit or credit card, net banking, or cash at the front desk; nothing is charged on the call. Membership starts the same day: after payment, walk in with the SMS and a photo ID. Documents: one government photo ID (Aadhaar, driving licence or passport). Age: 16 and above (under 18 needs a parent's consent), no upper age limit; with a health condition, ask your doctor first. A one-day free trial pass is available by walking in to any branch with an ID (it cannot be sent by SMS). Refund: within 3 days of joining, if the gym has not been used, the fee is refunded minus a 500 rupee admin charge; after that no refund, but you can freeze. Cancellation: you can cancel any time at the front desk; fees already paid follow the refund rule. Freeze: up to 15 days. There is no joining fee in this offer. Extra personal training sessions beyond the free weekly one are 600 rupees each. No student, group or friend discount in this offer; referral: when a friend joins you both get one extra free personal trainer session. Joining: open the link sent by SMS or walk into the nearest branch; the trainer does a free fitness assessment on day one.",
   "topic_words": [
    "gym",
    "जिम",
@@ -356,44 +375,283 @@
   "faqs": [
    {
     "keywords": [
+     "re:(trainer|ट्रेनर).{0,40}(alag|अलग|extra|additional|charge|kitne ka|कितने का|कितना|कितने|price|rate|cost|paid|पैसे|लगेगा)",
+     "extra session",
+     "अतिरिक्त सेशन"
+    ],
+    "answer": "One personal trainer session a week is free; extra sessions are 600 rupees each",
+    "answer_hi": "हफ़्ते में एक पर्सनल ट्रेनर सेशन फ्री है; उसके अलावा हर एक्स्ट्रा सेशन के 600 रुपये लगते हैं",
+    "answer_hinglish": "Hafte mein ek personal trainer session free hai; uske alawa har extra session ke 600 rupaye lagte hain",
+    "not_eligible": false
+   },
+   {
+    "keywords": [
+     "refund",
+     "रिफंड",
+     "रिफण्ड",
+     "money back",
+     "paise wapas",
+     "पैसे वापस",
+     "पैसा वापस",
+     "paisa wapas"
+    ],
+    "answer": "If you change your mind within 3 days of joining and have not used the gym, the fee is refunded minus a 500 rupee admin charge; after that there is no refund, but you can freeze the membership",
+    "answer_hi": "जॉइन करने के 3 दिन के अंदर अगर आपने जिम इस्तेमाल नहीं किया, तो फीस वापस मिलती है, बस 500 रुपये एडमिन चार्ज कटता है; उसके बाद रिफंड नहीं है, पर आप मेंबरशिप फ्रीज़ कर सकते हैं",
+    "answer_hinglish": "Join karne ke 3 din ke andar agar aapne gym use nahi kiya, to fees wapas milti hai, bas 500 rupaye admin charge katta hai; uske baad refund nahi hai, par aap membership freeze kar sakte hain",
+    "not_eligible": false
+   },
+   {
+    "keywords": [
+     "upi",
+     "यूपीआई",
+     "यू पी आई",
+     "gpay",
+     "phonepe",
+     "paytm",
+     "net banking",
+     "netbanking",
+     "payment method",
+     "card se",
+     "कार्ड से",
+     "cash",
+     "कैश",
+     "cheque"
+    ],
+    "answer": "You can pay by UPI, debit or credit card, net banking, or cash at the front desk",
+    "answer_hi": "आप UPI, डेबिट या क्रेडिट कार्ड, नेट बैंकिंग, या फ्रंट डेस्क पर कैश से पेमेंट कर सकते हैं",
+    "answer_hinglish": "Aap UPI, debit ya credit card, net banking, ya front desk par cash se payment kar sakte hain",
+    "not_eligible": false
+   },
+   {
+    "keywords": [
+     "monthly",
+     "मंथली",
+     "quarterly",
+     "annual",
+     "yearly",
+     "सालाना",
+     "plan options",
+     "month to month",
+     "mahine ka plan",
+     "महीने का प्लान",
+     "plans"
+    ],
+    "answer": "Plans are monthly at 2,200 rupees, quarterly for 3 months at 6,000 rupees, and annual at 21,000 rupees, about 1,750 rupees a month; this week's launch offer is 2,999 rupees for the first 3 months",
+    "answer_hi": "प्लान ये हैं: मंथली 2,200 रुपये, तीन महीने का 6,000 रुपये, और सालाना 21,000 रुपये यानी करीब 1,750 रुपये महीना; इस हफ़्ते का लॉन्च ऑफर पहले 3 महीने के 2,999 रुपये है",
+    "answer_hinglish": "Plans ye hain: monthly 2,200 rupaye, teen mahine ka 6,000 rupaye, aur annual 21,000 rupaye yaani kareeb 1,750 rupaye mahina; is hafte ka launch offer pehle 3 mahine ke 2,999 rupaye hai",
+    "not_eligible": false
+   },
+   {
+    "keywords": [
+     "activat",
+     "एक्टिवेट",
+     "kab se start",
+     "कब से शुरू",
+     "कब से start",
+     "start kar",
+     "कितने दिन में",
+     "kitne din mein",
+     "kitne din me",
+     "shuru kab"
+    ],
+    "answer": "Your membership starts the same day: after payment, walk in with the SMS and a photo ID",
+    "answer_hi": "आपकी मेंबरशिप उसी दिन शुरू हो जाती है: पेमेंट के बाद SMS और फ़ोटो ID लेकर सीधे आ जाइए",
+    "answer_hinglish": "Aapki membership usi din shuru ho jaati hai: payment ke baad SMS aur photo ID lekar seedhe aa jaiye",
+    "not_eligible": false
+   },
+   {
+    "keywords": [
+     "branch",
+     "ब्रांच",
      "location",
      "kahan",
      "कहाँ",
      "कहां",
      "address",
      "पता",
-     "near"
+     "near",
+     "gurgaon",
+     "gurugram",
+     "गुरुग्राम",
+     "गुड़गांव",
+     "noida",
+     "नोएडा",
+     "saket",
+     "साकेत",
+     "sector",
+     "सेक्टर",
+     "nearest",
+     "पास"
     ],
-    "answer": "We have branches across the city; the SMS will show the one nearest you",
-    "answer_hi": "हमारी कई ब्रांच हैं, SMS में आपके सबसे पास वाली ब्रांच का पता आ जाएगा",
-    "not_eligible": false,
-    "answer_hinglish": "Hamari kai branches hain, SMS mein aapke sabse paas wali branch ka pata aa jaayega"
+    "answer": "We have three branches in Delhi NCR: Saket in Delhi, Sector 29 in Gurugram and Sector 62 in Noida; there is no branch in Sector 49 Gurugram, the nearest is Sector 29",
+    "answer_hi": "दिल्ली NCR में हमारी तीन ब्रांच हैं: दिल्ली में साकेत, गुरुग्राम में सेक्टर 29 और नोएडा में सेक्टर 62; गुरुग्राम के सेक्टर 49 में ब्रांच नहीं है, सबसे पास सेक्टर 29 है",
+    "answer_hinglish": "Delhi NCR mein hamari teen branch hain: Delhi mein Saket, Gurugram mein Sector 29 aur Noida mein Sector 62; Gurugram ke Sector 49 mein branch nahi hai, sabse paas Sector 29 hai",
+    "not_eligible": false
+   },
+   {
+    "keywords": [
+     "timing",
+     "timings",
+     "टाइमिंग",
+     "kitne baje",
+     "कितने बजे",
+     "khula",
+     "खुला",
+     "hours",
+     "opening"
+    ],
+    "answer": "The gym is open every day from 5 am to 11 pm",
+    "answer_hi": "जिम रोज़ सुबह 5 बजे से रात 11 बजे तक खुला रहता है",
+    "answer_hinglish": "Gym roz subah 5 baje se raat 11 baje tak khula rehta hai",
+    "not_eligible": false
+   },
+   {
+    "keywords": [
+     "women",
+     "ladies",
+     "female",
+     "महिला",
+     "लेडीज",
+     "girls"
+    ],
+    "answer": "Yes, every branch has a women-only batch every day, 10 am to 12 noon and 4 to 6 pm, with a woman trainer",
+    "answer_hi": "जी हाँ, हर ब्रांच में रोज़ महिलाओं का अलग बैच है, सुबह 10 से 12 और शाम 4 से 6 बजे, महिला ट्रेनर के साथ",
+    "answer_hinglish": "Ji haan, har branch mein roz mahilaon ka alag batch hai, subah 10 se 12 aur shaam 4 se 6 baje, mahila trainer ke saath",
+    "not_eligible": false
+   },
+   {
+    "keywords": [
+     "trial",
+     "ट्रायल",
+     "demo",
+     "guest pass",
+     "day pass",
+     "free pass"
+    ],
+    "answer": "You can get a one-day free trial pass by walking in to any branch with an ID; it can't be sent by SMS",
+    "answer_hi": "किसी भी ब्रांच में ID लेकर आइए, एक दिन का फ्री ट्रायल पास मिल जाएगा; ये SMS से नहीं भेजा जा सकता",
+    "answer_hinglish": "Kisi bhi branch mein ID lekar aaiye, ek din ka free trial pass mil jaayega; ye SMS se nahi bheja ja sakta",
+    "not_eligible": false
+   },
+   {
+    "keywords": [
+     "parking",
+     "पार्किंग"
+    ],
+    "answer": "There is free parking for cars and bikes at all three branches",
+    "answer_hi": "तीनों ब्रांच में कार और बाइक की पार्किंग फ्री है",
+    "answer_hinglish": "Teeno branch mein car aur bike ki parking free hai",
+    "not_eligible": false
+   },
+   {
+    "keywords": [
+     "locker",
+     "लॉकर",
+     "shower",
+     "शावर",
+     "steam",
+     "sauna",
+     "स्टीम",
+     "सॉना",
+     "सौना",
+     "re:\\bac\\b",
+     "एसी",
+     "air condition",
+     "air-condition"
+    ],
+    "answer": "All branches are air-conditioned, and lockers and showers are included; there is no steam room or sauna",
+    "answer_hi": "सभी ब्रांच AC हैं, और लॉकर और शावर शामिल हैं; स्टीम रूम या सौना नहीं है",
+    "answer_hinglish": "Sabhi branch AC hain, aur locker aur shower shamil hain; steam room ya sauna nahi hai",
+    "not_eligible": false
+   },
+   {
+    "keywords": [
+     "document",
+     "डॉक्यूमेंट",
+     "id proof",
+     "aadhar",
+     "aadhaar",
+     "आधार",
+     "कागज",
+     "what to bring",
+     "kya lana",
+     "joining process",
+     "kaise join",
+     "कैसे जॉइन"
+    ],
+    "answer": "You only need one government photo ID, like Aadhaar, a driving licence or a passport; you can pay through the SMS link or at the front desk",
+    "answer_hi": "बस एक सरकारी फ़ोटो ID चाहिए, जैसे आधार, ड्राइविंग लाइसेंस या पासपोर्ट; पेमेंट SMS लिंक से या फ्रंट डेस्क पर कर सकते हैं",
+    "answer_hinglish": "Bas ek sarkari photo ID chahiye, jaise Aadhaar, driving licence ya passport; payment SMS link se ya front desk par kar sakte hain",
+    "not_eligible": false
+   },
+   {
+    "keywords": [
+     "age limit",
+     "उम्र",
+     "umar",
+     "re:\\bage\\b",
+     "बूढ़े",
+     "बुज़ुर्ग",
+     "बुजुर्ग",
+     "senior",
+     "elderly",
+     "old people",
+     "kids",
+     "bachche",
+     "बच्चे"
+    ],
+    "answer": "Members must be 16 or older, and under 18 needs a parent's consent; there is no upper age limit",
+    "answer_hi": "मेंबर की उम्र 16 साल या उससे ज़्यादा होनी चाहिए, 18 से कम हो तो माता-पिता की इजाज़त चाहिए; ऊपर की कोई उम्र सीमा नहीं है",
+    "answer_hinglish": "Member ki umar 16 saal ya usse zyada honi chahiye, 18 se kam ho to parents ki ijazat chahiye; upar ki koi umar seema nahi hai",
+    "not_eligible": false
+   },
+   {
+    "keywords": [
+     "cancel",
+     "कैंसल",
+     "band kar",
+     "बंद कर",
+     "रद्द"
+    ],
+    "answer": "You can cancel any time at the front desk; fees already paid follow the refund rule",
+    "answer_hi": "आप कभी भी फ्रंट डेस्क पर मेंबरशिप कैंसल कर सकते हैं; दी हुई फीस रिफंड के नियम के हिसाब से होगी",
+    "answer_hinglish": "Aap kabhi bhi front desk par membership cancel kar sakte hain; di hui fees refund ke niyam ke hisaab se hogi",
+    "not_eligible": false
    },
    {
     "keywords": [
      "freeze",
      "pause",
      "रोक",
-     "band",
-     "holiday"
+     "holiday",
+     "फ्रीज़"
     ],
     "answer": "You can freeze the membership for up to 15 days",
     "answer_hi": "आप मेंबरशिप पंद्रह दिन तक रोक सकते हैं",
-    "not_eligible": false,
-    "answer_hinglish": "Aap membership pandrah din tak rok sakte hain"
+    "answer_hinglish": "Aap membership pandrah din tak rok sakte hain",
+    "not_eligible": false
    },
    {
     "keywords": [
      "joining fee",
-     "extra",
      "hidden",
-     "छुपा",
-     "अलग से"
+     "हिडन",
+     "छुपा"
     ],
     "answer": "There is no joining fee in this offer",
     "answer_hi": "इस ऑफर में कोई जॉइनिंग फीस नहीं है",
-    "not_eligible": false,
-    "answer_hinglish": "Is offer mein koi joining fee nahi hai"
+    "answer_hinglish": "Is offer mein koi joining fee nahi hai",
+    "not_eligible": false
+   },
+   {
+    "keywords": [
+     "re:(student|स्टूडेंट|छात्र).{0,25}(discount|डिस्काउंट|छूट|offer|ऑफर)",
+     "re:(friend|दोस्त|group|ग्रुप).{0,25}(discount|डिस्काउंट|छूट|offer|ऑफर)"
+    ],
+    "answer": "There is no student, friend or group discount in this offer, and the launch price is already 50% off; when a friend joins through you, you both get one extra free personal trainer session",
+    "answer_hi": "इस ऑफर में स्टूडेंट, दोस्त या ग्रुप डिस्काउंट नहीं है, और लॉन्च कीमत पहले से 50% off है; अगर आपके ज़रिए कोई दोस्त जुड़ता है तो आप दोनों को एक एक्स्ट्रा फ्री पर्सनल ट्रेनर सेशन मिलता है",
+    "answer_hinglish": "Is offer mein student, friend ya group discount nahi hai, aur launch price pehle se 50% off hai; agar aapke zariye koi dost judta hai to aap dono ko ek extra free personal trainer session milta hai",
+    "not_eligible": false
    },
    {
     "keywords": [
@@ -408,8 +666,8 @@
     ],
     "answer": "Fair question. It is our launch offer for this week, you pay only at the gym or through the official link, nothing is charged on this call",
     "answer_hi": "अच्छा सवाल है। ये इस हफ्ते का लॉन्च ऑफर है, पेमेंट सिर्फ़ जिम पर या ऑफिशियल लिंक से होता है, इस कॉल पर कुछ नहीं कटता",
-    "not_eligible": false,
-    "answer_hinglish": "Achha sawal hai. Ye is hafte ka launch offer hai, payment sirf gym par ya official link se hota hai, is call par kuch nahi katta"
+    "answer_hinglish": "Achha sawal hai. Ye is hafte ka launch offer hai, payment sirf gym par ya official link se hota hai, is call par kuch nahi katta",
+    "not_eligible": false
    }
   ],
   "max_reoffers": 1,
@@ -418,9 +676,9 @@
   "price_note": "",
   "rupee_terms": {},
   "renewal_note": {
-   "en": "The offer price is for the first 3 months; after that it's ₹6,000 for 3 months.",
-   "hi": "Offer वाली कीमत पहले 3 महीने की है; उसके बाद 3 महीने के ₹6,000 लगेंगे।",
-   "hinglish": "Offer wali keemat pehle 3 mahine ki hai; uske baad 3 mahine ke ₹6,000 lagenge."
+   "en": "The offer price is for the first 3 months; after that it's 6,000 rupees for 3 months, and you can cancel any time at the front desk.",
+   "hi": "Offer वाली कीमत पहले 3 महीने की है; उसके बाद 3 महीने के ₹6,000 लगेंगे, और आप कभी भी फ्रंट डेस्क पर कैंसल कर सकते हैं।",
+   "hinglish": "Offer wali keemat pehle 3 mahine ki hai; uske baad 3 mahine ke ₹6,000 lagenge, aur aap kabhi bhi front desk par cancel kar sakte hain."
   },
   "annual_note": {},
   "allowed_numbers": [],
@@ -460,6 +718,7 @@
    "en": "the gym team at the nearest branch can tell you",
    "hi": "नज़दीकी ब्रांच पर जिम की टीम आपको बता सकती है",
    "hinglish": "nazdeeki branch par gym ki team aapko bata sakti hai"
-  }
+  },
+  "description": "operator demo facts: FitZone is the operator's own demo gym, not a real company. Every fact in this sheet (plans, branches, policies, rates) is authored demo data; the operator confirms or replaces it (see docs/PRODUCT_FACTS_TODO.md)."
  }
 }

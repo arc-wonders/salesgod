@@ -142,7 +142,7 @@ TOPICS: list[Topic] = [
     Topic("branch", re.compile(r"(branch|ब्रांच|gym|जिम|centre|center|where|kahan|कहाँ|कहां|near|nearest|पास|address|located).{0,60}(%s)|"
                                r"(%s).{0,60}(branch|ब्रांच|gym|जिम|centre|center|where|kahan|कहाँ|कहां|near|nearest|पास|address|located|hai kya|है क्या|hai ya nahi)|"
                                r"which (branch|area|location)|branch list|how many branch|kitni branch|कितनी ब्रांच|कौन सी ब्रांच|kaun si branch" % (_PLACE, _PLACE), _I),
-          _t("the branch list", "ब्रांच की लिस्ट", "branch ki list"), beats_faq=True),
+          _t("the branch list", "ब्रांच की लिस्ट", "branch ki list")),
     Topic("refund", re.compile(r"refund|रिफंड|रिफण्ड|money back|paise (wapas|vapas)|पैसे वापस|पैसा वापस|paisa (wapas|vapas)", _I),
           _t("the refund policy", "रिफंड पॉलिसी", "refund policy")),
     Topic("payment_method", re.compile(r"\bupi\b|यूपीआई|यू पी आई|gpay|google pay|phonepe|paytm|net ?banking|\bemi\b|debit|credit card|cash (de|se|mein)|cheque|"
@@ -167,7 +167,7 @@ TOPICS: list[Topic] = [
           _t("the context size", "कॉन्टेक्स्ट की सीमा", "context size")),
     Topic("group_discount", re.compile(r"(friend|दोस्त|\bgroup\b|ग्रुप|couple|family|corporate|senior citizen|referral|refer).{0,40}(discount|डिस्काउंट|छूट|offer|ऑफर|\boff\b|plan|सस्ता|sasta|कम|kam)|"
                                        r"(discount|डिस्काउंट|छूट|offer|ऑफर|plan|कम|kam).{0,40}(friend|दोस्त|\bgroup\b|ग्रुप|couple|family|corporate|senior citizen)", _I),
-          _t("details on a friend or group discount", "दोस्त या ग्रुप डिस्काउंट", "friend ya group discount"), beats_faq=True),
+          _t("details on a friend or group discount", "दोस्त या ग्रुप डिस्काउंट", "friend ya group discount")),
     Topic("payer", re.compile(r"(pota|पोता|beta|बेटा|son|husband|pati|पति|wife|daughter|grandson|dost|दोस्त|friend|papa|पापा|bhai|भाई).{0,40}"
                               r"(pay|paise|पैसे|payment|पेमेंट|de (sakta|sakti|dega|degi)|दे (सकता|सकती|देगा|देगी))", _I),
           _t("details on someone else paying", "किसी और के पेमेंट करने", "kisi aur ke payment karne")),
@@ -300,11 +300,11 @@ def health_question(text: str) -> bool:
 def health_variants(p, lang: str) -> list[str]:
     S = source(p, lang)
     return {
-        "en": [f"I can't say what is safe for a health problem like that, so please ask your doctor first. I don't have any age limit on my list; for the rest, {S}.",
+        "en": [f"I can't say what is safe for a health problem like that, so please ask your doctor first. For the rest, {S}.",
                f"For anything about your health, your doctor's word comes first; I can't promise what suits you. {cap(S)}."],
-        "hi": [f"सेहत की ऐसी परेशानी में क्या सुरक्षित है ये मैं नहीं बता सकता, इसलिए पहले डॉक्टर से पूछ लीजिए। मेरी लिस्ट में उम्र की कोई सीमा नहीं है; बाकी के लिए, {S}।",
+        "hi": [f"सेहत की ऐसी परेशानी में क्या सुरक्षित है ये मैं नहीं बता सकता, इसलिए पहले डॉक्टर से पूछ लीजिए। बाकी के लिए, {S}।",
                f"सेहत की किसी भी बात में पहले डॉक्टर की सलाह ज़रूरी है; आपके लिए क्या ठीक रहेगा ये मैं वादा नहीं कर सकता। {S}।"],
-        "hinglish": [f"Sehat ki aisi pareshani mein kya safe hai ye main nahi bata sakta, isliye pehle doctor se pooch lijiye. Meri list mein umar ki koi seema nahi hai; baaki ke liye, {S}.",
+        "hinglish": [f"Sehat ki aisi pareshani mein kya safe hai ye main nahi bata sakta, isliye pehle doctor se pooch lijiye. Baaki ke liye, {S}.",
                      f"Sehat ki kisi bhi baat mein pehle doctor ki salah zaroori hai; aapke liye kya theek rahega ye main vaada nahi kar sakta. {cap(S)}."],
     }[lang]
 

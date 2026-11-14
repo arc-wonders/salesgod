@@ -38,6 +38,7 @@ class FAQ(BaseModel):
 
 class Product(BaseModel):
     id: str = "claude-pro"
+    description: str = ""  # who wrote the facts: e.g. "operator demo facts" (authored by the operator for a demo; see docs/PRODUCT_FACTS_TODO.md)
     seller_name: str = "Anthropic"
     agent_name: str = "Arjun"
     product_name: str = "Claude Pro"
@@ -1069,7 +1070,7 @@ class ProductSalesDomain:
                                           (p.pitch_hinglish or p.pitch_hi) + " Abhi is pe {discount} chal raha hai. Price bataun?"))
         decided = ctx is not None and (ctx.has("payment_link") or ctx.decision != "undecided")
         price_core = bool(_PRICE_CORE.search(text)) and asks
-        pure_price = ((intent == "price" or price_core) and len(text.split()) <= 6 and bool(_PRICE_ASK.search(text))
+        pure_price = ((intent == "price" or price_core) and len(text.split()) <= 6 and bool(_PRICE_ASK.search(text)) and self._faq_match(text) is None
                       and d.get("last_intent") != "price"  # asked again = about something else (trainer cost)
                       and not decided and not _PRICE_DETAIL.search(text)
                       and not self._other_topic(text, u, intent)  # "personal trainer session कितने का?" is about the trainer
@@ -1077,7 +1078,7 @@ class ProductSalesDomain:
         if pure_price or (pending == "pitch" and plain_go_on):
             d["pending"] = "discovery"
             return self._price_plan(lang, known=bool(d.get("need_known")))
-        if price_core and quoted and len(text.split()) <= 10 and not decided and not _PRICE_DETAIL.search(text) and not _NEGOTIATE.search(text) \
+        if price_core and quoted and len(text.split()) <= 10 and not decided and self._faq_match(text) is None and not _PRICE_DETAIL.search(text) and not _NEGOTIATE.search(text) \
                 and not _HAGGLE.search(text) and not self._other_topic(text, u, intent) and (u is None or u.question_topic in ("offer_terms", "none")):
             # asked for the price again ("आपने बताया था, कितना था?"): the same fact, a new shape each time, never "I don't have it"
             n = int(d.get("price_again", "0"))
@@ -1188,6 +1189,7 @@ class ProductSalesDomain:
         haggle = _HAGGLE.search(text) or re.search(r"student|स्टूडेंट|(mein|me|में|for) (do|de do|दो|दे दो)\b|do na\b|दो ना|"
                                                    r"zyada hai|jyada hai|ज़्यादा है|ज्यादा है|mehenga|mehnga|महंगा|expensive|too much", text, re.I)
         if _PRICE_ASK.search(text) and not other_plan and not complaint and not haggle and (explicit_terms or not quoted_last) \
+                and self._faq_match(text) is None \
                 and not self._other_topic(text, u, intent) \
                 and (u is None or u.question_topic in ("offer_terms", "none", "product") or intent == "price"):
             lead = self._price_lead(text, lang)

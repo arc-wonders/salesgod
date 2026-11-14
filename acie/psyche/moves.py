@@ -392,7 +392,8 @@ def answer_again(mc: MoveContext, why: str = "") -> Move:
     if honest.NEGOTIATE.search(t):
         return _say(mc, "answer_fact", _by_lang(lambda l: honest.negotiate_variants(p, l)), slot="negotiate", note="Price is fixed; say so again in other words.")
     cat = build_catalog(p)
-    cands = [i for i in cat if _matches(i, t)] or ([i for i in cat if i.slot == "offer"] if _PRICE_Q.search(t) else [])
+    cands = sorted([i for i in cat if _matches(i, t)], key=lambda i: 0 if i.kind == "faq" else 1) \
+        or ([i for i in cat if i.slot == "offer"] if _PRICE_Q.search(t) else [])
     cands = [i for i in cands if mc.lang in i.text]
     if cands:
         it = cands[0]
@@ -483,8 +484,8 @@ def item_price_answer(p, text: str, lang: str) -> tuple[str, str] | None:
     """A price question that names something already described ("personal trainer कितने का?") is answered from
     the product facts (it is included), not with the membership price. Returns (benefit, text) or None. The benefit is
     spoken in the caller's language; with no translation the answer is skipped for that language (the LLM paraphrases)."""
-    if p is None or not _PRICE_WORDS.search(text):
-        return None
+    if p is None or not _PRICE_WORDS.search(text) or honest.covered_by_faq(p, text):
+        return None  # an approved FAQ answer (e.g. the rate of extra trainer sessions) beats the generic "it is included"
     low = text.lower()
     for w, b in sorted(item_words(p).items()):
         if re.search(r"(?<![\w\u0900-\u097f])" + re.escape(w), low):
