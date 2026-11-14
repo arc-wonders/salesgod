@@ -1,0 +1,53 @@
+from common import T
+
+GA_EN = "hello welcome to the bank how can i help you today"
+GA_HI = "नमस्ते, मैं बैंक की डिजिटल असिस्टेंट बोल रही हूँ, बताइए क्या मदद करूँ"
+GA_HG = "namaste main bank ki assistant bol rahi hoon bataiye kya madad karun"
+
+# ---------- greet ----------
+T("en", "hello", "greet", e=1, agent=None, notes="bare opener")
+T("en", "hello hello can you hear me hello", "greet", e=1, b=True, notes="line check, repetition typical of phone calls; not frustration")
+T("en", "hi yeah hi um", "greet", e=1, agent=GA_EN, notes="greeting with filler, no task yet")
+T("en", "good morning", "greet", e=1, notes="")
+T("en", "yes hello who is this", "greet", e=1, c=1, notes="caller unsure who they reached; mild confusion")
+T("en", "hey there okay so", "greet", e=1, agent=GA_EN, notes="trailing off, task not stated yet")
+T("hi", "हेलो", "greet", e=1, notes="")
+T("hi", "हां जी नमस्ते", "greet", e=1, agent=GA_HI, notes="polite rural/elderly opener")
+T("hi", "हेलो हेलो आवाज आ रही है", "greet", e=1, notes="line check; not confusion about content")
+T("hi", "हां बोलिए", "greet", e=1, agent=GA_HI, notes="caller treats it like an incoming call; greet-ish")
+T("hi", "राम राम जी", "greet", e=1, notes="rural greeting, no keyword like hello/namaste")
+T("hi", "हां हेलो जी बैंक से बोल रहे हो", "greet", e=1, notes="confirming who they reached")
+T("hinglish", "haan hello ji", "greet", e=1, notes="")
+T("hinglish", "hello haan ji namaskar", "greet", e=1, notes="")
+T("hinglish", "hello ji ye bank wala number hai na", "greet", e=1, c=1, notes="checking they dialled right; mild confusion")
+T("en", "hello hi i am calling from pune", "greet", e=1, notes="irrelevant detail, still greeting")
+
+# ---------- check_balance ----------
+T("en", "yeah i want to check my balance", "check_balance", notes="plain baseline")
+T("en", "uh how much money is there in my in my account", "check_balance", notes="no word 'balance'")
+T("en", "um can you tell me the balence in my savings", "check_balance", notes="ASR misspelling balence")
+T("en", "whats my balance", "check_balance", e=0, notes="curt but not frustrated, engagement low")
+T("en", "yeah i just want to know how much is left after the rent went out", "check_balance", e=2, notes="indirect balance request with context")
+T("en", "balance please quickly i'm driving", "check_balance", u=2, notes="urgency via situation not 'urgent'")
+T("en", "did my salary come in can you check", "check_balance", e=1, notes="balance intent phrased as credit check; ambiguous with unknown")
+T("en", "account balance", "check_balance", e=0, notes="two-word keyword style, low engagement")
+T("en", "i checked the app it shows something weird can you tell me the actual balance", "check_balance", c=1, e=2, notes="mild confusion about app, engaged")
+T("en", "hello yeah hi i need my available balance not the the ledger one", "check_balance", e=2, notes="greeting + task; false start; label task not greet")
+T("en", "how much do i have", "check_balance", notes="no account/balance words")
+T("en", "my balance sir what it is showing", "check_balance", notes="non-native English word order")
+T("hi", "मेरा बैलेंस बता दो", "check_balance", notes="English word in Devanagari")
+T("hi", "खाते में कितने पैसे हैं अभी", "check_balance", notes="no word balance")
+T("hi", "अकाउंट में कितना पड़ा है बताओ जरा", "check_balance", notes="colloquial 'pada hai'")
+T("hi", "हां वो बैलेंस चेक करना था", "check_balance", notes="")
+T("hi", "हेलो हां जी मेरा पैसा कितना है खाते में देख के बताओ", "check_balance", e=2, notes="greeting + task; elderly style")
+T("hi", "बेलेंस", "check_balance", e=0, notes="single word, ASR variant spelling")
+T("hi", "पेंशन आई कि नहीं देखो जरा", "check_balance", e=1, notes="elderly; pension credit check = balance; contains नहीं but not deny")
+T("hi", "मेरे अकाउंट में अभी कितना है जल्दी बताइए", "check_balance", u=1, notes="")
+T("hi", "बैलेंस कितना है मेरा वो सुबह पैसे डाले थे", "check_balance", e=2, notes="")
+T("hi", "हाँ बैलेंस", "check_balance", e=0, notes="minimal")
+T("hinglish", "mera balance kitna hai", "check_balance", notes="")
+T("hinglish", "account mein kitna paisa hai bhai", "check_balance", notes="")
+T("hinglish", "acha woh balance check karna tha", "check_balance", notes="")
+T("hinglish", "balence batao jaldi meeting hai", "check_balance", u=2, notes="ASR misspelling; urgency via meeting")
+T("hinglish", "kitna bacha hai account mein", "check_balance", notes="")
+T("hinglish", "haan ji mera balance bata dijiye aur kuch nahi", "check_balance", notes="'kuch nahi' is not deny")

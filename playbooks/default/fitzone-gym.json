@@ -1,0 +1,369 @@
+{
+ "tenant": "default",
+ "product_id": "fitzone-gym",
+ "generated_by": "claude-opus-5-5 (authored in session)",
+ "nodes": [
+  {
+   "id": "why_join",
+   "title": "asks why they should join / what they get",
+   "when": {
+    "keywords": [
+     "why (should|would) i",
+     "what.?s in it",
+     "what will i get",
+     "benefit",
+     "kya milega",
+     "kyu (lu|join)",
+     "fayda",
+     "क्या मिलेगा",
+     "क्यों (लूँ|join|जॉइन)",
+     "फायदा",
+     "फ़ायदा"
+    ],
+    "intents": [
+     "benefits",
+     "tell_more"
+    ],
+    "objections": []
+   },
+   "points": [
+    "Every week you get one free personal trainer session, so you always have a plan and correct form.",
+    "Unlimited group classes like yoga, zumba and HIIT are included, no extra charge.",
+    "It's open from 5 in the morning to 11 at night, so it fits around work or college.",
+    "Lockers and showers are there, and there's no joining fee in this offer."
+   ],
+   "points_hi": [
+    "हर हफ़्ते एक free personal trainer session मिलता है, तो आपके पास हमेशा plan और सही form रहता है।",
+    "Yoga, zumba और HIIT जैसी group classes unlimited हैं, कोई extra charge नहीं।",
+    "ये सुबह 5 से रात 11 बजे तक खुला रहता है, तो काम या college के हिसाब से आ सकते हैं।",
+    "Lockers और showers हैं, और इस offer में कोई joining fee नहीं है।"
+   ],
+   "ask": "What's your main goal: losing weight, building muscle, or staying fit?",
+   "ask_hi": "आपका main goal क्या है: weight कम करना, muscle बनाना, या fit रहना?",
+   "goal": "asks why they should join / what they get"
+  },
+  {
+   "id": "weight_loss",
+   "title": "wants to lose weight / get in shape",
+   "when": {
+    "keywords": [
+     "weight",
+     "वज़न",
+     "वजन",
+     "motapa",
+     "मोटापा",
+     "fat",
+     "pet",
+     "पेट",
+     "slim",
+     "patla",
+     "पतला",
+     "lose",
+     "kam karna",
+     "कम करना"
+    ],
+    "intents": [],
+    "objections": []
+   },
+   "points": [
+    "Weight loss works best with cardio plus strength, and the weekly trainer session gives you a plan for both.",
+    "Zumba and HIIT classes burn a lot of calories and are fun in a group.",
+    "The trainer does a free fitness assessment on day one, so you know where you start.",
+    "Most people see a difference in 6 to 8 weeks if they come 4 days a week."
+   ],
+   "points_hi": [
+    "Weight loss के लिए cardio और strength दोनों ज़रूरी हैं, और हर हफ़्ते का trainer session आपको दोनों का plan देता है।",
+    "Zumba और HIIT classes में calories खूब burn होती हैं, और group में मज़ा भी आता है।",
+    "पहले दिन trainer free fitness assessment करता है, तो पता चलता है कहाँ से शुरू करना है।",
+    "हफ़्ते में 4 दिन आने पर ज़्यादातर लोगों को 6-8 हफ़्ते में फ़र्क दिखने लगता है।"
+   ],
+   "ask": "How many days a week could you come?",
+   "ask_hi": "आप हफ़्ते में कितने दिन आ पाएँगे?",
+   "goal": "wants to lose weight / get in shape"
+  },
+  {
+   "id": "muscle",
+   "title": "wants to build muscle / strength / bench press",
+   "when": {
+    "keywords": [
+     "muscle",
+     "मसल",
+     "body bana",
+     "बॉडी",
+     "strength",
+     "bench",
+     "बेंच",
+     "squat",
+     "deadlift",
+     "weights",
+     "वेट",
+     "dumbbell",
+     "gain",
+     "bulk",
+     "protein"
+    ],
+    "intents": [],
+    "objections": []
+   },
+   "points": [
+    "The weights area has dumbbells, barbells, benches for bench press, a squat rack, cable machines and leg press.",
+    "The free weekly trainer session helps you with form and a progressive plan, so you get stronger safely.",
+    "Open 5 am to 11 pm, so the weights are usually free early morning or late night."
+   ],
+   "points_hi": [
+    "Weights area में dumbbells, barbells, bench press के लिए benches, squat rack, cable machines और leg press हैं।",
+    "हर हफ़्ते का free trainer session form और progressive plan में मदद करता है, तो आप safely strong बनते हैं।",
+    "सुबह 5 से रात 11 तक खुला है, तो सुबह-सुबह या देर रात weights आमतौर पर खाली मिलते हैं।"
+   ],
+   "ask": "Have you lifted before, or would you be starting fresh?",
+   "ask_hi": "आपने पहले weights किए हैं, या नए सिरे से शुरू करेंगे?",
+   "goal": "wants to build muscle / strength / bench press"
+  },
+  {
+   "id": "trainer",
+   "title": "asks about personal trainer cost or sessions",
+   "when": {
+    "keywords": [
+     "trainer",
+     "ट्रेनर",
+     "personal training",
+     "पर्सनल",
+     "coach",
+     "कोच",
+     "session",
+     "सेशन"
+    ],
+    "intents": [],
+    "objections": []
+   },
+   "points": [
+    "One personal trainer session every week is free with the membership.",
+    "Extra personal training beyond that is charged separately; the exact rate is shown at the front desk, I don't want to quote a wrong number.",
+    "In the free session the trainer sets your plan and checks your form."
+   ],
+   "points_hi": [
+    "Membership के साथ हर हफ़्ते एक personal trainer session free है।",
+    "उसके अलावा extra personal training का charge अलग है; सही rate front desk पर बताया जाता है, मैं ग़लत number नहीं बताना चाहता।",
+    "Free session में trainer आपका plan बनाता है और form check करता है।"
+   ],
+   "ask": "Would one free session a week be enough to start?",
+   "ask_hi": "शुरुआत के लिए हफ़्ते का एक free session ठीक रहेगा?",
+   "goal": "asks about personal trainer cost or sessions"
+  },
+  {
+   "id": "price_high",
+   "title": "says it's too expensive",
+   "when": {
+    "keywords": [
+     "expensive",
+     "mehenga",
+     "महंगा",
+     "महँगा",
+     "zyada hai",
+     "ज़्यादा है",
+     "ज्यादा है",
+     "kam karo",
+     "कम करो",
+     "discount",
+     "sasta",
+     "सस्ता",
+     "afford"
+    ],
+    "intents": [],
+    "objections": [
+     "price"
+    ]
+   },
+   "points": [
+    "It's already 50% off: ₹2,999 for 3 months instead of ₹6,000, that's about ₹33 a day.",
+    "That includes a free trainer session every week and unlimited classes, which usually cost extra elsewhere.",
+    "There's no joining fee in this offer, and you can freeze it for up to 15 days if you travel."
+   ],
+   "points_hi": [
+    "ये पहले से 50% off है: ₹6,000 की जगह 3 महीने के ₹2,999, यानी रोज़ के लगभग ₹33।",
+    "इसमें हर हफ़्ते free trainer session और unlimited classes हैं, जो दूसरी जगह अक्सर अलग से लगते हैं।",
+    "इस offer में कोई joining fee नहीं है, और बाहर जाना हो तो 15 दिन तक freeze कर सकते हैं।"
+   ],
+   "ask": "If it fit your schedule, would ₹33 a day be okay?",
+   "ask_hi": "अगर timing सही बैठे, तो रोज़ के ₹33 ठीक लगेंगे?",
+   "goal": "says it's too expensive"
+  },
+  {
+   "id": "time_schedule",
+   "title": "worries about time / busy schedule",
+   "when": {
+    "keywords": [
+     "time nahi",
+     "टाइम नहीं",
+     "busy",
+     "बिजी",
+     "schedule",
+     "office",
+     "job",
+     "shift",
+     "subah",
+     "सुबह",
+     "raat",
+     "रात",
+     "timing",
+     "टाइमिंग"
+    ],
+    "intents": [],
+    "objections": [
+     "timing"
+    ]
+   },
+   "points": [
+    "It's open from 5 am to 11 pm, so you can come before or after work.",
+    "Even 45 minutes, 3 or 4 days a week, makes a real difference.",
+    "Group classes run at fixed times, which helps you stick to a routine."
+   ],
+   "points_hi": [
+    "ये सुबह 5 से रात 11 तक खुला है, तो काम से पहले या बाद में आ सकते हैं।",
+    "हफ़्ते में 3-4 दिन 45 मिनट भी असली फ़र्क लाते हैं।",
+    "Group classes fixed time पर होती हैं, जिससे routine बना रहता है।"
+   ],
+   "ask": "Morning or evening, which suits you better?",
+   "ask_hi": "सुबह या शाम, आपके लिए कौन सा time सही रहेगा?",
+   "goal": "worries about time / busy schedule"
+  },
+  {
+   "id": "beginner",
+   "title": "beginner / nervous / never been to a gym",
+   "when": {
+    "keywords": [
+     "beginner",
+     "first time",
+     "pehli baar",
+     "पहली बार",
+     "never",
+     "kabhi nahi",
+     "कभी नहीं",
+     "darr",
+     "डर",
+     "sharm",
+     "शर्म",
+     "nervous",
+     "नया"
+    ],
+    "intents": [],
+    "objections": []
+   },
+   "points": [
+    "The trainer does a free assessment on day one and starts you at your level.",
+    "Yoga and zumba classes are beginner friendly and a nice way to start.",
+    "Lots of members are beginners; nobody judges, everyone starts somewhere."
+   ],
+   "points_hi": [
+    "पहले दिन trainer free assessment करके आपको आपके level से शुरू कराता है।",
+    "Yoga और zumba classes beginners के लिए अच्छी हैं, शुरुआत का बढ़िया तरीका।",
+    "बहुत से members beginners हैं; कोई judge नहीं करता, सब कहीं से शुरू करते हैं।"
+   ],
+   "ask": "Would you like to start with a class or with the trainer?",
+   "ask_hi": "आप class से शुरू करना चाहेंगे या trainer के साथ?",
+   "goal": "beginner / nervous / never been to a gym"
+  },
+  {
+   "id": "location",
+   "title": "asks where the gym is / how far",
+   "when": {
+    "keywords": [
+     "where",
+     "kahan",
+     "कहाँ",
+     "कहां",
+     "location",
+     "address",
+     "पता",
+     "near",
+     "paas",
+     "पास",
+     "door",
+     "दूर",
+     "branch",
+     "ब्रांच"
+    ],
+    "intents": [],
+    "objections": []
+   },
+   "points": [
+    "We have branches across the city; the SMS shows the one nearest you.",
+    "You can walk into any branch to see it before joining."
+   ],
+   "points_hi": [
+    "शहर में हमारी कई branches हैं; SMS में आपके सबसे पास वाली branch दिखेगी।",
+    "Join करने से पहले आप किसी भी branch में जाकर देख सकते हैं।"
+   ],
+   "ask": "Which area do you live in?",
+   "ask_hi": "आप किस area में रहते हैं?",
+   "goal": "asks where the gym is / how far"
+  },
+  {
+   "id": "trust",
+   "title": "doubts it's genuine / why so cheap",
+   "when": {
+    "keywords": [
+     "fraud",
+     "scam",
+     "fake",
+     "नकली",
+     "फ्रॉड",
+     "धोखा",
+     "sasta kyu",
+     "सस्ता क्यों",
+     "इतना सस्ता",
+     "itna sasta",
+     "genuine",
+     "असली"
+    ],
+    "intents": [],
+    "objections": [
+     "trust"
+    ]
+   },
+   "points": [
+    "It's a launch offer for people who join this week, that's why it's 50% off.",
+    "Nothing is charged on this call; you pay only at the gym or through the official link.",
+    "You can visit the nearest branch first and see it yourself."
+   ],
+   "points_hi": [
+    "ये इस हफ़्ते join करने वालों के लिए launch offer है, इसलिए 50% off है।",
+    "इस call पर कुछ नहीं कटता; पेमेंट सिर्फ़ gym पर या official link से होता है।",
+    "आप पहले पास वाली branch जाकर खुद देख सकते हैं।"
+   ],
+   "ask": "Would you like to visit the branch first?",
+   "ask_hi": "क्या आप पहले branch देखना चाहेंगे?",
+   "goal": "doubts it's genuine / why so cheap"
+  },
+  {
+   "id": "how_to_join",
+   "title": "asks how to join / ready",
+   "when": {
+    "keywords": [
+     "join",
+     "जॉइन",
+     "kaise (join|le|karu|karun)",
+     "कैसे (join|जॉइन|लूँ|करूँ)",
+     "register",
+     "membership le",
+     "sign up",
+     "start kar",
+     "शुरू कर"
+    ],
+    "intents": [],
+    "objections": []
+   },
+   "points": [
+    "I can send a link by SMS to this number; you open it and complete the joining, or just walk into the nearest branch.",
+    "On day one the trainer does your free fitness assessment and makes your plan."
+   ],
+   "points_hi": [
+    "मैं इसी नंबर पर SMS से link भेज सकता हूँ; उसे खोलकर joining पूरी कीजिए, या पास वाली branch में चले जाइए।",
+    "पहले दिन trainer आपका free fitness assessment करके plan बनाता है।"
+   ],
+   "ask": "Shall I send the link to this number?",
+   "ask_hi": "क्या मैं इसी नंबर पर link भेज दूँ?",
+   "goal": "asks how to join / ready"
+  }
+ ]
+}

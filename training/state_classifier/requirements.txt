@@ -1,0 +1,8 @@
+# Training / inference for the ACIE turn classifier. Install in a SEPARATE env on the GPU box,
+# not in the project .venv (the live pipeline does not need torch unless this model is deployed).
+# Pick the torch wheel matching the box's CUDA (A100 + CUDA 12.x shown).
+--extra-index-url https://download.pytorch.org/whl/cu124
+torch>=2.4
+transformers>=4.44,<5
+sentencepiece>=0.2   # xlm-roberta tokenizer
+protobuf>=4          # some tokenizer conversions

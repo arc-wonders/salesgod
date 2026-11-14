@@ -1,0 +1,370 @@
+{
+ "claude-pro": {
+  "id": "claude-pro",
+  "seller_name": "Anthropic",
+  "agent_name": "Arjun",
+  "product_name": "Claude Pro",
+  "one_liner": "an AI assistant for writing, coding, research and analysis",
+  "original_price": "$20 per month",
+  "offer_price": "$8 per month",
+  "discount": "60% off",
+  "offer_validity": "for the first 3 months",
+  "benefits": [
+   "much higher usage than the free plan",
+   "access to the most capable Claude models",
+   "Projects to organise your documents and chats"
+  ],
+  "call_to_action": "send you a payment link on SMS",
+  "pitch_hi": "Claude Pro एक AI असिस्टेंट है जो लिखने, कोडिंग और रिसर्च में मदद करता है, और इसमें फ्री प्लान से कहीं ज़्यादा इस्तेमाल मिलता है।",
+  "pitch_hinglish": "Claude Pro ek AI assistant hai jo likhne, coding aur research mein madad karta hai, aur isme free plan se kahin zyada usage milta hai.",
+  "pitch_en": "Claude Pro is an AI assistant for writing, coding and research, with far more usage than the free plan.",
+  "knowledge": "Claude is an AI assistant made by Anthropic. People use it by typing or talking to it to write and edit text, write and debug code, analyse documents and data, research topics and brainstorm. It works on the web (claude.ai), on iPhone and Android apps and on desktop. Claude Pro is the paid individual plan: much more usage than the free plan, access to more models, and Projects to keep documents and chats together. It is software, not a physical product; nothing is shipped. Limits: it cannot create images or videos (it can read and understand images, PDFs and files you upload); it needs the internet, there is no offline mode; it cannot make bookings, payments or phone calls for you. A Pro subscription is for one person's account and should not be shared; groups use the separate Team plan. Students, writers, developers and small businesses use it; it can explain homework step by step. This offer is for new Pro subscriptions: someone who already pays for Pro keeps their current plan and price, and someone on the free plan can take the offer. Many people use Claude alongside other assistants such as ChatGPT; people often pick Claude for careful writing, working with long documents and coding help. Coding: it explains problems step by step, helps debug, and can read long code files; good for practising DSA. It writes and edits reports and assignments and works in Hindi and many other languages. Privacy: Anthropic may use chats to improve its models only if the user allows it; each user chooses this in their privacy settings, and the full policy is at anthropic.com/privacy (say exactly this; do not claim it never uses data). Billing: there is also yearly billing that works out cheaper per month (exact price on the pricing page). There is no separate student discount in this offer; the discount already applies. Cancelling stops the next renewal and access continues until the end of the paid month; refunds follow the policy on the website. Anthropic is a real AI safety and research company, founded in 2021 and based in San Francisco, that makes Claude; the official site is anthropic.com. The payment page shows the payment methods; card works, and other methods depend on what the page shows (do not promise UPI or any specific method). The payment link comes by SMS to the number we called. Renewal: the subscription renews automatically every month; after the first 3 months it renews at $20 a month until the user cancels (say this plainly if asked whether money is taken automatically). Models: Pro includes Anthropic's latest Claude models, including the most capable Opus and the fast Sonnet; usage is roughly five times the free plan, counted in sessions that reset every five hours; the exact number of messages depends on their length, so there is no fixed message count (say so plainly). The $8 offer is only for the monthly plan. Yearly billing is listed at about $200 a year (about $17 a month) with no extra offer; Team plan prices are on the website. The SMS with the link usually arrives within a couple of minutes and opens Anthropic's official claude.ai page. Receipts and invoices for each payment are available in the account's billing settings. For a shop or small business it helps: GST calculations, bill formats, lists of dues (udhaari), and drafting WhatsApp or SMS messages to customers (it writes them, the user sends them); the user should check the numbers. Tally (टैली/टेली) is accounting software; Claude is not a replacement for Tally, but helps alongside it. OTP: on the payment page the user's own bank may send an OTP to approve the payment; it must never be shared with anyone, including this call. If an existing subscriber asks whether cancelling and signing up again with a new account would get the offer: you don't know that and must not promise it. Colleagues or friends who don't have Pro yet can each take this offer on their own account. The SMS comes from Anthropic, not from a bank, and the link opens Anthropic's own claude.ai payment page. Never suggest making another account or email to get the offer, and never claim what is or isn't allowed for second accounts; you can't confirm those rules. If asked where we got their number: you don't have details of the list's source; offer to remove the number.",
+  "topic_words": [
+   "claude",
+   "क्लॉड",
+   "क्लाउड",
+   "cloud",
+   "pro",
+   "प्रो",
+   "ai",
+   "एआई",
+   "assistant",
+   "असिस्टेंट",
+   "subscription",
+   "सब्सक्रिप्शन",
+   "plan",
+   "प्लान",
+   "offer",
+   "ऑफर",
+   "app",
+   "ऐप",
+   "chatgpt",
+   "anthropic",
+   "model",
+   "मॉडल",
+   "it",
+   "this",
+   "ये",
+   "यह",
+   "इसमें",
+   "इसका",
+   "इसको",
+   "इसे",
+   "isme",
+   "iska",
+   "isko",
+   "ise",
+   "ye",
+   "yeh"
+  ],
+  "faqs": [
+   {
+    "keywords": [
+     "already using claude",
+     "already use claude",
+     "already have claude",
+     "already have pro",
+     "already subscribed",
+     "already a subscriber",
+     "pehle se le rakha",
+     "पहले से ले रखा",
+     "पहले से इस्तेमाल",
+     "पहले से यूज़",
+     "existing",
+     "already pay",
+     "already paying",
+     "current plan",
+     "pro le rakha",
+     "pro पहले से",
+     "re:already .{0,25}(claude|pro|क्लॉड|प्रो)",
+     "re:(claude|pro|क्लॉड|प्रो) .{0,25}(use|यूज़|यूज|इस्तेमाल) (kar|कर)",
+     "pehle se pro",
+     "पहले से pro",
+     "पहले से प्रो",
+     "claude use kar raha",
+     "क्लॉड इस्तेमाल कर रहा",
+     "क्लॉड यूज़ कर रहा"
+    ],
+    "answer": "Thanks for using Claude! This offer is for new Pro subscriptions; if you already pay for Pro, your plan stays as it is",
+    "answer_hi": "Claude इस्तेमाल करने के लिए शुक्रिया! ये ऑफर नए Pro सब्सक्रिप्शन के लिए है; अगर आप पहले से Pro लेते हैं, तो आपका प्लान वैसा ही रहेगा",
+    "not_eligible": true
+   },
+   {
+    "keywords": [
+     "fake",
+     "nakli",
+     "नकली",
+     "scam",
+     "fraud",
+     "फ्रॉड",
+     "genuine",
+     "असली",
+     "asli",
+     "real hai",
+     "so cheap",
+     "सस्ता",
+     "sasta",
+     "itna kam",
+     "इतना कम",
+     "धोखा",
+     "dhokha"
+    ],
+    "answer": "Fair question. It's a genuine intro discount for the first 3 months; you pay only through a secure link, and can cancel any time",
+    "answer_hi": "अच्छा सवाल है। ये पहले तीन महीने का असली intro डिस्काउंट है, पेमेंट सिर्फ़ सुरक्षित लिंक से होता है, और आप कभी भी cancel कर सकते हैं",
+    "not_eligible": false
+   },
+   {
+    "keywords": [
+     "how to pay",
+     "how do i pay",
+     "how can i pay",
+     "how to buy",
+     "how do i buy",
+     "kaise kharid",
+     "कैसे खरीद",
+     "कैसे पेमेंट",
+     "पेमेंट कैसे",
+     "पेवेंट कैसे",
+     "kaise pay",
+     "payment kaise",
+     "kaise le"
+    ],
+    "answer": "I'll send a secure payment link by SMS to this number; you open it and pay on the official page with the methods shown there, usually a card; nothing is taken on this call",
+    "answer_hi": "मैं इसी नंबर पर SMS से एक सुरक्षित पेमेंट लिंक भेजूँगा, उसे खोलकर ऑफिशियल पेज पर वहाँ दिखाए गए तरीके से, आमतौर पर कार्ड से, पेमेंट होता है; इस कॉल पर कुछ नहीं लिया जाता",
+    "not_eligible": false
+   },
+   {
+    "keywords": [
+     "train",
+     "training",
+     "my data",
+     "privacy",
+     "प्राइवेसी",
+     "डेटा",
+     "डाटा",
+     "data use",
+     "chats use"
+    ],
+    "answer": "Only if you allow it: your privacy settings have an option that controls whether your chats are used to improve the models, and you can switch it off any time",
+    "answer_hi": "सिर्फ़ तब, जब आप इजाज़त दें: आपकी privacy settings में एक option है जिससे तय होता है कि आपकी chats मॉडल सुधारने में इस्तेमाल हों या नहीं, और आप उसे कभी भी बंद कर सकते हैं",
+    "not_eligible": false
+   },
+   {
+    "keywords": [
+     "cancel",
+     "band kar",
+     "बंद कर",
+     "रद्द",
+     "कैंसल"
+    ],
+    "answer": "You can cancel any time in your claude.ai settings, under billing; you keep access until the end of the month you've paid for, and nothing more is charged",
+    "answer_hi": "आप कभी भी claude.ai की settings में billing से cancel कर सकते हैं; जिस महीने का पैसा दिया है उसके आख़िर तक इस्तेमाल चलता रहेगा, और आगे कुछ नहीं कटेगा",
+    "not_eligible": false
+   },
+   {
+    "keywords": [
+     "re:(student|स्टूडेंट|छात्र).{0,25}(discount|डिस्काउंट|offer|ऑफर|छूट|sasta|सस्ता|kam|कम)",
+     "re:(discount|डिस्काउंट|छूट).{0,25}(student|स्टूडेंट|छात्र)"
+    ],
+    "answer": "There's no separate student discount; this offer is the same for everyone, and it's already 60% off for the first 3 months",
+    "answer_hi": "अलग से student discount नहीं है; ये ऑफर सबके लिए एक जैसा है, और पहले 3 महीने पहले से 60% off है",
+    "not_eligible": false
+   },
+   {
+    "keywords": [
+     "hindi",
+     "हिंदी",
+     "language",
+     "bhasha",
+     "भाषा"
+    ],
+    "answer": "It understands and replies in Hindi and many other languages",
+    "answer_hi": "ये हिंदी समेत कई भाषाएँ समझता है और उनमें जवाब देता है",
+    "not_eligible": false
+   },
+   {
+    "keywords": [
+     "free",
+     "फ्री",
+     "muft",
+     "मुफ्त"
+    ],
+    "answer": "There is a free plan, but Pro gives much more usage and the best models",
+    "answer_hi": "फ्री प्लान भी है, पर Pro में कहीं ज़्यादा इस्तेमाल और सबसे अच्छे मॉडल मिलते हैं",
+    "not_eligible": false
+   }
+  ],
+  "max_reoffers": 1,
+  "style": "natural",
+  "tone": "warm, respectful and conversational, like a helpful person, never pushy",
+  "price_note": "about ₹700 a month for the first 3 months, then about ₹1,700 a month, at today's exchange rate; the exact amount with taxes is shown on the payment page",
+  "rupee_terms": {
+   "en": "that's about ₹700 a month, then about ₹1,700",
+   "hi": "यानी लगभग 700 रुपये महीना, फिर लगभग 1,700 रुपये",
+   "hinglish": "yaani lagbhag 700 rupaye mahina, phir lagbhag 1,700"
+  },
+  "renewal_note": {
+   "en": "The discount is only for the first 3 months; after that it renews automatically at $20 a month until you cancel, and you can cancel any time.",
+   "hi": "छूट सिर्फ़ पहले 3 महीने है; उसके बाद अपने आप $20 महीना लगेगा, जब तक आप cancel न करें, और cancel कभी भी कर सकते हैं।",
+   "hinglish": "Discount sirf pehle 3 mahine hai; uske baad apne aap $20 mahina lagega jab tak aap cancel na karein, aur cancel kabhi bhi kar sakte hain."
+  },
+  "annual_note": {
+   "en": "Yearly billing is about $200 a year, around $17 a month; this $8 offer is only for the monthly plan.",
+   "hi": "सालाना प्लान लगभग $200 साल का है, यानी करीब $17 महीना; ये $8 वाला ऑफर सिर्फ़ मंथली प्लान पर है।",
+   "hinglish": "Yearly plan lagbhag $200 saal ka hai, yaani kareeb $17 mahina; ye $8 wala offer sirf monthly plan pe hai."
+  },
+  "allowed_numbers": [
+   "+917838982010",
+   "+919990883280"
+  ],
+  "pronunciations": {
+   "Anthropic": "एन्थ्रॉपिक",
+   "Claude": "क्लॉड",
+   "SMS": "एस एम एस",
+   "AI": "ए आई",
+   "Pro": "प्रो"
+  },
+  "payment_link": "https://claude.ai/upgrade",
+  "sms_text": "",
+  "terms": {},
+  "discovery_question": {
+   "en": "What would you mainly use it for?",
+   "hi": "आप इसे ज़्यादातर किस काम के लिए इस्तेमाल करेंगे?",
+   "hinglish": "Aap ise zyadatar kis kaam ke liye use karenge?"
+  },
+  "tenant": "default",
+  "use_playbook": true
+ },
+ "fitzone-gym": {
+  "id": "fitzone-gym",
+  "seller_name": "FitZone",
+  "agent_name": "Arjun",
+  "product_name": "FitZone membership",
+  "one_liner": "a gym membership with trainers and group classes",
+  "original_price": "₹6,000 for 3 months",
+  "offer_price": "₹2,999 for 3 months",
+  "discount": "50% off",
+  "offer_validity": "if you join this week",
+  "benefits": [
+   "a free personal trainer session every week",
+   "unlimited group classes like yoga and zumba",
+   "open from 5 am to 11 pm"
+  ],
+  "call_to_action": "send you the joining link on SMS",
+  "pitch_hi": "FitZone एक जिम है जहाँ ट्रेनर, योगा और ज़ुम्बा क्लासेस मिलती हैं, और ये सुबह पाँच से रात ग्यारह बजे तक खुला रहता है।",
+  "pitch_hinglish": "Claude Pro ek AI assistant hai jo likhne, coding aur research mein madad karta hai, aur isme free plan se kahin zyada usage milta hai.",
+  "pitch_en": "FitZone is a gym with trainers and yoga and zumba classes, open from 5 in the morning to 11 at night.",
+  "knowledge": "FitZone is a neighbourhood gym chain (demo product). Membership includes gym floor access, cardio and weights, group classes (yoga, zumba, HIIT), one free personal trainer session per week, lockers and showers. Members can freeze the membership for up to 15 days. There is no joining fee in this offer. Equipment: cardio machines (treadmills, cycles, cross-trainers), free weights (dumbbells, barbells, plates), benches for bench press, a squat rack, cable machines and leg press. Personal training beyond the one free session a week is charged separately; the exact rate is shown at the front desk (never invent a price). Joining: open the link sent by SMS or walk into the nearest branch; the trainer does a free fitness assessment on day one.",
+  "topic_words": [
+   "gym",
+   "जिम",
+   "fitzone",
+   "फिटज़ोन",
+   "membership",
+   "मेंबरशिप",
+   "trainer",
+   "ट्रेनर",
+   "yoga",
+   "योगा",
+   "zumba",
+   "ज़ुम्बा",
+   "workout",
+   "exercise",
+   "कसरत",
+   "it",
+   "this",
+   "ये",
+   "यह",
+   "इसमें",
+   "isme",
+   "ye",
+   "yeh"
+  ],
+  "faqs": [
+   {
+    "keywords": [
+     "location",
+     "kahan",
+     "कहाँ",
+     "कहां",
+     "address",
+     "पता",
+     "near"
+    ],
+    "answer": "We have branches across the city; the SMS will show the one nearest you",
+    "answer_hi": "हमारी कई ब्रांच हैं, SMS में आपके सबसे पास वाली ब्रांच का पता आ जाएगा",
+    "not_eligible": false
+   },
+   {
+    "keywords": [
+     "freeze",
+     "pause",
+     "रोक",
+     "band",
+     "holiday"
+    ],
+    "answer": "You can freeze the membership for up to 15 days",
+    "answer_hi": "आप मेंबरशिप पंद्रह दिन तक रोक सकते हैं",
+    "not_eligible": false
+   },
+   {
+    "keywords": [
+     "joining fee",
+     "extra",
+     "hidden",
+     "छुपा",
+     "अलग से"
+    ],
+    "answer": "There is no joining fee in this offer",
+    "answer_hi": "इस ऑफर में कोई जॉइनिंग फीस नहीं है",
+    "not_eligible": false
+   },
+   {
+    "keywords": [
+     "fake",
+     "nakli",
+     "नकली",
+     "scam",
+     "fraud",
+     "सस्ता",
+     "sasta",
+     "itna kam"
+    ],
+    "answer": "Fair question. It is our launch offer for this week, you pay only at the gym or through the official link, nothing is charged on this call",
+    "answer_hi": "अच्छा सवाल है। ये इस हफ्ते का लॉन्च ऑफर है, पेमेंट सिर्फ़ जिम पर या ऑफिशियल लिंक से होता है, इस कॉल पर कुछ नहीं कटता",
+    "not_eligible": false
+   }
+  ],
+  "max_reoffers": 1,
+  "style": "natural",
+  "tone": "warm, respectful and conversational, like a helpful person, never pushy",
+  "price_note": "",
+  "rupee_terms": {},
+  "renewal_note": {
+   "en": "The offer price is for the first 3 months; after that it's ₹6,000 for 3 months, and you can cancel any time.",
+   "hi": "Offer वाली कीमत पहले 3 महीने की है; उसके बाद 3 महीने के ₹6,000 लगेंगे, और कभी भी cancel कर सकते हैं।",
+   "hinglish": "Offer wali keemat pehle 3 mahine ki hai; uske baad 3 mahine ke ₹6,000 lagenge, aur kabhi bhi cancel kar sakte hain."
+  },
+  "annual_note": {},
+  "allowed_numbers": [],
+  "pronunciations": {
+   "FitZone": "फिटज़ोन",
+   "SMS": "एस एम एस",
+   "AI": "ए आई"
+  },
+  "payment_link": "https://claude.ai/upgrade",
+  "sms_text": "{seller}: your {product} offer at {offer_price}. Pay securely at {link} . Never share OTP or card details on a call.",
+  "terms": {
+   "en": "₹2,999 for 3 months if you join this week, then ₹6,000 for 3 months",
+   "hi": "इस हफ़्ते join करने पर 3 महीने के ₹2,999, उसके बाद 3 महीने के ₹6,000",
+   "hinglish": "is hafte join karne par 3 mahine ke ₹2,999, uske baad 3 mahine ke ₹6,000"
+  },
+  "discovery_question": {
+   "en": "What's your fitness goal: losing weight, building muscle, or just staying fit?",
+   "hi": "आपका fitness goal क्या है: weight कम करना, muscle बनाना, या बस fit रहना?",
+   "hinglish": "Aapka fitness goal kya hai: weight kam karna, muscle banana, ya bas fit rehna?"
+  },
+  "tenant": "default",
+  "use_playbook": true
+ }
+}

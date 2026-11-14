@@ -1,0 +1,26 @@
+{
+ "spread": {
+  "pitch": 0.982,
+  "pitch_var": 0.556,
+  "loudness": 1.334,
+  "effort": 1.688,
+  "rate": 0.618
+ },
+ "default_spread": {
+  "pitch": 1.5,
+  "pitch_var": 0.6,
+  "loudness": 3.0,
+  "effort": 2.5,
+  "rate": 0.9
+ },
+ "calls": 16,
+ "turns": 98,
+ "speaker": {
+  "same_caller_sim_p10": 0.402,
+  "same_caller_sim_median": 0.572,
+  "other_caller_sim_p90": 0.82,
+  "other_caller_sim_max": 0.911
+ },
+ "feature_ms_per_audio_s": 7.8,
+ "fitted_at": "2026-11-14 22:01"
+}

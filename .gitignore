@@ -1,0 +1,13 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+data/profiles/
+*.egg-info/
+data/sft/prompts.jsonl
+data/voice/calls/
+data/voice/profiles/
+data/voice/sims/
+data/voice/calls/
+runs/
+models/

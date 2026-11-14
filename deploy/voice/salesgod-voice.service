@@ -1,0 +1,15 @@
+[Unit]
+Description=salesgod voice server (Plivo + Whisper + ACIE + Fish TTS)
+After=network-online.target salesgod-llm.service
+
+[Service]
+User=salesgod
+WorkingDirectory=/opt/salesgod/app
+EnvironmentFile=/opt/salesgod/.env
+Environment=HF_HOME=/opt/salesgod/hf
+ExecStart=/bin/bash -c 'SP=$(/opt/salesgod/venv/bin/python -c "import site;print(site.getsitepackages()[0])"); export LD_LIBRARY_PATH=$SP/nvidia/cublas/lib:$SP/nvidia/cudnn/lib; exec /opt/salesgod/venv/bin/uvicorn voice.server:app --host 127.0.0.1 --port 8080 --proxy-headers --ws-ping-interval 20'
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>salesgod voice</title>
+<style>
+:root{--bg:#f6f7f9;--card:#fff;--ink:#16181d;--mute:#6b7280;--line:#e5e7eb;--acc:#2f6fed;--ok:#15803d;--bad:#b91c1c;--warn:#b45309;--chip:#eef2ff}
+@media (prefers-color-scheme: dark){:root{--bg:#0f1115;--card:#171a21;--ink:#e8eaee;--mute:#9aa1ad;--line:#262b35;--acc:#6b9bff;--ok:#4ade80;--bad:#f87171;--warn:#fbbf24;--chip:#1e2533}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+header{display:flex;align-items:center;gap:12px;padding:14px 20px;border-bottom:1px solid var(--line);background:var(--card)}
+header h1{font-size:16px;margin:0}header .sub{color:var(--mute);font-size:12px}
+main{display:grid;grid-template-columns:340px 1fr;gap:16px;padding:16px;max-width:1400px;margin:0 auto}
+@media (max-width:900px){main{grid-template-columns:1fr}}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px}
+label{display:block;font-size:12px;color:var(--mute);margin:10px 0 4px}
+textarea,select,input{width:100%;padding:8px;border:1px solid var(--line);border-radius:7px;background:var(--bg);color:var(--ink);font:inherit}
+button{background:var(--acc);color:#fff;border:0;border-radius:7px;padding:9px 14px;font:inherit;font-weight:600;cursor:pointer}
+button.ghost{background:transparent;color:var(--bad);border:1px solid var(--line);padding:4px 10px;font-weight:500}
+.row{display:flex;gap:8px}.row>*{flex:1}
+.calls{display:flex;flex-direction:column;gap:6px;max-height:60vh;overflow:auto;margin-top:8px}
+.ci{padding:8px 10px;border:1px solid var(--line);border-radius:8px;cursor:pointer;display:flex;justify-content:space-between;gap:8px}
+.ci.sel{border-color:var(--acc)}.ci small{color:var(--mute)}
+.st{font-size:11px;padding:1px 7px;border-radius:99px;background:var(--chip)}
+.st.live{background:var(--ok);color:#fff}.st.failed{background:var(--bad);color:#fff}
+.tr{display:flex;flex-direction:column;gap:10px}
+.msg{max-width:85%;padding:9px 12px;border-radius:10px;border:1px solid var(--line)}
+.msg.customer{align-self:flex-end;background:var(--chip)}
+.msg.agent{align-self:flex-start}
+.meta{font-size:11px;color:var(--mute);margin-top:5px;display:flex;flex-wrap:wrap;gap:4px 10px}
+.chip{font-size:11px;background:var(--chip);border-radius:5px;padding:0 6px}
+.bar{display:inline-block;width:46px;height:6px;background:var(--line);border-radius:3px;vertical-align:middle;overflow:hidden}
+.bar i{display:block;height:100%;background:var(--warn)}
+.ev{font-size:12px;color:var(--mute);text-align:center}
+.err{color:var(--bad)}
+#login{max-width:340px;margin:12vh auto}
+.hidden{display:none}
+</style>
+</head>
+<body>
+<div id="login" class="card hidden">
+  <h2 style="margin-top:0">salesgod voice</h2>
+  <label>Password</label><input id="pw" type="password" autofocus>
+  <div style="margin-top:12px"><button onclick="doLogin()">Sign in</button> <span id="lerr" class="err"></span></div>
+</div>
+<div id="appv" class="hidden">
+<header><h1>salesgod voice</h1><span class="sub" id="from"></span></header>
+<main>
+  <div>
+    <div class="card">
+      <b>Start calls</b>
+      <label>Phone numbers (one per line, +91…)</label>
+      <textarea id="numbers" rows="4" placeholder="+919876543210"></textarea>
+      <label>Campaign</label><select id="campaign" onchange="campChanged()"></select>
+      <div id="bankopts"><label>Bank demo customer</label><select id="cust"><option value="c1">c1 Rahul (₹25k left, card-eligible)</option><option value="c2">c2 Priya (₹12k, not eligible)</option></select></div>
+      <div id="prodopts"><label>Customer name (optional)</label><input id="cname" placeholder="e.g. Yash">
+      <label>Customer age (optional)</label><input id="cage" type="number" min="10" max="110" placeholder="e.g. 21"></div>
+      <div class="row">
+        <div><label>Opening language</label><select id="lang"><option value="hi">Hindi</option><option value="en">English</option><option value="hinglish">Hinglish</option></select></div>
+        <div><label>Expression</label><select id="backend"><option value="llm">Qwen LLM</option><option value="template">Templates</option></select></div>
+      </div>
+      <label style="display:flex;gap:6px;align-items:center"><input type="checkbox" id="allowf" style="width:auto"> call anyway if the number is safety-flagged</label>
+      <div style="margin-top:12px"><button onclick="startCalls()">Call</button> <span id="cerr" class="err"></span></div>
+    </div>
+    <div class="card" style="margin-top:16px"><b>Calls</b><div class="calls" id="calls"></div></div>
+    <div class="card" style="margin-top:16px">
+      <div style="display:flex;justify-content:space-between;align-items:center"><b>Products</b>
+        <span><select id="pedit" onchange="loadProduct()" style="width:auto"></select> <button class="ghost" style="color:var(--acc)" onclick="newProduct()">New</button></span></div>
+      <div id="pform">
+        <div class="row"><div><label>ID</label><input id="p_id"></div><div><label>Product name</label><input id="p_product_name"></div></div>
+        <div class="row"><div><label>Seller / company</label><input id="p_seller_name"></div><div><label>Agent name</label><input id="p_agent_name"></div></div>
+        <label>One-liner (what it is)</label><input id="p_one_liner">
+        <div class="row"><div><label>Original price</label><input id="p_original_price"></div><div><label>Offer price</label><input id="p_offer_price"></div></div>
+        <div class="row"><div><label>Discount</label><input id="p_discount"></div><div><label>Offer validity</label><input id="p_offer_validity"></div></div>
+        <label>Benefits (one per line, first two are pitched)</label><textarea id="p_benefits" rows="3"></textarea>
+        <label>Call to action (what "yes" triggers)</label><input id="p_call_to_action">
+        <div class="row"><div><label>Speaking style</label><select id="p_style"><option value="natural">natural (LLM phrases each turn to fit the conversation)</option><option value="scripted">scripted (reviewed templates word for word, fastest)</option></select></div>
+        <div><label>Tone of voice</label><input id="p_tone"></div></div>
+        <label>What the product is (background the agent uses to answer questions)</label><textarea id="p_knowledge" rows="3"></textarea>
+        <label>One-line pitch, Hindi</label><textarea id="p_pitch_hi" rows="2"></textarea>
+        <label>One-line pitch, English</label><textarea id="p_pitch_en" rows="2"></textarea>
+        <label>FAQs / objections (one per line: keyword, keyword =&gt; English answer || Hindi answer)</label><textarea id="p_faqs" rows="3"></textarea>
+        <div style="margin-top:10px"><button onclick="saveProduct()">Save product</button> <span id="perr" class="err"></span></div>
+      </div>
+    </div>
+  </div>
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <b id="title">Select a call</b><span id="actions"></span>
+    </div>
+    <div id="rec" style="margin-top:10px"></div>
+    <div class="tr" id="tr" style="margin-top:12px"></div>
+  </div>
+</main>
+</div>
+<script>
+const $=id=>document.getElementById(id);
+let calls={}, sel=null, live={};
+async function api(path,opt={}){const r=await fetch(path,{headers:{'Content-Type':'application/json'},...opt});if(r.status===401)throw new Error('auth');if(!r.ok)throw new Error((await r.json().catch(()=>({detail:r.statusText}))).detail);return r.json()}
+async function boot(){const me=await api('/api/me');if(!me.authed){$('login').classList.remove('hidden');return}
+ $('appv').classList.remove('hidden');$('from').textContent='calling from '+me.from_number;await loadProducts();await refresh();
+ const es=new EventSource('/api/events');es.onmessage=e=>onEvent(JSON.parse(e.data))}
+async function doLogin(){try{await api('/api/login',{method:'POST',body:JSON.stringify({password:$('pw').value})});location.reload()}catch(e){$('lerr').textContent=e.message}}
+$('pw').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin()});
+let products={};
+const PF=['product_name','seller_name','agent_name','one_liner','original_price','offer_price','discount','offer_validity','call_to_action','pitch_hi','pitch_en','style','tone','knowledge'];
+async function loadProducts(){const d=await api('/api/products');products={};d.products.forEach(p=>products[p.id]=p);
+ const camp=$('campaign'),cur=camp.value;camp.innerHTML=Object.values(products).map(p=>`<option value="${esc(p.id)}">Sell: ${esc(p.product_name)} (${esc(p.discount)})</option>`).join('')+'<option value="bank_demo">Bank support demo</option>';
+ if(cur)camp.value=cur;campChanged();
+ const pe=$('pedit'),pc=pe.value;pe.innerHTML=Object.values(products).map(p=>`<option value="${esc(p.id)}">${esc(p.id)}</option>`).join('');if(pc&&products[pc])pe.value=pc;loadProduct()}
+function campChanged(){const bank=$('campaign').value==='bank_demo';$('bankopts').style.display=bank?'':'none';$('prodopts').style.display=bank?'none':''}
+function loadProduct(){const p=products[$('pedit').value];if(!p)return;$('p_id').value=p.id;PF.forEach(f=>$('p_'+f).value=p[f]||'');
+ $('p_benefits').value=(p.benefits||[]).join('\n');$('p_faqs').value=(p.faqs||[]).map(f=>f.keywords.join(', ')+' => '+f.answer+(f.answer_hi?' || '+f.answer_hi:'')).join('\n')}
+function newProduct(){$('p_id').value='new-product';PF.forEach(f=>$('p_'+f).value='');$('p_style').value='natural';$('p_benefits').value='';$('p_faqs').value=''}
+async function saveProduct(){$('perr').textContent='';const id=$('p_id').value.trim();const body=Object.assign({},products[id]||{});PF.forEach(f=>body[f]=$('p_'+f).value.trim());if(!body.style)body.style='natural';
+ body.benefits=$('p_benefits').value.split('\n').map(s=>s.trim()).filter(Boolean);
+ body.faqs=$('p_faqs').value.split('\n').filter(l=>l.includes('=>')).map(l=>{const [k,rest]=l.split('=>');const [a,ah]=rest.split('||');return{keywords:k.split(',').map(s=>s.trim()).filter(Boolean),answer:a.trim(),answer_hi:(ah||'').trim()}});
+ try{await api('/api/products/'+encodeURIComponent(id),{method:'PUT',body:JSON.stringify(body)});$('pedit').value=id;await loadProducts();$('pedit').value=id;loadProduct();$('perr').textContent='saved'}catch(e){$('perr').textContent=e.message}}
+async function refresh(){const d=await api('/api/calls');calls={};d.calls.forEach(c=>calls[c.call_id]=c);renderList();if(sel)renderCall()}
+async function startCalls(){$('cerr').textContent='';try{const d=await api('/api/calls',{method:'POST',body:JSON.stringify({numbers:$('numbers').value,customer_id:$('cust').value,campaign:$('campaign').value,customer_name:$('cname').value,customer_age:$('cage').value||null,allow_flagged:$("allowf").checked,allow_dnc:$("allowf").checked,allow_after_hours:$("allowf").checked,language:$('lang').value,backend:$('backend').value})});
+ const errs=d.calls.filter(c=>c.error).map(c=>c.number+': '+c.error);$('cerr').textContent=errs.join('; ');await refresh();const first=d.calls.find(c=>c.call_id);if(first){sel=first.call_id;renderList();renderCall()}}catch(e){$('cerr').textContent=e.message}}
+function onEvent(ev){if(ev.type==='status'){calls[ev.call.call_id]={...calls[ev.call.call_id],...ev.call};renderList();if(sel===ev.call.call_id)renderCall();return}
+ const c=calls[ev.call_id];if(!c)return;
+ if(ev.type==='turn'){c.turns=c.turns||[];c.turns.push(ev)}else{(live[ev.call_id]=live[ev.call_id]||[]).push({...ev,_after:(c.turns||[]).length})}
+ if(sel===ev.call_id)renderCall()}
+function renderList(){const el=$('calls');el.innerHTML='';Object.values(calls).sort((a,b)=>b.created_at-a.created_at).forEach(c=>{
+ const d=document.createElement('div');d.className='ci'+(c.call_id===sel?' sel':'');d.onclick=()=>{sel=c.call_id;renderList();renderCall()};
+ d.innerHTML=`<div>${c.to}<br><small>${new Date(c.created_at*1000).toLocaleTimeString()} · ${esc(c.campaign||'bank_demo')} · ${c.language} · ${c.backend}</small></div><div><span class="st ${c.status}">${c.status}</span></div>`;el.appendChild(d)})}
+const esc=s=>String(s??'').replace(/[&<>]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[m]));
+const bar=(name,v)=>`<span title="${name} ${v}">${name} <span class="bar"><i style="width:${Math.round(v*100)}%"></i></span></span>`;
+function renderCall(){const c=calls[sel];if(!c)return;$('title').textContent=`${c.to} — ${c.status}${c.end_reason?' ('+c.end_reason+')':''}`;
+ $('actions').innerHTML=c.status==='live'||c.status==='ringing'?`<button class="ghost" onclick="hang('${c.call_id}')">Hang up</button>`:'';
+ $('rec').innerHTML=c.status==='ended'&&c.answered_at?`<audio controls preload="none" style="width:100%" src="/api/calls/${c.call_id}/recording"></audio><div class="meta">left: customer · right: agent</div>`:'';
+ const tr=$('tr');tr.innerHTML='';const evs=(c.status==='ended'&&c.events)?c.events.map(e=>({...e,_after:e.after_turn})):(live[c.call_id]||[]);
+ (c.turns||[]).forEach((t,i)=>{evs.filter(e=>e._after===i).forEach(e=>tr.appendChild(evEl(e)));tr.appendChild(turnEl(t))});
+ evs.filter(e=>e._after>=(c.turns||[]).length).forEach(e=>tr.appendChild(evEl(e)));tr.scrollTop=tr.scrollHeight}
+function evEl(e){const d=document.createElement('div');d.className='ev'+(e.type==='error'?' err':'');d.textContent=e.type==='barge_in'?'— customer interrupted —':e.type==='noise'?`(noise ignored, ${e.duration_s}s)`:e.type+': '+(e.message||'');return d}
+function turnEl(t){const d=document.createElement('div');d.className='msg '+t.role;let m='';
+ if(t.role==='customer')m=`<span class="chip">${t.stt_lang}</span><span>STT ${t.stt_ms} ms</span><span>${t.duration_s}s speech</span>${t.barge_in?'<span class="chip">barge-in</span>':''}${t.prosody?`<span class="chip" title="pitch level / variation / loudness">pitch ${Math.round(t.prosody.f0_median_hz)} Hz · var ${t.prosody.f0_std_st} st · ${t.prosody.loudness_db} dB</span>`:''}`;
+ else if(t.state){const s=t.state,x=t.expression,l=t.latency_ms||{};
+  m=`<span class="chip">${t.intent}</span>${bar('frus',s.frustration)}${bar('conf',s.confusion)}${bar('urg',s.urgency)}${bar('eng',s.engagement)}
+  ${t.nlu?`<span class="chip" title="neural understanding: ${esc(t.nlu.gist||'')}">nlu ${t.nlu.intent} · buy ${t.nlu.buying_signal.toFixed(2)} · ${t.nlu.question_topic}${t.nlu.objection!=='none'?' · '+t.nlu.objection:''}</span>`:''}
+  <span class="chip">${x.language}</span><span class="chip">verb ${x.verbosity}</span><span class="chip">cplx ${x.complexity}</span><span class="chip">warm ${x.warmth}</span>${x.acknowledge_emotion?'<span class="chip">ack</span>':''}
+  <span>first audio ${l.first_audio_after_speech_end??'–'} ms (STT ${l.stt}, ACIE ${l.acie_total}, TTS ${l.tts_first_chunk??'–'})</span>
+  ${t.validation&&t.validation.used_fallback?'<span class="chip" title="'+esc((t.validation.issues||[]).join('; '))+'">fallback</span>':''}${t.interrupted?'<span class="chip">interrupted</span>':''}
+  ${s.signals&&s.signals.length?'<span>signals: '+esc(s.signals.join(', '))+'</span>':''}`}
+ else m=`<span class="chip">${t.intent||''}</span>`;
+ d.innerHTML=`<div>${esc(t.text)}</div><div class="meta">${m}</div>`;return d}
+async function hang(id){await api(`/api/calls/${id}/hangup`,{method:'POST'})}
+boot().catch(e=>{$('login').classList.remove('hidden')});
+</script>
+</body>
+</html>

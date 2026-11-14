@@ -1,0 +1,16 @@
+[Unit]
+Description=salesgod expression LLM (vLLM, Qwen3-14B-AWQ)
+After=network-online.target
+
+[Service]
+User=salesgod
+WorkingDirectory=/opt/salesgod
+Environment=HF_HOME=/opt/salesgod/hf
+ExecStart=/opt/salesgod/venv-vllm/bin/vllm serve Qwen/Qwen3-14B-AWQ --served-model-name acie-expression \
+  --host 127.0.0.1 --port 8000 --gpu-memory-utilization 0.6 --max-model-len 4096 \
+  --enable-prefix-caching --max-num-seqs 32
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,627 @@
+{
+ "tenant": "default",
+ "product_id": "claude-pro",
+ "generated_by": "claude-opus-5-5 (authored in session)",
+ "nodes": [
+  {
+   "id": "why_buy",
+   "title": "asks what's in it for them / why they should buy it",
+   "when": {
+    "keywords": [
+     "why (should|would) i",
+     "what.?s in it",
+     "what will i get",
+     "what do i get",
+     "benefit",
+     "kya milega",
+     "kyu (lu|lun|loon|lena)",
+     "kyon lu",
+     "fayda",
+     "faayda",
+     "क्या मिलेगा",
+     "क्यों (लूँ|लूं|लेना)",
+     "फायदा",
+     "फ़ायदा",
+     "मेरे (क्या )?काम"
+    ],
+    "intents": [
+     "benefits",
+     "tell_more"
+    ],
+    "topics": [
+     "product"
+    ]
+   },
+   "points": [
+    "It's like having a smart assistant on your phone and laptop: you ask in plain Hindi or English and it writes, explains, plans or fixes things for you in seconds.",
+    "Pro gives roughly five times the free plan's usage, so you don't hit the limit in the middle of work.",
+    "You get Anthropic's most capable models, Opus and Sonnet, which are especially good at careful writing, long documents and coding.",
+    "Projects keep your documents and chats together, so it remembers the context of your college work, job or business.",
+    "For $8 a month for the first 3 months you can see for yourself if it saves you time, and cancel any time."
+   ],
+   "ask": "What do you spend the most time on these days: work, study, or something else?",
+   "goal": "make the value concrete and learn what they'd use it for",
+   "points_hi": [
+    "ये आपके फ़ोन और laptop पर एक smart assistant जैसा है: आप हिंदी या English में पूछिए, और ये सेकंडों में लिखकर, समझाकर या plan बनाकर दे देता है।",
+    "Pro में free plan से लगभग पाँच गुना ज़्यादा इस्तेमाल मिलता है, तो काम के बीच में limit खत्म नहीं होती।",
+    "इसमें Anthropic के सबसे अच्छे models, Opus और Sonnet मिलते हैं, जो लिखने, लंबे documents और coding में ख़ास तौर पर अच्छे हैं।",
+    "Projects में आपके documents और chats एक जगह रहते हैं, तो इसे आपके college, नौकरी या business का context याद रहता है।",
+    "पहले 3 महीने $8 महीना देकर आप खुद देख सकते हैं कि ये आपका time बचाता है या नहीं, और कभी भी cancel कर सकते हैं।"
+   ],
+   "ask_hi": "आजकल आपका सबसे ज़्यादा time किस चीज़ में जाता है: काम, पढ़ाई या कुछ और?"
+  },
+  {
+   "id": "compare_chatgpt",
+   "title": "compares with ChatGPT, Gemini or the free version",
+   "when": {
+    "keywords": [
+     "chatgpt",
+     "chat gpt",
+     "\\bgpt\\b",
+     "gemini",
+     "चैटजीपीटी",
+     "जेमिनी",
+     "free (wala|version|plan)",
+     "फ्री (वाला|प्लान)",
+     "better (than|kaise)",
+     "difference",
+     "फर्क",
+     "farak",
+     "alag kaise",
+     "अलग कैसे"
+    ],
+    "topics": [
+     "product"
+    ]
+   },
+   "points": [
+    "Many people use Claude alongside ChatGPT; people often pick Claude for careful writing, long documents and coding help.",
+    "Claude can read long files in one go, a whole report, a big code file or a long PDF, and explain or fix it.",
+    "Compared to the free plan, Pro gives about five times the usage and the best models, so you don't get cut off mid-task.",
+    "The easiest way to compare is to try it on your real work for 3 months at $8, and cancel any time if it isn't better for you."
+   ],
+   "ask": "What do you usually use ChatGPT for?",
+   "goal": "position Claude honestly against what they use, without bashing competitors",
+   "points_hi": [
+    "बहुत लोग ChatGPT के साथ Claude भी इस्तेमाल करते हैं; लंबा लिखने, बड़े documents और coding के लिए लोग अक्सर Claude चुनते हैं।",
+    "Claude एक बार में लंबी files पढ़ लेता है, पूरी report, बड़ी code file या लंबा PDF, और उसे समझा या ठीक कर देता है।",
+    "Free plan के मुकाबले Pro में लगभग पाँच गुना इस्तेमाल और सबसे अच्छे models मिलते हैं, तो काम बीच में नहीं रुकता।",
+    "सबसे आसान तरीका है 3 महीने $8 में अपने असली काम पर आज़माना, और अच्छा न लगे तो कभी भी cancel कर दीजिए।"
+   ],
+   "ask_hi": "आप ChatGPT ज़्यादातर किस काम के लिए इस्तेमाल करते हैं?"
+  },
+  {
+   "id": "price_high",
+   "title": "says it's too expensive or tries to haggle",
+   "when": {
+    "keywords": [
+     "expensive",
+     "too much",
+     "costly",
+     "mehenga",
+     "mehnga",
+     "महंगा",
+     "महँगा",
+     "zyada hai",
+     "ज़्यादा है",
+     "ज्यादा है",
+     "kam karo",
+     "कम करो",
+     "discount do",
+     "sasta",
+     "सस्ता कर",
+     "(do|de do|दो) na",
+     "afford"
+    ],
+    "objections": [
+     "price"
+    ]
+   },
+   "points": [
+    "It's already 60% off for the first 3 months: $8 a month, about ₹700, instead of $20.",
+    "If it saves you even an hour or two a month on writing, assignments, code or emails, it pays for itself.",
+    "There's no lock-in: you can cancel any time from settings, so the risk is one month at a time.",
+    "I can't go lower than the offer price, but there's no separate catch or hidden charge."
+   ],
+   "ask": "If it helped you with one thing every day, what would that be?",
+   "goal": "reframe price as value, stay honest that the offer price is the lowest",
+   "points_hi": [
+    "पहले 3 महीने ये पहले से 60% off है: $20 की जगह $8 महीना, यानी लगभग 700 रुपये।",
+    "अगर ये महीने में एक-दो घंटे भी बचा दे, assignments, code या emails में, तो पैसे वसूल हो जाते हैं।",
+    "कोई lock-in नहीं है: settings से कभी भी cancel कर सकते हैं, तो risk बस एक महीने का है।",
+    "इससे कम कीमत मैं नहीं कर सकता, पर कोई छुपा हुआ charge भी नहीं है।"
+   ],
+   "ask_hi": "अगर ये रोज़ आपकी एक चीज़ में मदद करे, तो वो क्या होगी?"
+  },
+  {
+   "id": "trust",
+   "title": "doubts it's genuine (scam, fake, who is calling, why so cheap)",
+   "when": {
+    "keywords": [
+     "fraud",
+     "scam",
+     "fake",
+     "nakli",
+     "नकली",
+     "फ्रॉड",
+     "धोखा",
+     "dhokha",
+     "genuine",
+     "asli",
+     "असली",
+     "real hai",
+     "trust",
+     "bharosa",
+     "भरोसा",
+     "kaise maan",
+     "कैसे मान",
+     "why so cheap",
+     "itna sasta",
+     "इतना सस्ता"
+    ],
+    "objections": [
+     "trust"
+    ]
+   },
+   "points": [
+    "Anthropic is a real AI company, founded in 2021 in San Francisco; Claude is its product, and the official site is claude.ai.",
+    "I will never ask for your card number, OTP or PIN; payment happens only on Anthropic's own claude.ai page.",
+    "The low price is an intro discount for the first 3 months; after that it's the normal $20, and you can cancel any time.",
+    "You can check it yourself: open claude.ai, the same Pro plan is there."
+   ],
+   "ask": "Would it help if you checked claude.ai yourself first?",
+   "goal": "remove the fear with verifiable facts, never pressure",
+   "points_hi": [
+    "Anthropic एक असली AI कंपनी है, 2021 में San Francisco में बनी; Claude उसी का product है, और official site claude.ai है।",
+    "मैं कभी आपका card number, OTP या PIN नहीं माँगूँगा; पेमेंट सिर्फ़ Anthropic के अपने claude.ai page पर होता है।",
+    "कम कीमत पहले 3 महीने का intro discount है; उसके बाद normal $20 है, और कभी भी cancel कर सकते हैं।",
+    "आप खुद check कर सकते हैं: claude.ai खोलिए, वहाँ यही Pro plan है।"
+   ],
+   "ask_hi": "क्या पहले आप खुद claude.ai देख लेना चाहेंगे?"
+  },
+  {
+   "id": "no_need",
+   "title": "says they don't need it or don't use AI",
+   "when": {
+    "keywords": [
+     "don.?t need",
+     "no need",
+     "zarurat nahi",
+     "ज़रूरत नहीं",
+     "जरूरत नहीं",
+     "kaam nahi",
+     "काम नहीं",
+     "use nahi karta",
+     "इस्तेमाल नहीं करता",
+     "never used",
+     "kabhi use nahi"
+    ],
+    "objections": [
+     "need"
+    ]
+   },
+   "points": [
+    "Most people start with small things: a quick email or message, a summary of a long document, or help understanding a topic.",
+    "It works in Hindi too, so you can just talk to it like you'd ask a smart friend.",
+    "Even one task a day, like drafting replies or planning your week, adds up to real time saved.",
+    "No problem if it's not for you right now; you can try it on the free plan first."
+   ],
+   "ask": "Is there anything you do every week that takes more time than you'd like?",
+   "goal": "find one real need, respect a genuine no",
+   "points_hi": [
+    "ज़्यादातर लोग छोटी चीज़ों से शुरू करते हैं: एक जल्दी का email या message, किसी लंबे document का सार, या कोई topic समझना।",
+    "ये हिंदी में भी काम करता है, तो आप इससे ऐसे बात कर सकते हैं जैसे किसी समझदार दोस्त से पूछते हैं।",
+    "दिन में एक काम भी, जैसे replies लिखना या हफ़्ते का plan बनाना, मिलाकर काफ़ी time बचाता है।",
+    "अभी आपके लिए नहीं है तो कोई बात नहीं; आप पहले free plan से आज़मा सकते हैं।"
+   ],
+   "ask_hi": "क्या हर हफ़्ते कोई ऐसा काम है जिसमें उम्मीद से ज़्यादा time लगता है?"
+  },
+  {
+   "id": "timing",
+   "title": "busy, will think about it, maybe later",
+   "when": {
+    "keywords": [
+     "think about",
+     "soch",
+     "सोच",
+     "later",
+     "baad mein",
+     "बाद में",
+     "not now",
+     "abhi nahi",
+     "अभी नहीं",
+     "busy",
+     "बिजी",
+     "time nahi",
+     "टाइम नहीं"
+    ],
+    "objections": [
+     "timing"
+    ],
+    "intents": [
+     "callback"
+    ]
+   },
+   "points": [
+    "Of course, no rush at all.",
+    "The offer is $8 a month for the first 3 months, and you can cancel any time, so there's little to decide.",
+    "If you like, I can call you back at a time that suits you."
+   ],
+   "ask": "Would a call back later today or tomorrow be better?",
+   "goal": "respect their time; offer a callback, no pressure",
+   "points_hi": [
+    "बिल्कुल, कोई जल्दी नहीं है।",
+    "Offer पहले 3 महीने $8 महीना है, और कभी भी cancel कर सकते हैं, तो सोचने को ज़्यादा कुछ नहीं है।",
+    "आप चाहें तो मैं आपके सुविधा के समय पर दोबारा call कर सकता हूँ।"
+   ],
+   "ask_hi": "आज बाद में या कल call करूँ तो ठीक रहेगा?"
+  },
+  {
+   "id": "student",
+   "title": "is a student / college / exams / assignments",
+   "when": {
+    "keywords": [
+     "student",
+     "स्टूडेंट",
+     "college",
+     "कॉलेज",
+     "school",
+     "स्कूल",
+     "exam",
+     "एग्जाम",
+     "assignment",
+     "असाइनमेंट",
+     "padhai",
+     "पढ़ाई",
+     "homework",
+     "project report",
+     "semester",
+     "\\bnotes\\b"
+    ]
+   },
+   "points": [
+    "It explains tough topics step by step, like a patient tutor, in Hindi or English.",
+    "It helps you plan and edit assignments and reports, and checks your writing (the work stays yours).",
+    "For coding and DSA it explains problems, finds bugs and walks you through the logic.",
+    "It can read your long notes or PDFs and make quick revision summaries before exams.",
+    "There's no separate student discount, but this offer is already 60% off for the first 3 months."
+   ],
+   "ask": "Which subject or kind of assignment takes you the longest?",
+   "goal": "tie concrete study benefits to them",
+   "points_hi": [
+    "ये मुश्किल topics को step by step समझाता है, एक patient tutor की तरह, हिंदी या English में।",
+    "Assignments और reports का plan बनाने और उन्हें सुधारने में मदद करता है (काम आपका ही रहता है)।",
+    "Coding और DSA में ये सवाल समझाता है, bugs ढूँढता है और logic step by step बताता है।",
+    "आपके लंबे notes या PDFs पढ़कर exam से पहले revision के लिए छोटे summaries बना देता है।",
+    "अलग से student discount नहीं है, पर ये offer पहले 3 महीने पहले से 60% off है।"
+   ],
+   "ask_hi": "कौन सा subject या assignment आपका सबसे ज़्यादा time लेता है?"
+  },
+  {
+   "id": "developer",
+   "title": "codes / developer / software work",
+   "when": {
+    "keywords": [
+     "\\bcode\\b",
+     "coding",
+     "कोडिंग",
+     "कोड",
+     "developer",
+     "डेवलपर",
+     "programming",
+     "debug",
+     "\\bbugs?\\b",
+     "dsa",
+     "leetcode",
+     "python",
+     "java",
+     "javascript",
+     "react",
+     "software",
+     "app bana"
+    ]
+   },
+   "points": [
+    "It reads long code files and explains, refactors or debugs them step by step.",
+    "It's strong at writing code and tests, and at explaining errors in plain words.",
+    "Pro gives about five times the free usage, so long debugging sessions don't hit the limit.",
+    "Projects keep your codebase notes and docs together across chats."
+   ],
+   "ask": "What are you building or working on right now?",
+   "goal": "show coding value with specifics",
+   "points_hi": [
+    "ये लंबी code files पढ़कर उन्हें step by step समझाता है, सुधारता है या debug करता है।",
+    "Code और tests लिखने में, और errors को आसान शब्दों में समझाने में ये बहुत अच्छा है।",
+    "Pro में free से लगभग पाँच गुना इस्तेमाल मिलता है, तो लंबे debugging sessions में limit नहीं आती।",
+    "Projects में आपके codebase के notes और docs सारी chats में साथ रहते हैं।"
+   ],
+   "ask_hi": "आप अभी क्या बना रहे हैं या किस पर काम कर रहे हैं?"
+  },
+  {
+   "id": "business",
+   "title": "runs a shop or small business",
+   "when": {
+    "keywords": [
+     "shop",
+     "dukan",
+     "दुकान",
+     "business",
+     "बिज़नेस",
+     "बिजनेस",
+     "dhandha",
+     "धंधा",
+     "gst",
+     "जीएसटी",
+     "\\bbills?\\b",
+     "बिल",
+     "hisab",
+     "हिसाब",
+     "udhaar",
+     "उधार",
+     "customer",
+     "ग्राहक",
+     "tally",
+     "टैली",
+     "टेली",
+     "whatsapp"
+    ]
+   },
+   "points": [
+    "It helps with GST calculations, bill formats and lists of dues; you just check the numbers.",
+    "It drafts WhatsApp or SMS messages to customers, like offers, reminders or festival greetings; you send them.",
+    "It isn't accounting software like Tally, but it helps alongside it, explaining entries and calculations.",
+    "It can write product descriptions, simple ads or a price list in Hindi or English."
+   ],
+   "ask": "What takes most of your time in the shop: accounts, customers, or messages?",
+   "goal": "make it useful for their business, honestly",
+   "points_hi": [
+    "ये GST का हिसाब, bill का format और उधारी की list बनाने में मदद करता है; आप बस numbers check कर लीजिए।",
+    "ग्राहकों के लिए WhatsApp या SMS messages लिख देता है, जैसे offers, reminders या त्योहार की बधाई; भेजते आप हैं।",
+    "ये Tally जैसा accounting software नहीं है, पर उसके साथ entries और हिसाब समझाने में मदद करता है।",
+    "ये हिंदी या English में product की जानकारी, छोटे ads या rate list लिख सकता है।"
+   ],
+   "ask_hi": "दुकान में आपका सबसे ज़्यादा time किसमें जाता है: हिसाब, ग्राहक या messages?"
+  },
+  {
+   "id": "writing_work",
+   "title": "office work, writing, emails, reports, content",
+   "when": {
+    "keywords": [
+     "office",
+     "\\bjob\\b",
+     "naukri",
+     "नौकरी",
+     "email",
+     "ईमेल",
+     "report",
+     "रिपोर्ट",
+     "presentation",
+     "\\bppt\\b",
+     "content",
+     "writing",
+     "likhna",
+     "लिखना",
+     "blog",
+     "linkedin",
+     "resume",
+     "excel",
+     "meeting"
+    ]
+   },
+   "points": [
+    "It drafts emails, reports and presentations in seconds; you edit instead of starting from a blank page.",
+    "It can read long documents or PDFs and summarise them, or pull out the key points.",
+    "It helps prepare for meetings and interviews, and polishes your resume or LinkedIn posts.",
+    "Projects keep your work documents together, so it understands your context every time."
+   ],
+   "ask": "What kind of writing or documents do you deal with most at work?",
+   "goal": "tie concrete work benefits",
+   "points_hi": [
+    "ये सेकंडों में emails, reports और presentations का draft बना देता है; आपको खाली page से शुरू नहीं करना पड़ता।",
+    "लंबे documents या PDFs पढ़कर उनका सार या ज़रूरी points निकाल देता है।",
+    "Meetings और interviews की तैयारी में मदद करता है, और आपका resume या LinkedIn post सुधारता है।",
+    "Projects में आपके काम के documents साथ रहते हैं, तो ये हर बार आपका context समझता है।"
+   ],
+   "ask_hi": "काम पर आपको सबसे ज़्यादा किस तरह की writing या documents से निपटना पड़ता है?"
+  },
+  {
+   "id": "privacy",
+   "title": "worried about data or privacy",
+   "when": {
+    "keywords": [
+     "privacy",
+     "प्राइवेसी",
+     "\\bdata\\b",
+     "डेटा",
+     "डाटा",
+     "\\btrain",
+     "\\bsafe\\b",
+     "secure",
+     "surakshit",
+     "सुरक्षित",
+     "chats use"
+    ]
+   },
+   "points": [
+    "Your chats are used to improve the models only if you allow it; there's a setting in privacy settings you can switch off any time.",
+    "Payment is only on Anthropic's official claude.ai page; nobody on this call asks for card, OTP or PIN.",
+    "The full policy is at anthropic.com/privacy."
+   ],
+   "ask": "Does that answer your concern?",
+   "goal": "answer the privacy worry exactly as approved",
+   "points_hi": [
+    "आपकी chats models सुधारने में सिर्फ़ तब इस्तेमाल होती हैं जब आप इजाज़त दें; privacy settings में इसका option है, जिसे कभी भी बंद कर सकते हैं।",
+    "पेमेंट सिर्फ़ Anthropic के official claude.ai page पर होता है; इस call पर कोई card, OTP या PIN नहीं माँगता।",
+    "पूरी policy anthropic.com/privacy पर है।"
+   ],
+   "ask_hi": "क्या इससे आपकी चिंता दूर हुई?"
+  },
+  {
+   "id": "how_to_start",
+   "title": "asks how it works, how to start or how to pay",
+   "when": {
+    "keywords": [
+     "how (does it|do i|to) (work|use|start|pay)",
+     "kaise (use|chalega|shuru|pay|kare)",
+     "कैसे (इस्तेमाल|चलेगा|शुरू|पेमेंट|करें|करे)",
+     "\\bapp\\b",
+     "ऐप",
+     "download",
+     "login",
+     "signup",
+     "payment",
+     "पेमेंट",
+     "upi",
+     "यूपीआई"
+    ]
+   },
+   "points": [
+    "It works on claude.ai, and on the iPhone, Android and desktop apps; you just type or talk to it.",
+    "I send a secure payment link by SMS to this number; it opens Anthropic's official claude.ai page, and you pay with the methods shown there.",
+    "Once you upgrade, Pro features start right away on your account, and you can cancel any time from settings."
+   ],
+   "ask": "Would you like me to send the link so you can try it?",
+   "goal": "make starting feel easy",
+   "points_hi": [
+    "ये claude.ai पर, और iPhone, Android और desktop apps पर चलता है; आप बस type कीजिए या बोलिए।",
+    "मैं इसी नंबर पर SMS से एक सुरक्षित payment link भेजता हूँ; वो Anthropic का official claude.ai page खोलता है, और वहाँ दिखाए गए तरीकों से पेमेंट होता है।",
+    "Upgrade करते ही आपके account पर Pro शुरू हो जाता है, और settings से कभी भी cancel कर सकते हैं।"
+   ],
+   "ask_hi": "क्या मैं link भेज दूँ ताकि आप आज़मा सकें?"
+  },
+  {
+   "id": "beginner_confused",
+   "title": "doesn't know what AI is or is confused",
+   "when": {
+    "keywords": [
+     "ai kya",
+     "ए ?आई क्या",
+     "what is ai",
+     "samajh nahi",
+     "समझ नहीं",
+     "समझे नहीं",
+     "kya hota hai",
+     "क्या होता है",
+     "kya cheez",
+     "क्या चीज़"
+    ],
+    "min_confusion": 0.5
+   },
+   "points": [
+    "Think of it as a very smart helper on your phone: you ask a question in Hindi or English and it answers or writes things for you.",
+    "For example, it can write a message or letter for you, explain a bill, or help your children with homework.",
+    "You don't need any technical knowledge; you just type or speak."
+   ],
+   "ask": "Who in your family uses a phone or computer the most for work or studies?",
+   "goal": "explain simply with everyday examples, no jargon",
+   "points_hi": [
+    "इसे फ़ोन पर एक बहुत समझदार मददगार समझिए: आप हिंदी या English में सवाल पूछिए, ये जवाब देता है या आपके लिए लिख देता है।",
+    "जैसे, ये आपके लिए कोई message या चिट्ठी लिख सकता है, कोई bill समझा सकता है, या बच्चों का homework करवा सकता है।",
+    "इसके लिए कोई technical जानकारी नहीं चाहिए; बस type कीजिए या बोलिए।"
+   ],
+   "ask_hi": "आपके घर में काम या पढ़ाई के लिए phone या computer सबसे ज़्यादा कौन इस्तेमाल करता है?"
+  },
+  {
+   "id": "family_member",
+   "title": "thinking of it for a child, grandchild or family member",
+   "when": {
+    "keywords": [
+     "beti",
+     "बेटी",
+     "pota",
+     "पोता",
+     "poti",
+     "पोती",
+     "\\bson\\b",
+     "daughter",
+     "grandson",
+     "bachche",
+     "बच्चे",
+     "family",
+     "घर में",
+     "behen",
+     "बहन"
+    ]
+   },
+   "points": [
+    "It can really help someone who studies or works on a computer: writing, coding, research and explaining tough topics.",
+    "A Pro subscription is for one person's account, so it's best taken on their own account.",
+    "It's completely fine to talk it over with them first; there's no hurry."
+   ],
+   "ask": "Would you like to discuss it with them first?",
+   "goal": "be helpful, never push a purchase meant for someone else",
+   "points_hi": [
+    "जो पढ़ाई या computer पर काम करता है, उसके लिए ये सच में काम का है: लिखना, coding, research और मुश्किल topics समझाना।",
+    "Pro subscription एक व्यक्ति के account के लिए होता है, तो इसे उन्हीं के account पर लेना सबसे अच्छा है।",
+    "पहले उनसे बात कर लेना बिल्कुल ठीक है; कोई जल्दी नहीं है।"
+   ],
+   "ask_hi": "क्या आप पहले उनसे बात करना चाहेंगे?"
+  },
+  {
+   "id": "ready_to_buy",
+   "title": "sounds ready or positive",
+   "when": {
+    "keywords": [
+     "sounds good",
+     "accha hai",
+     "अच्छा है",
+     "badhiya",
+     "बढ़िया",
+     "interesting",
+     "\\bnice\\b",
+     "\\bgreat\\b",
+     "theek lag",
+     "ठीक लग",
+     "try kar",
+     "ट्राई"
+    ],
+    "min_buying": 0.65
+   },
+   "points": [
+    "Great, it's $8 a month for the first 3 months, then $20, and you can cancel any time.",
+    "The link comes by SMS to this number and opens Anthropic's official claude.ai page.",
+    "You can start using Pro right after paying."
+   ],
+   "ask": "Shall I send the link to this number?",
+   "goal": "close clearly with the full terms",
+   "points_hi": [
+    "बढ़िया, ये पहले 3 महीने $8 महीना है, फिर $20, और कभी भी cancel कर सकते हैं।",
+    "Link इसी नंबर पर SMS से आता है और Anthropic का official claude.ai page खोलता है।",
+    "पेमेंट करते ही आप Pro इस्तेमाल करना शुरू कर सकते हैं।"
+   ],
+   "ask_hi": "क्या मैं इसी नंबर पर link भेज दूँ?"
+  },
+  {
+   "id": "annoyed",
+   "title": "sounds annoyed or says the agent keeps repeating",
+   "when": {
+    "keywords": [
+     "repeat",
+     "baar baar",
+     "बार बार",
+     "fir wahi",
+     "फिर वही",
+     "same thing",
+     "irritat",
+     "pareshan",
+     "परेशान",
+     "suno",
+     "सुनो",
+     "listen"
+    ],
+    "min_frustration": 0.45
+   },
+   "points": [
+    "Sorry about that, let me answer exactly what you asked.",
+    "I'll keep it short."
+   ],
+   "ask": "",
+   "goal": "apologise, answer directly, no selling question",
+   "points_hi": [
+    "माफ़ कीजिए, मैं ठीक वही बताता हूँ जो आपने पूछा।",
+    "मैं छोटा रखूँगा।"
+   ],
+   "ask_hi": ""
+  }
+ ]
+}

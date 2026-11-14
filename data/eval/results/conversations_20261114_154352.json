@@ -1,0 +1,4392 @@
+{
+  "meta": {
+    "data": "/home/arkin/salesgod/data/eval/conversations.jsonl",
+    "n_conversations": 28,
+    "n_turns": 142,
+    "invalid_skipped": 0,
+    "backend": "TemplateBackend",
+    "timestamp": "2026-11-14T15:43:52"
+  },
+  "conversation_pass_rate": 0.536,
+  "by_key": {
+    "ALL": {
+      "pass": 136,
+      "total": 152,
+      "rate": 0.895
+    },
+    "acknowledge_emotion": {
+      "pass": 5,
+      "total": 5,
+      "rate": 1.0
+    },
+    "complexity": {
+      "pass": 3,
+      "total": 7,
+      "rate": 0.429
+    },
+    "intent": {
+      "pass": 111,
+      "total": 122,
+      "rate": 0.91
+    },
+    "language": {
+      "pass": 14,
+      "total": 15,
+      "rate": 0.933
+    },
+    "verbosity": {
+      "pass": 3,
+      "total": 3,
+      "rate": 1.0
+    }
+  },
+  "by_lang": {
+    "en": {
+      "ALL": {
+        "pass": 61,
+        "total": 68,
+        "rate": 0.897
+      },
+      "acknowledge_emotion": {
+        "pass": 1,
+        "total": 1,
+        "rate": 1.0
+      },
+      "complexity": {
+        "pass": 1,
+        "total": 3,
+        "rate": 0.333
+      },
+      "intent": {
+        "pass": 50,
+        "total": 54,
+        "rate": 0.926
+      },
+      "language": {
+        "pass": 8,
+        "total": 9,
+        "rate": 0.889
+      },
+      "verbosity": {
+        "pass": 1,
+        "total": 1,
+        "rate": 1.0
+      }
+    },
+    "hi": {
+      "ALL": {
+        "pass": 60,
+        "total": 66,
+        "rate": 0.909
+      },
+      "acknowledge_emotion": {
+        "pass": 4,
+        "total": 4,
+        "rate": 1.0
+      },
+      "complexity": {
+        "pass": 1,
+        "total": 2,
+        "rate": 0.5
+      },
+      "intent": {
+        "pass": 47,
+        "total": 52,
+        "rate": 0.904
+      },
+      "language": {
+        "pass": 6,
+        "total": 6,
+        "rate": 1.0
+      },
+      "verbosity": {
+        "pass": 2,
+        "total": 2,
+        "rate": 1.0
+      }
+    },
+    "hinglish": {
+      "ALL": {
+        "pass": 15,
+        "total": 18,
+        "rate": 0.833
+      },
+      "complexity": {
+        "pass": 1,
+        "total": 2,
+        "rate": 0.5
+      },
+      "intent": {
+        "pass": 14,
+        "total": 16,
+        "rate": 0.875
+      }
+    }
+  },
+  "latency_ms": {
+    "total_p50": 0.23,
+    "total_p95": 0.3,
+    "total_max": 0.47,
+    "stages_p50": {
+      "understand": 0.14,
+      "adapt": 0.17,
+      "decide": 0.19,
+      "first_sentence": 0.23,
+      "total": 0.23
+    }
+  },
+  "root_failures": 13,
+  "failures": [
+    {
+      "conv": "c001",
+      "lang": "hi",
+      "turn": 2,
+      "text": "मतलब लिमिट क्या होती है मेरा पैसा है तो",
+      "key": "complexity",
+      "expected": "low",
+      "got": "med",
+      "after_earlier_failure": false,
+      "state": {
+        "frustration": 0.0,
+        "confusion": 0.0,
+        "urgency": 0.0,
+        "engagement": 0.773
+      },
+      "signals": []
+    },
+    {
+      "conv": "c004",
+      "lang": "hi",
+      "turn": 4,
+      "text": "बस रखता हूं",
+      "key": "intent",
+      "expected": "goodbye",
+      "got": "unknown",
+      "after_earlier_failure": false,
+      "state": {
+        "frustration": 0.49,
+        "confusion": 0.0,
+        "urgency": 0.098,
+        "engagement": 0.678
+      },
+      "signals": []
+    },
+    {
+      "conv": "c007",
+      "lang": "hi",
+      "turn": 3,
+      "text": "ठीक है पच्चीस कर दो",
+      "key": "intent",
+      "expected": "transfer_confirm",
+      "got": "transfer_done",
+      "after_earlier_failure": false,
+      "state": {
+        "frustration": 0.49,
+        "confusion": 0.0,
+        "urgency": 0.098,
+        "engagement": 0.647
+      },
+      "signals": []
+    },
+    {
+      "conv": "c007",
+      "lang": "hi",
+      "turn": 4,
+      "text": "हां",
+      "key": "intent",
+      "expected": "transfer_done",
+      "got": "unknown",
+      "after_earlier_failure": true,
+      "state": {
+        "frustration": 0.343,
+        "confusion": 0.0,
+        "urgency": 0.069,
+        "engagement": 0.513
+      },
+      "signals": [
+        "minimal reply"
+      ]
+    },
+    {
+      "conv": "c008",
+      "lang": "hi",
+      "turn": 2,
+      "text": "और मेरा एटीएम कार्ड ब्लॉक हो गया है",
+      "key": "intent",
+      "expected": "unknown",
+      "got": "human_agent",
+      "after_earlier_failure": false,
+      "state": {
+        "frustration": 0.0,
+        "confusion": 0.0,
+        "urgency": 0.0,
+        "engagement": 0.71
+      },
+      "signals": []
+    },
+    {
+      "conv": "c009",
+      "lang": "hi",
+      "turn": 1,
+      "text": "पेंशन आई कि नहीं देखो जरा",
+      "key": "intent",
+      "expected": "check_balance",
+      "got": "unknown",
+      "after_earlier_failure": false,
+      "state": {
+        "frustration": 0.0,
+        "confusion": 0.0,
+        "urgency": 0.0,
+        "engagement": 0.5
+      },
+      "signals": []
+    },
+    {
+      "conv": "c012",
+      "lang": "en",
+      "turn": 4,
+      "text": "fine twenty five then",
+      "key": "intent",
+      "expected": "transfer_confirm",
+      "got": "unknown",
+      "after_earlier_failure": false,
+      "state": {
+        "frustration": 0.0,
+        "confusion": 0.294,
+        "urgency": 0.0,
+        "engagement": 0.5
+      },
+      "signals": []
+    },
+    {
+      "conv": "c015",
+      "lang": "en",
+      "turn": 2,
+      "text": "what i never set any limit",
+      "key": "complexity",
+      "expected": "low",
+      "got": "med",
+      "after_earlier_failure": false,
+      "state": {
+        "frustration": 0.0,
+        "confusion": 0.0,
+        "urgency": 0.0,
+        "engagement": 0.71
+      },
+      "signals": []
+    },
+    {
+      "conv": "c018",
+      "lang": "en",
+      "turn": 3,
+      "text": "i said no",
+      "key": "intent",
+      "expected": "card_declined_again",
+      "got": "unknown",
+      "after_earlier_failure": false,
+      "state": {
+        "frustration": 0.0,
+        "confusion": 0.0,
+        "urgency": 0.0,
+        "engagement": 0.5
+      },
+      "signals": []
+    },
+    {
+      "conv": "c020",
+      "lang": "en",
+      "turn": 2,
+      "text": "wait so the money went or not",
+      "key": "complexity",
+      "expected": "low",
+      "got": "med",
+      "after_earlier_failure": false,
+      "state": {
+        "frustration": 0.0,
+        "confusion": 0.0,
+        "urgency": 0.0,
+        "engagement": 0.5
+      },
+      "signals": []
+    },
+    {
+      "conv": "c021",
+      "lang": "en",
+      "turn": 1,
+      "text": "my debit card got blocked",
+      "key": "intent",
+      "expected": "unknown",
+      "got": "human_agent",
+      "after_earlier_failure": false,
+      "state": {
+        "frustration": 0.0,
+        "confusion": 0.0,
+        "urgency": 0.0,
+        "engagement": 0.5
+      },
+      "signals": []
+    },
+    {
+      "conv": "c023",
+      "lang": "hinglish",
+      "turn": 3,
+      "text": "ye limit wimit kya hai mujhe nahi pata",
+      "key": "complexity",
+      "expected": "low",
+      "got": "med",
+      "after_earlier_failure": false,
+      "state": {
+        "frustration": 0.0,
+        "confusion": 0.0,
+        "urgency": 0.0,
+        "engagement": 0.71
+      },
+      "signals": []
+    },
+    {
+      "conv": "c023",
+      "lang": "hinglish",
+      "turn": 4,
+      "text": "acha pachees hazaar kar do",
+      "key": "intent",
+      "expected": "transfer_confirm",
+      "got": "unknown",
+      "after_earlier_failure": true,
+      "state": {
+        "frustration": 0.0,
+        "confusion": 0.0,
+        "urgency": 0.0,
+        "engagement": 0.647
+      },
+      "signals": []
+    },
+    {
+      "conv": "c023",
+      "lang": "hinglish",
+      "turn": 5,
+      "text": "haan",
+      "key": "intent",
+      "expected": "transfer_done",
+      "got": "unknown",
+      "after_earlier_failure": true,
+      "state": {
+        "frustration": 0.0,
+        "confusion": 0.0,
+        "urgency": 0.0,
+        "engagement": 0.513
+      },
+      "signals": [
+        "minimal reply"
+      ]
+    },
+    {
+      "conv": "c024",
+      "lang": "en",
+      "turn": 1,
+      "text": "thoda mix karke bolo na hindi english dono",
+      "key": "language",
+      "expected": "hinglish",
+      "got": "en",
+      "after_earlier_failure": false,
+      "state": {
+        "frustration": 0.0,
+        "confusion": 0.0,
+        "urgency": 0.0,
+        "engagement": 0.71
+      },
+      "signals": []
+    },
+    {
+      "conv": "c028",
+      "lang": "en",
+      "turn": 1,
+      "text": "my pension came or not",
+      "key": "intent",
+      "expected": "check_balance",
+      "got": "unknown",
+      "after_earlier_failure": false,
+      "state": {
+        "frustration": 0.0,
+        "confusion": 0.0,
+        "urgency": 0.0,
+        "engagement": 0.5
+      },
+      "signals": []
+    }
+  ],
+  "turns": {
+    "c001": [
+      {
+        "turn": 0,
+        "text": "हेलो",
+        "checks": {
+          "intent": {
+            "expected": "greet",
+            "got": "greet",
+            "ok": true
+          }
+        },
+        "reply": "नमस्ते Rahul, मैं आपकी क्या मदद कर सकता हूँ?",
+        "state": {
+          "frustration": 0.0,
+          "confusion": 0.0,
+          "urgency": 0.0,
+          "engagement": 0.5
+        },
+        "signals": [],
+        "timings_ms": {
+          "understand": 0.17,
+          "adapt": 0.2,
+          "decide": 0.23,
+          "first_sentence": 0.29,
+          "total": 0.3
+        },
+        "used_fallback": false
+      },
+      {
+        "turn": 1,
+        "text": "हां वो पचास हज़ार भेजना है भाई को",
+        "checks": {
+          "intent": {
+            "expected": "transfer_over_limit",
+            "got": "transfer_over_limit",
+            "ok": true
+          }
+        },
+        "reply": "आपकी डेली लिमिट ₹40,000 है और आज सिर्फ़ ₹25,000 बाकी है, इसलिए ₹50,000 नहीं भेज सकते। क्या मैं ₹25,000 भेज दूँ?",
+        "state": {
+          "frustration": 0.0,
+          "confusion": 0.0,
+          "urgency": 0.0,
+          "engagement": 0.71
+        },
+        "signals": [],
+        "timings_ms": {
+          "understand": 0.21,
+          "adapt": 0.26,
+          "decide": 0.39,
+          "first_sentence": 0.45,
+          "total": 0.47
+        },
+        "used_fallback": false
+      },
+      {
+        "turn": 2,
+        "text": "मतलब लिमिट क्या होती है मेरा पैसा है तो",
+        "checks": {
+          "complexity": {
+            "expected": "low",
+            "got": "med",
+            "ok": false
+          }
+        },
+        "reply": "आपकी डेली ट्रांसफर लिमिट ₹40,000 है, और आज ₹25,000 बाकी है।",
+        "state": {
+          "frustration": 0.0,
+          "confusion": 0.0,
+          "urgency": 0.0,
+          "engagement": 0.773
+        },
+        "signals": [],
+        "timings_ms": {
+          "understand": 0.23,
+          "adapt": 0.26,
+          "decide": 0.29,
+          "first_sentence": 0.33,
+          "total": 0.33
+        },
+        "used_fallback": false
+      },
+      {
+        "turn": 3,
+        "text": "अच्छा तो पच्चीस हज़ार ही भेज दो",
+        "checks": {
+          "intent": {
+            "expected": "transfer_confirm",
+            "got": "transfer_confirm",
+            "ok": true
+          }
+        },
+        "reply": "कन्फ़र्म कर दूँ, आप ₹25,000 ट्रांसफर करना चाहते हैं?",
+        "state": {
+          "frustration": 0.0,
+          "confusion": 0.0,
+          "urgency": 0.0,
+          "engagement": 0.691
+        },
+        "signals": [],
+        "timings_ms": {
+          "understand": 0.22,
+          "adapt": 0.25,
+          "decide": 0.31,
+          "first_sentence": 0.35,
+          "total": 0.35
+        },
+        "used_fallback": false
+      },
+      {
+        "turn": 4,
+        "text": "हां",
+        "checks": {
+          "intent": {
+            "expected": "transfer_done",
+            "got": "transfer_done",
+            "ok": true
+          }
+        },
+        "reply": "हो गया। ₹25,000 ट्रांसफर हो गए हैं। आपका रेफ़रेंस नंबर TXN618745 है।",
+        "state": {
+          "frustration": 0.0,
+          "confusion": 0.0,
+          "urgency": 0.0,
+          "engagement": 0.544
+        },
+        "signals": [
+          "minimal reply"
+        ],
+        "timings_ms": {
+          "understand": 0.13,
+          "adapt": 0.14,
+          "decide": 0.18,
+          "first_sentence": 0.22,
+          "total": 0.23
+        },
+        "used_fallback": false
+      },
+      {
+        "turn": 5,
+        "text": "बस धन्यवाद",
+        "checks": {
+          "intent": {
+            "expected": "goodbye",
+            "got": "goodbye",
+            "ok": true
+          }
+        },
+        "reply": "कॉल करने के लिए धन्यवाद। आपका दिन शुभ हो!",
+        "state": {
+          "frustration": 0.0,
+          "confusion": 0.0,
+          "urgency": 0.0,
+          "engagement": 0.531
+        },
+        "signals": [],
+        "timings_ms": {
+          "understand": 0.13,
+          "adapt": 0.15,
+          "decide": 0.17,
+          "first_sentence": 0.2,
+          "total": 0.2
+        },
+        "used_fallback": false
+      }
+    ],
+    "c002": [
+      {
+        "turn": 0,
+        "text": "बैलेंस बताओ",
+        "checks": {
+          "intent": {
+            "expected": "check_balance",
+            "got": "check_balance",
+            "ok": true
+          }
+        },
+        "reply": "आपका मौजूदा बैलेंस ₹12,000 है।",
+        "state": {
+          "frustration": 0.0,
+          "confusion": 0.0,
+          "urgency": 0.0,
+          "engagement": 0.5
+        },
+        "signals": [],
+        "timings_ms": {
+          "understand": 0.13,
+          "adapt": 0.15,
+          "decide": 0.18,
+          "first_sentence": 0.22,
+          "total": 0.22
+        },
+        "used_fallback": false
+      },
+      {
+        "turn": 1,
+        "text": "पंद्रह हज़ार ट्रांसफर करना है",
+        "checks": {
+          "intent": {
+            "expected": "transfer_insufficient",
+            "got": "transfer_insufficient",
+            "ok": true
+          }
+        },
+        "reply": "मैं ₹15,000 नहीं भेज सकता क्योंकि आपका बैलेंस ₹12,000 है।",
+        "state": {
+          "frustration": 0.0,
+          "confusion": 0.0,
+          "urgency": 0.0,
+          "engagement": 0.5
+        },
+        "signals": [],
+        "timings_ms": {
+          "understand": 0.18,
+          "adapt": 0.21,
+          "decide": 0.25,
+          "first_sentence": 0.29,
+          "total": 0.29
+        },
+        "used_fallback": false
+      },
+      {
+        "turn": 2,
+        "text": "अच्छा दस हज़ार कर दो फिर",
+        "checks": {
+          "intent": {
+            "expected": "transfer_confirm",
+            "got": "transfer_confirm",
+            "ok": true
+          }
+        },
+        "reply": "कन्फ़र्म कर दूँ, आप ₹10,000 ट्रांसफर करना चाहते हैं?",
+        "state": {
+          "frustration": 0.0,
+          "confusion": 0.0,
+          "urgency": 0.0,
+          "engagement": 0.5
+        },
+        "signals": [],
+        "timings_ms": {
+          "understand": 0.17,
+          "adapt": 0.2,
+          "decide": 0.25,
+          "first_sentence": 0.29,
+          "total": 0.29
+        },
+        "used_fallback": false
+      },
+      {
+        "turn": 3,
+        "text": "हां कर दो",
+        "checks": {
+          "intent": {
+            "expected": "transfer_done",
+            "got": "transfer_done",
+            "ok": true
+          }
+        },
+        "reply": "हो गया। ₹10,000 ट्रांसफर हो गए हैं। आपका रेफ़रेंस नंबर TXN796325 है।",
+        "state": {
+          "frustration": 0.0,
+          "confusion": 0.0,
+          "urgency": 0.0,
+          "engagement": 0.5
+        },
+        "signals": [],
+        "timings_ms": {
+          "understand": 0.15,
+          "adapt": 0.17,
+          "decide": 0.2,
+          "first_sentence": 0.24,
+          "total": 0.25
+        },
+        "used_fallback": false
+      },
+      {
+        "turn": 4,
+        "text": "ओके बाय",
+        "checks": {
+          "intent": {
+            "expected": "goodbye",
+            "got": "goodbye",
+            "ok": true
+          }
+        },
+        "reply": "कॉल करने के लिए धन्यवाद। आपका दिन शुभ हो!",
+        "state": {
+          "frustration": 0.0,
+          "confusion": 0.0,
+          "urgency": 0.0,
+          "engagement": 0.5
+        },
+        "signals": [],
+        "timings_ms": {
+          "understand": 0.14,
+          "adapt": 0.16,
+          "decide": 0.18,
+          "first_sentence": 0.21,
+          "total": 0.21
+        },
+        "used_fallback": false
+      }
+    ],
+    "c003": [
+      {
+        "turn": 0,
+        "text": "बैलेंस कितना है मेरा",
+        "checks": {
+          "intent": {
+            "expected": "check_balance",
+            "got": "check_balance",
+            "ok": true
+          }
+        },
+        "reply": "आपका मौजूदा बैलेंस ₹82,500 है।",
+        "state": {
+          "frustration": 0.0,
+          "confusion": 0.0,
+          "urgency": 0.0,
+          "engagement": 0.71
+        },
+        "signals": [],
+        "timings_ms": {
+          "understand": 0.15,
+          "adapt": 0.18,
+          "decide": 0.2,
+          "first_sentence": 0.24,
+          "total": 0.24
+        },
+        "used_fallback": false
+      },
+      {
+        "turn": 1,
+        "text": "अच्छा",
+        "checks": {},
+        "reply": "माफ़ कीजिए, मैं समझ नहीं पाया। मैं बैलेंस, ट्रांसफर, लिमिट या क्रेडिट कार्ड में मदद कर सकता हूँ।",
+        "state": {
+          "frustration": 0.0,
+          "confusion": 0.0,
+          "urgency": 0.0,
+          "engagement": 0.557
+        },
+        "signals": [
+          "minimal reply"
+        ],
+        "timings_ms": {
+          "understand": 0.12,
+          "adapt": 0.14,
+          "decide": 0.14,
+          "first_sentence": 0.17,
+          "total": 0.18
+        },
+        "used_fallback": false
+      },
+      {
+        "turn": 2,
+        "text": "वो क्रेडिट कार्ड का मैसेज आया था वो क्या है",
+        "checks": {
+          "intent": {
+            "expected": "card_offer",
+            "got": "card_offer",
+            "ok": true
+          }
+        },
+        "reply": "आपके लिए ₹1,50,000 लिमिट वाला क्रेडिट कार्ड pre-approved है, no annual fee in the first year। क्या आप apply करना चाहेंगे?",
+        "state": {
+          "frustration": 0.0,
+          "confusion": 0.0,
+          "urgency": 0.0,
+          "engagement": 0.727
+        },
+        "signals": [],
+        "timings_ms": {
+          "understand": 0.19,
+          "adapt": 0.22,
+          "decide": 0.25,
+          "first_sentence": 0.29,
+          "total": 0.29
+        },
+        "used_fallback": false
+      },
+      {
+        "turn": 3,
+        "text": "सालाना फीस कितनी है इसकी",
+        "checks": {},
+        "reply": "माफ़ कीजिए, मैं समझ नहीं पाया। मैं बैलेंस, ट्रांसफर, लिमिट या क्रेडिट कार्ड में मदद कर सकता हूँ।",
+        "state": {
+          "frustration": 0.0,
+          "confusion": 0.0,
+          "urgency": 0.0,
+          "engagement": 0.778
+        },
+        "signals": [],
+        "timings_ms": {
+          "understand": 0.18,
+          "adapt": 0.21,
+          "decide": 0.22,
+          "first_sentence": 0.25,
+          "total": 0.26
+        },
+        "used_fallback": false
+      },
+      {
+        "turn": 4,
+        "text": "ठीक है बनवा दो",
+        "checks": {
+          "intent": {
+            "expected": "card_apply_started",
+            "got": "card_apply_started",
+            "ok": true
+          }
+        },
+        "reply": "बढ़िया, मैंने आपकी एप्लिकेशन शुरू कर दी है। इसे पूरा करने के लिए आपको SMS पर लिंक मिलेगा।",
+        "state": {
+          "frustration": 0.0,
+          "confusion": 0.0,
+          "urgency": 0.0,
+          "engagement": 0.695
+        },
+        "signals": [],
+        "timings_ms": {
+          "understand": 0.16,
+          "adapt": 0.19,
+          "decide": 0.25,
+          "first_sentence": 0.29,
+          "total": 0.3
+        },
+        "used_fallback": false
+      },
+      {
+        "turn": 5,
+        "text": "धन्यवाद",
+        "checks": {
+          "intent": {
+            "expected": "goodbye",
+            "got": "goodbye",
+            "ok": true
+          }
+        },
+        "reply": "कॉल करने के लिए धन्यवाद। आपका दिन शुभ हो!",
+        "state": {
+          "frustration": 0.0,
+          "confusion": 0.0,
+          "urgency": 0.0,
+          "engagement": 0.636
+        },
+        "signals": [],
+        "timings_ms": {
+          "understand": 0.12,
+          "adapt": 0.13,
+          "decide": 0.15,
+          "first_sentence": 0.18,
+          "total": 0.18
+        },
+        "used_fallback": false
+      }
+    ],
+    "c004": [
+      {
+        "turn": 0,
+        "text": "बैलेंस",
+        "checks": {
+          "intent": {
+            "expected": "check_balance",
+            "got": "check_balance",
+            "ok": true
+          }
+        },
+        "reply": "आपका मौजूदा बैलेंस ₹82,500 है।",
+        "state": {
+          "frustration": 0.0,
+          "confusion": 0.0,
+          "urgency": 0.0,
+          "engagement": 0.5
+        },
+        "signals": [],
+        "timings_ms": {
+          "understand": 0.11,
+          "adapt": 0.12,
+          "decide": 0.14,
+          "first_sentence": 0.18,
+          "total": 0.18
+        },
+        "used_fallback": false
+      },
+      {
+        "turn": 1,
+        "text": "कार्ड वाला क्या ऑफर है",
+        "checks": {
+          "intent": {
+            "expected": "card_offer",
+            "got": "card_offer",
+            "ok": true
+          }
+        },
+        "reply": "आपके लिए ₹1,50,000 लिमिट वाला क्रेडिट कार्ड pre-approved है, no annual fee in the first year। क्या आप apply करना चाहेंगे?",
+        "state": {
+          "frustration": 0.0,
+          "confusion": 0.0,
+          "urgency": 0.0,
+          "engagement": 0.71
+        },
+        "signals": [],
+        "timings_ms": {
+          "understand": 0.16,
+          "adapt": 0.19,
+          "decide": 0.21,
+          "first_sentence": 0.25,
+          "total": 0.26
+        },
+        "used_fallback": false
+      },
+      {
+        "turn": 2,
+        "text": "नहीं चाहिए",
+        "checks": {
+          "intent": {
+            "expected": "card_declined",
+            "got": "card_declined",
+            "ok": true
+          }
+        },
+        "reply": "कोई बात नहीं। क्या मैं किसी और चीज़ में मदद कर सकता हूँ?",
+        "state": {
+          "frustration": 0.0,
+          "confusion": 0.0,
+          "urgency": 0.0,
+          "engagement": 0.647
+        },
+        "signals": [],
+        "timings_ms": {
+          "understand": 0.16,
+          "adapt": 0.18,
+          "decide": 0.19,
+          "first_sentence": 0.22,
+          "total": 0.23
+        },
+        "used_fallback": false
+      },
+      {
+        "turn": 3,
+        "text": "अरे कितनी बार बोलूं नहीं चाहिए कार्ड",
+        "checks": {
+          "intent": {
+            "expected": "card_declined_again",
+            "got": "card_declined_again",
+            "ok": true
+          },
+          "acknowledge_emotion": {
+            "expected": true,
+            "got": true,
+            "ok": true
+          },
+          "verbosity": {
+            "expected": "low",
+            "got": "low",
+            "ok": true
+          }
+        },
+        "reply": "ज़रूर। आपने पहले मना किया था, तो मैं ज़ोर नहीं दूँगा। और कुछ?",
+        "state": {
+          "frustration": 0.7,
+          "confusion": 0.0,
+          "urgency": 0.14,
+          "engagement": 0.754
+        },
+        "signals": [
+          "frustration phrase: कितनी बार बोल*",
+          "barge-in"
+        ],
+        "timings_ms": {
+          "understand": 0.19,
+          "adapt": 0.24,
+          "decide": 0.26,
+          "first_sentence": 0.3,
+          "total": 0.3
+        },
+        "used_fallback": false
+      },
+      {
+        "turn": 4,
+        "text": "बस रखता हूं",
+        "checks": {
+          "intent": {
+            "expected": "goodbye",
+            "got": "unknown",
+            "ok": false
+          },
+          "acknowledge_emotion": {
+            "expected": false,
+            "got": false,
+            "ok": true
+          }
+        },
+        "reply": "माफ़ कीजिए, मैं समझ नहीं पाया। मैं बैलेंस, ट्रांसफर, लिमिट या क्रेडिट कार्ड में मदद कर सकता हूँ।",
+        "state": {
+          "frustration": 0.49,
+          "confusion": 0.0,
+          "urgency": 0.098,
+          "engagement": 0.678
+        },
+        "signals": [],
+        "timings_ms": {
+          "understand": 0.14,
+          "adapt": 0.16,
+          "decide": 0.17,
+          "first_sentence": 0.2,
+          "total": 0.21
+        },
+        "used_fallback": false
+      }
+    ],
+    "c005": [
+      {
+        "turn": 0,
+        "text": "हेलो जी",
+        "checks": {
+          "intent": {
+            "expected": "greet",
+            "got": "greet",
+            "ok": true
+          }
+        },
+        "reply": "नमस्ते Priya, मैं आपकी क्या मदद कर सकता हूँ?",
+        "state": {
+          "frustration": 0.0,
+          "confusion": 0.0,
+          "urgency": 0.0,
+          "engagement": 0.5
+        },
+        "signals": [],
+        "timings_ms": {
+          "understand": 0.11,
+          "adapt": 0.13,
+          "decide": 0.15,
+          "first_sentence": 0.19,
+          "total": 0.19
+        },
+        "used_fallback": false
+      },
+      {
+        "turn": 1,
+        "text": "मुझे क्रेडिट कार्ड चाहिए था",
+        "checks": {
+          "intent": {
+            "expected": "card_ineligible",
+            "got": "card_ineligible",
+            "ok": true
+          }
+        },
+        "reply": "अभी आप क्रेडिट कार्ड के लिए eligible नहीं हैं। मैं बाद में फिर से देख सकता हूँ।",
+        "state": {
+          "frustration": 0.0,
+          "confusion": 0.0,
+          "urgency": 0.0,
+          "engagement": 0.5
+        },
+        "signals": [],
+        "timings_ms": {
+          "understand": 0.17,
+          "adapt": 0.2,
+          "decide": 0.21,
+          "first_sentence": 0.24,
+          "total": 0.25
+        },
+        "used_fallback": false
+      },
+      {
+        "turn": 2,
+        "text": "क्यों नहीं मिलेगा",
+        "checks": {},
+        "reply": "माफ़ कीजिए, मैं समझ नहीं पाया। मैं बैलेंस, ट्रांसफर, लिमिट या क्रेडिट कार्ड में मदद कर सकता हूँ।",
+        "state": {
+          "frustration": 0.0,
+          "confusion": 0.0,
+          "urgency": 0.0,
+          "engagement": 0.71
+        },
+        "signals": [],
+        "timings_ms": {
+          "understand": 0.16,
+          "adapt": 0.18,
+          "decide": 0.19,
+          "first_sentence": 0.22,
+          "total": 0.23
+        },
+        "used_fallback": false
+      },
+      {
+        "turn": 3,
+        "text": "ठीक है बैलेंस बता दो",
+        "checks": {
+          "intent": {
+            "expected": "check_balance",
+            "got": "check_balance",
+            "ok": true
+          }
+        },
+        "reply": "आपका मौजूदा बैलेंस ₹12,000 है।",
+        "state": {
+          "frustration": 0.0,
+          "confusion": 0.0,
+          "urgency": 0.0,
+          "engagement": 0.647
+        },
+        "signals": [],
+        "timings_ms": {
+          "understand": 0.15,
+          "adapt": 0.18,
+          "decide": 0.2,
+          "first_sentence": 0.24,
+          "total": 0.24
+        },
+        "used_fallback": false
+      },
+      {
+        "turn": 4,
+        "text": "ठीक है धन्यवाद",
+        "checks": {
+          "intent": {
+            "expected": "goodbye",
+            "got": "goodbye",
+            "ok": true
+          }
+        },
+        "reply": "कॉल करने के लिए धन्यवाद। आपका दिन शुभ हो!",
+        "state": {
+          "frustration": 0.0,
+          "confusion": 0.0,
+          "urgency": 0.0,
+          "engagement": 0.603
+        },
+        "signals": [],
+        "timings_ms": {
+          "understand": 0.14,
+          "adapt": 0.16,
+          "decide": 0.17,
+          "first_sentence": 0.2,
+          "total": 0.21
+        },
+        "used_fallback": false
+      }
+    ],
+    "c006": [
+      {
+        "turn": 0,
+        "text": "हेलो",
+        "checks": {
+          "intent": {
+            "expected": "greet",
+            "got": "greet",
+            "ok": true
+          }
+        },
+        "reply": "नमस्ते Rahul, मैं आपकी क्या मदद कर सकता हूँ?",
+        "state": {
+          "frustration": 0.0,
+          "confusion": 0.0,
+          "urgency": 0.0,
+          "engagement": 0.5
+        },
+        "signals": [],
+        "timings_ms": {
+          "understand": 0.1,
+          "adapt": 0.12,
+          "decide": 0.14,
+          "first_sentence": 0.17,
+          "total": 0.18
+        },
+        "used_fallback": false
+      },
+      {
+        "turn": 1,
+        "text": "मेरी ट्रांसफर लिमिट कितनी है",
+        "checks": {
+          "intent": {
+            "expected": "transfer_limit",
+            "got": "transfer_limit",
+            "ok": true
+          }
+        },
+        "reply": "आपकी डेली ट्रांसफर लिमिट ₹40,000 है, और आज ₹25,000 बाकी है।",
+        "state": {
+          "frustration": 0.0,
+          "confusion": 0.0,
+          "urgency": 0.0,
+          "engagement": 0.71
+        },
+        "signals": [],
+        "timings_ms": {
+          "understand": 0.18,
+          "adapt": 0.21,
+          "decide": 0.23,
+          "first_sentence": 0.28,
+          "total": 0.28
+        },
+        "used_fallback": false
+      },
+      {
+        "turn": 2,
+        "text": "इंग्लिश में बोलो प्लीज़",
+        "checks": {
+          "language": {
+            "expected": "en",
+            "got": "en",
+            "ok": true
+          }
+        },
+        "reply": "Sorry, I didn't get that. I can help with balance, transfers, limits or a credit card.",
+        "state": {
+          "frustration": 0.0,
+          "confusion": 0.0,
+          "urgency": 0.0,
+          "engagement": 0.647
+        },
+        "signals": [],
+        "timings_ms": {
+          "understand": 0.16,
+          "adapt": 0.18,
+          "decide": 0.2,
+          "first_sentence": 0.23,
+          "total": 0.24
+        },
+        "used_fallback": false
+      },
+      {
+        "turn": 3,
+        "text": "ok send twenty thousand to my brother",
+        "checks": {
+          "intent": {
+            "expected": "transfer_confirm",
+            "got": "transfer_confirm",
+            "ok": true
+          },
+          "language": {
+            "expected": "en",
+            "got": "en",
+            "ok": true
+          }
+        },
+        "reply": "Just to confirm, you want to transfer ₹20,000?",
+        "state": {
+          "frustration": 0.0,
+          "confusion": 0.0,
+          "urgency": 0.0,
+          "engagement": 0.603
+        },
+        "signals": [],
+        "timings_ms": {
+          "understand": 0.16,
+          "adapt": 0.18,
+          "decide": 0.22,
+          "first_sentence": 0.26,
+          "total": 0.26
+        },
+        "used_fallback": false
+      },
+      {
+        "turn": 4,
+        "text": "yes",
+        "checks": {
+          "intent": {
+            "expected": "transfer_done",
+            "got": "transfer_done",
+            "ok": true
+          },
+          "language": {
+            "expected": "en",
+            "got": "en",
+            "ok": true
+          }
+        },
+        "reply": "Done. ₹20,000 has been transferred. Your reference number is TXN189056.",
+        "state": {
+          "frustration": 0.0,
+          "confusion": 0.0,
+          "urgency": 0.0,
+          "engagement": 0.572
+        },
+        "signals": [],
+        "timings_ms": {
+          "understand": 0.11,
+          "adapt": 0.13,
+          "decide": 0.16,
+          "first_sentence": 0.19,
+          "total": 0.2
+        },
+        "used_fallback": false
+      },
+      {
+        "turn": 5,
+        "text": "bye",
+        "checks": {
+          "intent": {
+            "expected": "goodbye",
+            "got": "goodbye",
+            "ok": true
+          }
+        },
+        "reply": "Thank you for calling. Have a good day!",
+        "state": {
+          "frustration": 0.0,
+          "confusion": 0.0,
+          "urgency": 0.0,
+          "engagement": 0.55
+        },
+        "signals": [],
+        "timings_ms": {
+          "understand": 0.1,
+          "adapt": 0.11,
+          "decide": 0.12,
+          "first_sentence": 0.15,
+          "total": 0.16
+        },
+        "used_fallback": false
+      }
+    ],
+    "c007": [
+      {
+        "turn": 0,
+        "text": "पैसे भेजने हैं",
+        "checks": {
+          "intent": {
+            "expected": "transfer_ask_amount",
+            "got": "transfer_ask_amount",
+            "ok": true
+          }
+        },
+        "reply": "ज़रूर। आप कितने पैसे ट्रांसफर करना चाहते हैं?",
+        "state": {
+          "frustration": 0.0,
+          "confusion": 0.0,
+          "urgency": 0.0,
+          "engagement": 0.5
+        },
+        "signals": [],
+        "timings_ms": {
+          "understand": 0.14,
+          "adapt": 0.17,
+          "decide": 0.19,
+          "first_sentence": 0.22,
+          "total": 0.23
+        },
+        "used_fallback": false
+      },
+      {
+        "turn": 1,
+        "text": "तीस हज़ार",
+        "checks": {
+          "intent": {
+            "expected": "transfer_over_limit",
+            "got": "transfer_over_limit",
+            "ok": true
+          }
+        },
+        "reply": "आपकी डेली लिमिट ₹40,000 है और आज सिर्फ़ ₹25,000 बाकी है, इसलिए ₹30,000 नहीं भेज सकते। क्या मैं ₹25,000 भेज दूँ?",
+        "state": {
+          "frustration": 0.0,
+          "confusion": 0.0,
+          "urgency": 0.0,
+          "engagement": 0.5
+        },
+        "signals": [],
+        "timings_ms": {
+          "understand": 0.12,
+          "adapt": 0.14,
+          "decide": 0.19,
+          "first_sentence": 0.23,
+          "total": 0.24
+        },
+        "used_fallback": false
+      },
+      {
+        "turn": 2,
+        "text": "अरे यार ये क्या है अपना ही पैसा है कितनी बार यही सुनूं",
+        "checks": {
+          "acknowledge_emotion": {
+            "expected": true,
+            "got": true,
+            "ok": true
+          },
+          "verbosity": {
+            "expected": "low",
+            "got": "low",
+            "ok": true
+          }
+        },
+        "reply": "माफ़ कीजिए, मैं समझ नहीं पाया। मैं बैलेंस, ट्रांसफर, लिमिट या क्रेडिट कार्ड में मदद कर सकता हूँ।",
+        "state": {
+          "frustration": 0.7,
+          "confusion": 0.0,
+          "urgency": 0.14,
+          "engagement": 0.71
+        },
+        "signals": [
+          "frustration phrase: ये क्या है",
+          "barge-in"
+        ],
+        "timings_ms": {
+          "understand": 0.25,
+          "adapt": 0.29,
+          "decide": 0.31,
+          "first_sentence": 0.34,
+          "total": 0.35
+        },
+        "used_fallback": false
+      },
+      {
+        "turn": 3,
+        "text": "ठीक है पच्चीस कर दो",
+        "checks": {
+          "intent": {
+            "expected": "transfer_confirm",
+            "got": "transfer_done",
+            "ok": false
+          },
+          "acknowledge_emotion": {
+            "expected": false,
+            "got": false,
+            "ok": true
+          }
+        },
+        "reply": "हो गया। ₹25,000 ट्रांसफर हो गए हैं। आपका रेफ़रेंस नंबर TXN153362 है।",
+        "state": {
+          "frustration": 0.49,
+          "confusion": 0.0,
+          "urgency": 0.098,
+          "engagement": 0.647
+        },
+        "signals": [],
+        "timings_ms": {
+          "understand": 0.18,
+          "adapt": 0.21,
+          "decide": 0.25,
+          "first_sentence": 0.29,
+          "total": 0.3
+        },
+        "used_fallback": false
+      },
+      {
+        "turn": 4,
+        "text": "हां",
+        "checks": {
+          "intent": {
+            "expected": "transfer_done",
+            "got": "unknown",
+            "ok": false
+          }
+        },
+        "reply": "माफ़ कीजिए, मैं समझ नहीं पाया। मैं बैलेंस, ट्रांसफर, लिमिट या क्रेडिट कार्ड में मदद कर सकता हूँ।",
+        "state": {
+          "frustration": 0.343,
+          "confusion": 0.0,
+          "urgency": 0.069,
+          "engagement": 0.513
+        },
+        "signals": [
+          "minimal reply"
+        ],
+        "timings_ms": {
+          "understand": 0.11,
+          "adapt": 0.13,
+          "decide": 0.14,
+          "first_sentence": 0.17,
+          "total": 0.18
+        },
+        "used_fallback": false
+      }
+    ],
+    "c008": [
+      {
+        "turn": 0,
+        "text": "हेलो जी नमस्ते",
+        "checks": {
+          "intent": {
+            "expected": "greet",
+            "got": "greet",
+            "ok": true
+          }
+        },
+        "reply": "नमस्ते Rahul, मैं आपकी क्या मदद कर सकता हूँ?",
+        "state": {
+          "frustration": 0.0,
+          "confusion": 0.0,
+          "urgency": 0.0,
+          "engagement": 0.5
+        },
+        "signals": [],
+        "timings_ms": {
+          "understand": 0.13,
+          "adapt": 0.16,
+          "decide": 0.17,
+          "first_sentence": 0.21,
+          "total": 0.21
+        },
+        "used_fallback": false
+      },
+      {
+        "turn": 1,
+        "text": "बैलेंस बताओ",
+        "checks": {
+          "intent": {
+            "expected": "check_balance",
+            "got": "check_balance",
+            "ok": true
+          }
+        },
+        "reply": "आपका मौजूदा बैलेंस ₹82,500 है।",
+        "state": {
+          "frustration": 0.0,
+          "confusion": 0.0,
+          "urgency": 0.0,
+          "engagement": 0.5
+        },
+        "signals": [],
+        "timings_ms": {
+          "understand": 0.13,
+          "adapt": 0.15,
+          "decide": 0.17,
+          "first_sentence": 0.21,
+          "total": 0.21
+        },
+        "used_fallback": false
+      },
+      {
+        "turn": 2,
+        "text": "और मेरा एटीएम कार्ड ब्लॉक हो गया है",
+        "checks": {
+          "intent": {
+            "expected": "unknown",
+            "got": "human_agent",
+            "ok": false
+          }
+        },
+        "reply": "ज़रूर, मैं आपको अभी एक एजेंट से जोड़ रहा हूँ।",
+        "state": {
+          "frustration": 0.0,
+          "confusion": 0.0,
+          "urgency": 0.0,
+          "engagement": 0.71
+        },
+        "signals": [],
+        "timings_ms": {
+          "understand": 0.19,
+          "adapt": 0.22,
+          "decide": 0.23,
+          "first_sentence": 0.27,
+          "total": 0.27
+        },
+        "used_fallback": false
+      },
+      {
+        "turn": 3,
+        "text": "किसी आदमी से बात कराओ",
+        "checks": {
+          "intent": {
+            "expected": "human_agent",
+            "got": "human_agent",
+            "ok": true
+          }
+        },
+        "reply": "ज़रूर, मैं आपको अभी एक एजेंट से जोड़ रहा हूँ।",
+        "state": {
+          "frustration": 0.0,
+          "confusion": 0.0,
+          "urgency": 0.0,
+          "engagement": 0.647
+        },
+        "signals": [],
+        "timings_ms": {
+          "understand": 0.16,
+          "adapt": 0.19,
+          "decide": 0.2,
+          "first_sentence": 0.24,
+          "total": 0.24
+        },
+        "used_fallback": false
+      }
+    ],
+    "c009": [
+      {
+        "turn": 0,
+        "text": "हां जी नमस्ते",
+        "checks": {
+          "intent": {
+            "expected": "greet",
+            "got": "greet",
+            "ok": true
+          }
+        },
+        "reply": "नमस्ते Priya, मैं आपकी क्या मदद कर सकता हूँ?",
+        "state": {
+          "frustration": 0.0,
+          "confusion": 0.0,
+          "urgency": 0.0,
+          "engagement": 0.5
+        },
+        "signals": [],
+        "timings_ms": {
+          "understand": 0.13,
+          "adapt": 0.15,
+          "decide": 0.17,
+          "first_sentence": 0.21,
+          "total": 0.21
+        },
+        "used_fallback": false
+      },
+      {
+        "turn": 1,
+        "text": "पेंशन आई कि नहीं देखो जरा",
+        "checks": {
+          "intent": {
+            "expected": "check_balance",
+            "got": "unknown",
+            "ok": false
+          }
+        },
+        "reply": "माफ़ कीजिए, मैं समझ नहीं पाया। मैं बैलेंस, ट्रांसफर, लिमिट या क्रेडिट कार्ड में मदद कर सकता हूँ।",
+        "state": {
+          "frustration": 0.0,
+          "confusion": 0.0,
+          "urgency": 0.0,
+          "engagement": 0.5
+        },
+        "signals": [],
+        "timings_ms": {
+          "understand": 0.16,
+          "adapt": 0.19,
+          "decide": 0.19,
+          "first_sentence": 0.23,
+          "total": 0.23
+        },
+        "used_fallback": false
+      },
+      {
+        "turn": 2,
+        "text": "बारह हज़ार हां पर पेंशन आई या नहीं समझ नहीं आया",
+        "checks": {
+          "complexity": {
+            "expected": "low",
+            "got": "low",
+            "ok": true
+          }
+        },
+        "reply": "नमस्ते Priya, मैं आपकी क्या मदद कर सकता हूँ?",
+        "state": {
+          "frustration": 0.0,
+          "confusion": 0.665,
+          "urgency": 0.0,
+          "engagement": 0.71
+        },
+        "signals": [
+          "confusion phrase: समझ नहीं"
+        ],
+        "timings_ms": {
+          "understand": 0.21,
+          "adapt": 0.26,
+          "decide": 0.37,
+          "first_sentence": 0.41,
+          "total": 0.42
+        },
+        "used_fallback": false
+      },
+      {
+        "turn": 3,
+        "text": "अच्छा बेटा पांच हज़ार पोते को भेजना है",
+        "checks": {
+          "intent": {
+            "expected": "transfer_confirm",
+            "got": "transfer_confirm",
+            "ok": true
+          }
+        },
+        "reply": "कन्फ़र्म कर दूँ, आप ₹5,000 ट्रांसफर करना चाहते हैं?",
+        "state": {
+          "frustration": 0.0,
+          "confusion": 0.465,
+          "urgency": 0.0,
+          "engagement": 0.773
+        },
+        "signals": [],
+        "timings_ms": {
+          "understand": 0.19,
+          "adapt": 0.22,
+          "decide": 0.26,
+          "first_sentence": 0.3,
+          "total": 0.3
+        },
+        "used_fallback": false
+      },
+      {
+        "turn": 4,
+        "text": "हां जी भेज दो",
+        "checks": {
+          "intent": {
+            "expected": "transfer_done",
+            "got": "transfer_done",
+            "ok": true
+          }
+        },
+        "reply": "हो गया। ₹5,000 ट्रांसफर हो गए हैं। आपका रेफ़रेंस नंबर TXN341758 है।",
+        "state": {
+          "frustration": 0.0,
+          "confusion": 0.326,
+          "urgency": 0.0,
+          "engagement": 0.691
+        },
+        "signals": [],
+        "timings_ms": {
+          "understand": 0.16,
+          "adapt": 0.19,
+          "decide": 0.22,
+          "first_sentence": 0.26,
+          "total": 0.27
+        },
+        "used_fallback": false
+      },
+      {
+        "turn": 5,
+        "text": "धन्यवाद बेटा",
+        "checks": {
+          "intent": {
+            "expected": "goodbye",
+            "got": "goodbye",
+            "ok": true
+          }
+        },
+        "reply": "कॉल करने के लिए धन्यवाद। आपका दिन शुभ हो!",
+        "state": {
+          "frustration": 0.0,
+          "confusion": 0.228,
+          "urgency": 0.0,
+          "engagement": 0.634
+        },
+        "signals": [],
+        "timings_ms": {
+          "understand": 0.15,
+          "adapt": 0.17,
+          "decide": 0.18,
+          "first_sentence": 0.21,
+          "total": 0.22
+        },
+        "used_fallback": false
+      }
+    ],
+    "c010": [
+      {
+        "turn": 0,
+        "text": "पच्चीस हज़ार ट्रांसफर करना है",
+        "checks": {
+          "intent": {
+            "expected": "transfer_confirm",
+            "got": "transfer_confirm",
+            "ok": true
+          }
+        },
+        "reply": "कन्फ़र्म कर दूँ, आप ₹25,000 ट्रांसफर करना चाहते हैं?",
+        "state": {
+          "frustration": 0.0,
+          "confusion": 0.0,
+          "urgency": 0.0,
+          "engagement": 0.5
+        },
+        "signals": [],
+        "timings_ms": {
+          "understand": 0.16,
+          "adapt": 0.19,
+          "decide": 0.23,
+          "first_sentence": 0.27,
+          "total": 0.27
+        },
+        "used_fallback": false
+      },
+      {
+        "turn": 1,
+        "text": "नहीं नहीं रुको मत भेजो",
+        "checks": {
+          "intent": {
+            "expected": "cancelled",
+            "got": "cancelled",
+            "ok": true
+          }
+        },
+        "reply": "ठीक है, मैंने कोई ट्रांसफर नहीं किया। और कुछ?",
+        "state": {
+          "frustration": 0.175,
+          "confusion": 0.0,
+          "urgency": 0.14,
+          "engagement": 0.5
+        },
+        "signals": [
+          "barge-in"
+        ],
+        "timings_ms": {
+          "understand": 0.18,
+          "adapt": 0.21,
+          "decide": 0.23,
+          "first_sentence": 0.26,
+          "total": 0.26
+        },
+        "used_fallback": false
+      },
+      {
+        "turn": 2,
+        "text": "बैलेंस कितना है",
+        "checks": {
+          "intent": {
+            "expected": "check_balance",
+            "got": "check_balance",
+            "ok": true
+          }
+        },
+        "reply": "आपका मौजूदा बैलेंस ₹82,500 है।",
+        "state": {
+          "frustration": 0.122,
+          "confusion": 0.0,
+          "urgency": 0.098,
+          "engagement": 0.71
+        },
+        "signals": [],
+        "timings_ms": {
+          "understand": 0.15,
+          "adapt": 0.17,
+          "decide": 0.19,
+          "first_sentence": 0.23,
+          "total": 0.23
+        },
+        "used_fallback": false
+      },
+      {
+        "turn": 3,
+        "text": "ठीक है बाय",
+        "checks": {
+          "intent": {
+            "expected": "goodbye",
+            "got": "goodbye",
+            "ok": true
+          }
+        },
+        "reply": "कॉल करने के लिए धन्यवाद। आपका दिन शुभ हो!",
+        "state": {
+          "frustration": 0.085,
+          "confusion": 0.0,
+          "urgency": 0.069,
+          "engagement": 0.647
+        },
+        "signals": [],
+        "timings_ms": {
+          "understand": 0.13,
+          "adapt": 0.15,
+          "decide": 0.16,
+          "first_sentence": 0.19,
+          "total": 0.19
+        },
+        "used_fallback": false
+      }
+    ],
+    "c011": [
+      {
+        "turn": 0,
+        "text": "आज कितना भेज सकती हूं",
+        "checks": {
+          "intent": {
+            "expected": "transfer_limit",
+            "got": "transfer_limit",
+            "ok": true
+          }
+        },
+        "reply": "आपकी डेली ट्रांसफर लिमिट ₹25,000 है, और आज ₹25,000 बाकी है।",
+        "state": {
+          "frustration": 0.0,
+          "confusion": 0.0,
+          "urgency": 0.0,
+          "engagement": 0.71
+        },
+        "signals": [],
+        "timings_ms": {
+          "understand": 0.15,
+          "adapt": 0.18,
+          "decide": 0.2,
+          "first_sentence": 0.25,
+          "total": 0.25
+        },
+        "used_fallback": false
+      },
+      {
+        "turn": 1,
+        "text": "बीस हज़ार भेजना है",
+        "checks": {
+          "intent": {
+            "expected": "transfer_insufficient",
+            "got": "transfer_insufficient",
+            "ok": true
+          }
+        },
+        "reply": "मैं ₹20,000 नहीं भेज सकता क्योंकि आपका बैलेंस ₹12,000 है।",
+        "state": {
+          "frustration": 0.0,
+          "confusion": 0.0,
+          "urgency": 0.0,
+          "engagement": 0.647
+        },
+        "signals": [],
+        "timings_ms": {
+          "understand": 0.15,
+          "adapt": 0.18,
+          "decide": 0.22,
+          "first_sentence": 0.26,
+          "total": 0.27
+        },
+        "used_fallback": false
+      },
+      {
+        "turn": 2,
+        "text": "अच्छा तो दस हज़ार",
+        "checks": {
+          "intent": {
+            "expected": "transfer_confirm",
+            "got": "transfer_confirm",
+            "ok": true
+          }
+        },
+        "reply": "कन्फ़र्म कर दूँ, आप ₹10,000 ट्रांसफर करना चाहते हैं?",
+        "state": {
+          "frustration": 0.0,
+          "confusion": 0.0,
+          "urgency": 0.0,
+          "engagement": 0.603
+        },
+        "signals": [],
+        "timings_ms": {
+          "understand": 0.15,
+          "adapt": 0.18,
+          "decide": 0.21,
+          "first_sentence": 0.25,
+          "total": 0.25
+        },
+        "used_fallback": false
+      },
+      {
+        "turn": 3,
+        "text": "हां",
+        "checks": {
+          "intent": {
+            "expected": "transfer_done",
+            "got": "transfer_done",
+            "ok": true
+          }
+        },
+        "reply": "हो गया। ₹10,000 ट्रांसफर हो गए हैं। आपका रेफ़रेंस नंबर TXN143730 है।",
+        "state": {
+          "frustration": 0.0,
+          "confusion": 0.0,
+          "urgency": 0.0,
+          "engagement": 0.482
+        },
+        "signals": [
+          "minimal reply"
+        ],
+        "timings_ms": {
+          "understand": 0.12,
+          "adapt": 0.14,
+          "decide": 0.16,
+          "first_sentence": 0.2,
+          "total": 0.21
+        },
+        "used_fallback": false
+      }
+    ],
+    "c012": [
+      {
+        "turn": 0,
+        "text": "hello",
+        "checks": {
+          "intent": {
+            "expected": "greet",
+            "got": "greet",
+            "ok": true
+          }
+        },
+        "reply": "Hello Rahul, how can I help you today?",
+        "state": {
+          "frustration": 0.0,
+          "confusion": 0.0,
+          "urgency": 0.0,
+          "engagement": 0.5
+        },
+        "signals": [],
+        "timings_ms": {
+          "understand": 0.1,
+          "adapt": 0.12,
+          "decide": 0.13,
+          "first_sentence": 0.17,
+          "total": 0.17
+        },
+        "used_fallback": false
+      },
+      {
+        "turn": 1,
+        "text": "whats my balance",
+        "checks": {
+          "intent": {
+            "expected": "check_balance",
+            "got": "check_balance",
+            "ok": true
+          }
+        },
+        "reply": "Your current balance is ₹82,500.",
+        "state": {
+          "frustration": 0.0,
+          "confusion": 0.0,
+          "urgency": 0.0,
+          "engagement": 0.5
+        },
+        "signals": [],
+        "timings_ms": {
+          "understand": 0.13,
+          "adapt": 0.16,
+          "decide": 0.18,
+          "first_sentence": 0.22,
+          "total": 0.22
+        },
+        "used_fallback": false
+      },
+      {
+        "turn": 2,
+        "text": "ok send fifty thousand to my landlord",
+        "checks": {
+          "intent": {
+            "expected": "transfer_over_limit",
+            "got": "transfer_over_limit",
+            "ok": true
+          }
+        },
+        "reply": "Your daily limit is ₹40,000 and only ₹25,000 is left today, so I can't send ₹50,000. Should I send ₹25,000 instead?",
+        "state": {
+          "frustration": 0.0,
+          "confusion": 0.0,
+          "urgency": 0.0,
+          "engagement": 0.5
+        },
+        "signals": [],
+        "timings_ms": {
+          "understand": 0.16,
+          "adapt": 0.19,
+          "decide": 0.23,
+          "first_sentence": 0.28,
+          "total": 0.29
+        },
+        "used_fallback": false
+      },
+      {
+        "turn": 3,
+        "text": "which limit",
+        "checks": {
+          "complexity": {
+            "expected": "low",
+            "got": "low",
+            "ok": true
+          }
+        },
+        "reply": "Your daily limit is ₹40,000 and only ₹25,000 is left today, so I can't send ₹50,000. Should I send ₹25,000 instead?",
+        "state": {
+          "frustration": 0.0,
+          "confusion": 0.42,
+          "urgency": 0.0,
+          "engagement": 0.5
+        },
+        "signals": [
+          "confusion phrase: which limit"
+        ],
+        "timings_ms": {
+          "understand": 0.14,
+          "adapt": 0.16,
+          "decide": 0.19,
+          "first_sentence": 0.24,
+          "total": 0.25
+        },
+        "used_fallback": false
+      },
+      {
+        "turn": 4,
+        "text": "fine twenty five then",
+        "checks": {
+          "intent": {
+            "expected": "transfer_confirm",
+            "got": "unknown",
+            "ok": false
+          }
+        },
+        "reply": "Sorry, I didn't get that. I can help with balance, transfers, limits or a credit card.",
+        "state": {
+          "frustration": 0.0,
+          "confusion": 0.294,
+          "urgency": 0.0,
+          "engagement": 0.5
+        },
+        "signals": [],
+        "timings_ms": {
+          "understand": 0.15,
+          "adapt": 0.18,
+          "decide": 0.19,
+          "first_sentence": 0.22,
+          "total": 0.24
+        },
+        "used_fallback": false
+      },
+      {
+        "turn": 5,
+        "text": "yes",
+        "checks": {
+          "intent": {
+            "expected": "transfer_done",
+            "got": "transfer_done",
+            "ok": true
+          }
+        },
+        "reply": "Done. ₹25,000 has been transferred. Your reference number is TXN416954.",
+        "state": {
+          "frustration": 0.0,
+          "confusion": 0.206,
+          "urgency": 0.0,
+          "engagement": 0.5
+        },
+        "signals": [],
+        "timings_ms": {
+          "understand": 0.11,
+          "adapt": 0.13,
+          "decide": 0.16,
+          "first_sentence": 0.19,
+          "total": 0.2
+        },
+        "used_fallback": false
+      },
+      {
+        "turn": 6,
+        "text": "thanks bye",
+        "checks": {
+          "intent": {
+            "expected": "goodbye",
+            "got": "goodbye",
+            "ok": true
+          }
+        },
+        "reply": "Thank you for calling. Have a good day!",
+        "state": {
+          "frustration": 0.0,
+          "confusion": 0.144,
+          "urgency": 0.0,
+          "engagement": 0.5
+        },
+        "signals": [],
+        "timings_ms": {
+          "understand": 0.12,
+          "adapt": 0.14,
+          "decide": 0.15,
+          "first_sentence": 0.18,
+          "total": 0.19
+        },
+        "used_fallback": false
+      }
+    ],
+    "c013": [
+      {
+        "turn": 0,
+        "text": "i want to send fifteen thousand",
+        "checks": {
+          "intent": {
+            "expected": "transfer_insufficient",
+            "got": "transfer_insufficient",
+            "ok": true
+          }
+        },
+        "reply": "I can't send ₹15,000 because your balance is ₹12,000.",
+        "state": {
+          "frustration": 0.0,
+          "confusion": 0.0,
+          "urgency": 0.0,
+          "engagement": 0.5
+        },
+        "signals": [],
+        "timings_ms": {
+          "understand": 0.14,
+          "adapt": 0.17,
+          "decide": 0.21,
+          "first_sentence": 0.25,
+          "total": 0.26
+        },
+        "used_fallback": false
+      },
+      {
+        "turn": 1,
+        "text": "how much do i have",
+        "checks": {
+          "intent": {
+            "expected": "check_balance",
+            "got": "check_balance",
+            "ok": true
+          }
+        },
+        "reply": "Your current balance is ₹12,000.",
+        "state": {
+          "frustration": 0.0,
+          "confusion": 0.0,
+          "urgency": 0.0,
+          "engagement": 0.71
+        },
+        "signals": [],
+        "timings_ms": {
+          "understand": 0.14,
+          "adapt": 0.17,
+          "decide": 0.19,
+          "first_sentence": 0.22,
+          "total": 0.22
+        },
+        "used_fallback": false
+      },
+      {
+        "turn": 2,
+        "text": "okay send ten thousand",
+        "checks": {
+          "intent": {
+            "expected": "transfer_confirm",
+            "got": "transfer_confirm",
+            "ok": true
+          }
+        },
+        "reply": "Just to confirm, you want to transfer ₹10,000?",
+        "state": {
+          "frustration": 0.0,
+          "confusion": 0.0,
+          "urgency": 0.0,
+          "engagement": 0.647
+        },
+        "signals": [],
+        "timings_ms": {
+          "understand": 0.15,
+          "adapt": 0.18,
+          "decide": 0.21,
+          "first_sentence": 0.25,
+          "total": 0.25
+        },
+        "used_fallback": false
+      },
+      {
+        "turn": 3,
+        "text": "no wait dont",
+        "checks": {
+          "intent": {
+            "expected": "cancelled",
+            "got": "cancelled",
+            "ok": true
+          }
+        },
+        "reply": "Okay, I have not made any transfer. Anything else?",
+        "state": {
+          "frustration": 0.175,
+          "confusion": 0.0,
+          "urgency": 0.14,
+          "engagement": 0.603
+        },
+        "signals": [
+          "barge-in"
+        ],
+        "timings_ms": {
+          "understand": 0.14,
+          "adapt": 0.17,
+          "decide": 0.18,
+          "first_sentence": 0.22,
+          "total": 0.22
+        },
+        "used_fallback": false
+      },
+      {
+        "turn": 4,
+        "text": "bye",
+        "checks": {
+          "intent": {
+            "expected": "goodbye",
+            "got": "goodbye",
+            "ok": true
+          }
+        },
+        "reply": "Thank you for calling. Have a good day!",
+        "state": {
+          "frustration": 0.122,
+          "confusion": 0.0,
+          "urgency": 0.098,
+          "engagement": 0.572
+        },
+        "signals": [],
+        "timings_ms": {
+          "understand": 0.11,
+          "adapt": 0.12,
+          "decide": 0.13,
+          "first_sentence": 0.16,
+          "total": 0.17
+        },
+        "used_fallback": false
+      }
+    ],
+    "c014": [
+      {
+        "turn": 0,
+        "text": "hi",
+        "checks": {
+          "intent": {
+            "expected": "greet",
+            "got": "greet",
+            "ok": true
+          }
+        },
+        "reply": "Hello Rahul, how can I help you today?",
+        "state": {
+          "frustration": 0.0,
+          "confusion": 0.0,
+          "urgency": 0.0,
+          "engagement": 0.5
+        },
+        "signals": [],
+        "timings_ms": {
+          "understand": 0.1,
+          "adapt": 0.11,
+          "decide": 0.13,
+          "first_sentence": 0.17,
+          "total": 0.17
+        },
+        "used_fallback": false
+      },
+      {
+        "turn": 1,
+        "text": "i got some sms about a credit card offer",
+        "checks": {
+          "intent": {
+            "expected": "card_offer",
+            "got": "card_offer",
+            "ok": true
+          }
+        },
+        "reply": "You are pre-approved for a credit card with a limit of ₹1,50,000 and no annual fee in the first year. Would you like to apply?",
+        "state": {
+          "frustration": 0.0,
+          "confusion": 0.0,
+          "urgency": 0.0,
+          "engagement": 0.71
+        },
+        "signals": [],
+        "timings_ms": {
+          "understand": 0.16,
+          "adapt": 0.2,
+          "decide": 0.22,
+          "first_sentence": 0.26,
+          "total": 0.27
+        },
+        "used_fallback": false
+      },
+      {
+        "turn": 2,
+        "text": "whats the annual fee",
+        "checks": {},
+        "reply": "Sorry, I didn't get that. I can help with balance, transfers, limits or a credit card.",
+        "state": {
+          "frustration": 0.0,
+          "confusion": 0.0,
+          "urgency": 0.0,
+          "engagement": 0.647
+        },
+        "signals": [],
+        "timings_ms": {
+          "understand": 0.17,
+          "adapt": 0.19,
+          "decide": 0.2,
+          "first_sentence": 0.23,
+          "total": 0.24
+        },
+        "used_fallback": false
+      },
+      {
+        "turn": 3,
+        "text": "okay sign me up",
+        "checks": {
+          "intent": {
+            "expected": "card_apply_started",
+            "got": "card_apply_started",
+            "ok": true
+          }
+        },
+        "reply": "Great, I have started your application. You'll get an SMS link to complete it.",
+        "state": {
+          "frustration": 0.0,
+          "confusion": 0.0,
+          "urgency": 0.0,
+          "engagement": 0.603
+        },
+        "signals": [],
+        "timings_ms": {
+          "understand": 0.14,
+          "adapt": 0.17,
+          "decide": 0.22,
+          "first_sentence": 0.25,
+          "total": 0.26
+        },
+        "used_fallback": false
+      },
+      {
+        "turn": 4,
+        "text": "thanks",
+        "checks": {
+          "intent": {
+            "expected": "goodbye",
+            "got": "goodbye",
+            "ok": true
+          }
+        },
+        "reply": "Thank you for calling. Have a good day!",
+        "state": {
+          "frustration": 0.0,
+          "confusion": 0.0,
+          "urgency": 0.0,
+          "engagement": 0.572
+        },
+        "signals": [],
+        "timings_ms": {
+          "understand": 0.11,
+          "adapt": 0.13,
+          "decide": 0.14,
+          "first_sentence": 0.17,
+          "total": 0.17
+        },
+        "used_fallback": false
+      }
+    ],
+    "c015": [
+      {
+        "turn": 0,
+        "text": "transfer money",
+        "checks": {
+          "intent": {
+            "expected": "transfer_ask_amount",
+            "got": "transfer_ask_amount",
+            "ok": true
+          }
+        },
+        "reply": "Sure. How much would you like to transfer?",
+        "state": {
+          "frustration": 0.0,
+          "confusion": 0.0,
+          "urgency": 0.0,
+          "engagement": 0.5
+        },
+        "signals": [],
+        "timings_ms": {
+          "understand": 0.12,
+          "adapt": 0.14,
+          "decide": 0.16,
+          "first_sentence": 0.19,
+          "total": 0.2
+        },
+        "used_fallback": false
+      },
+      {
+        "turn": 1,
+        "text": "forty thousand",
+        "checks": {
+          "intent": {
+            "expected": "transfer_over_limit",
+            "got": "transfer_over_limit",
+            "ok": true
+          }
+        },
+        "reply": "Your daily limit is ₹40,000 and only ₹25,000 is left today, so I can't send ₹40,000. Should I send ₹25,000 instead?",
+        "state": {
+          "frustration": 0.0,
+          "confusion": 0.0,
+          "urgency": 0.0,
+          "engagement": 0.5
+        },
+        "signals": [],
+        "timings_ms": {
+          "understand": 0.12,
+          "adapt": 0.15,
+          "decide": 0.19,
+          "first_sentence": 0.23,
+          "total": 0.24
+        },
+        "used_fallback": false
+      },
+      {
+        "turn": 2,
+        "text": "what i never set any limit",
+        "checks": {
+          "complexity": {
+            "expected": "low",
+            "got": "med",
+            "ok": false
+          }
+        },
+        "reply": "Your daily transfer limit is ₹40,000, and ₹25,000 is left for today.",
+        "state": {
+          "frustration": 0.0,
+          "confusion": 0.0,
+          "urgency": 0.0,
+          "engagement": 0.71
+        },
+        "signals": [],
+        "timings_ms": {
+          "understand": 0.17,
+          "adapt": 0.19,
+          "decide": 0.22,
+          "first_sentence": 0.26,
+          "total": 0.26
+        },
+        "used_fallback": false
+      },
+      {
+        "turn": 3,
+        "text": "this is ridiculous just connect me to a person",
+        "checks": {
+          "intent": {
+            "expected": "human_agent",
+            "got": "human_agent",
+            "ok": true
+          },
+          "acknowledge_emotion": {
+            "expected": true,
+            "got": true,
+            "ok": true
+          },
+          "verbosity": {
+            "expected": "low",
+            "got": "low",
+            "ok": true
+          }
+        },
+        "reply": "Sure, I am connecting you to an agent now.",
+        "state": {
+          "frustration": 0.7,
+          "confusion": 0.0,
+          "urgency": 0.14,
+          "engagement": 0.773
+        },
+        "signals": [
+          "frustration phrase: this is ridiculous",
+          "barge-in"
+        ],
+        "timings_ms": {
+          "understand": 0.21,
+          "adapt": 0.24,
+          "decide": 0.26,
+          "first_sentence": 0.29,
+          "total": 0.29
+        },
+        "used_fallback": false
+      }
+    ],
+    "c016": [
+      {
+        "turn": 0,
+        "text": "am i eligible for a credit card",
+        "checks": {
+          "intent": {
+            "expected": "card_ineligible",
+            "got": "card_ineligible",
+            "ok": true
+          }
+        },
+        "reply": "Right now you are not eligible for a credit card. I can check again later.",
+        "state": {
+          "frustration": 0.0,
+          "confusion": 0.0,
+          "urgency": 0.0,
+          "engagement": 0.5
+        },
+        "signals": [],
+        "timings_ms": {
+          "understand": 0.14,
+          "adapt": 0.17,
+          "decide": 0.19,
+          "first_sentence": 0.22,
+          "total": 0.23
+        },
+        "used_fallback": false
+      },
+      {
+        "turn": 1,
+        "text": "why not ive been with you for like ten years",
+        "checks": {},
+        "reply": "Sorry, I didn't get that. I can help with balance, transfers, limits or a credit card.",
+        "state": {
+          "frustration": 0.0,
+          "confusion": 0.0,
+          "urgency": 0.0,
+          "engagement": 0.71
+        },
+        "signals": [],
+        "timings_ms": {
+          "understand": 0.17,
+          "adapt": 0.2,
+          "decide": 0.21,
+          "first_sentence": 0.24,
+          "total": 0.25
+        },
+        "used_fallback": false
+      },
+      {
+        "turn": 2,
+        "text": "forget it whats my balance",
+        "checks": {
+          "intent": {
+            "expected": "check_balance",
+            "got": "check_balance",
+            "ok": true
+          }
+        },
+        "reply": "Your current balance is ₹12,000.",
+        "state": {
+          "frustration": 0.0,
+          "confusion": 0.0,
+          "urgency": 0.0,
+          "engagement": 0.647
+        },
+        "signals": [],
+        "timings_ms": {
+          "understand": 0.15,
+          "adapt": 0.18,
+          "decide": 0.2,
+          "first_sentence": 0.23,
+          "total": 0.23
+        },
+        "used_fallback": false
+      },
+      {
+        "turn": 3,
+        "text": "bye",
+        "checks": {
+          "intent": {
+            "expected": "goodbye",
+            "got": "goodbye",
+            "ok": true
+          }
+        },
+        "reply": "Thank you for calling. Have a good day!",
+        "state": {
+          "frustration": 0.0,
+          "confusion": 0.0,
+          "urgency": 0.0,
+          "engagement": 0.603
+        },
+        "signals": [],
+        "timings_ms": {
+          "understand": 0.11,
+          "adapt": 0.13,
+          "decide": 0.14,
+          "first_sentence": 0.17,
+          "total": 0.17
+        },
+        "used_fallback": false
+      }
+    ],
+    "c017": [
+      {
+        "turn": 0,
+        "text": "hello",
+        "checks": {
+          "intent": {
+            "expected": "greet",
+            "got": "greet",
+            "ok": true
+          }
+        },
+        "reply": "Hello Rahul, how can I help you today?",
+        "state": {
+          "frustration": 0.0,
+          "confusion": 0.0,
+          "urgency": 0.0,
+          "engagement": 0.5
+        },
+        "signals": [],
+        "timings_ms": {
+          "understand": 0.1,
+          "adapt": 0.11,
+          "decide": 0.13,
+          "first_sentence": 0.17,
+          "total": 0.17
+        },
+        "used_fallback": false
+      },
+      {
+        "turn": 1,
+        "text": "transfer limit please",
+        "checks": {
+          "intent": {
+            "expected": "transfer_limit",
+            "got": "transfer_limit",
+            "ok": true
+          }
+        },
+        "reply": "Your daily transfer limit is ₹40,000, and ₹25,000 is left for today.",
+        "state": {
+          "frustration": 0.0,
+          "confusion": 0.0,
+          "urgency": 0.0,
+          "engagement": 0.5
+        },
+        "signals": [],
+        "timings_ms": {
+          "understand": 0.13,
+          "adapt": 0.16,
+          "decide": 0.18,
+          "first_sentence": 0.22,
+          "total": 0.22
+        },
+        "used_fallback": false
+      },
+      {
+        "turn": 2,
+        "text": "हिंदी में बोलो",
+        "checks": {
+          "language": {
+            "expected": "hi",
+            "got": "hi",
+            "ok": true
+          }
+        },
+        "reply": "माफ़ कीजिए, मैं समझ नहीं पाया। मैं बैलेंस, ट्रांसफर, लिमिट या क्रेडिट कार्ड में मदद कर सकता हूँ।",
+        "state": {
+          "frustration": 0.0,
+          "confusion": 0.0,
+          "urgency": 0.0,
+          "engagement": 0.5
+        },
+        "signals": [],
+        "timings_ms": {
+          "understand": 0.14,
+          "adapt": 0.17,
+          "decide": 0.18,
+          "first_sentence": 0.21,
+          "total": 0.22
+        },
+        "used_fallback": false
+      },
+      {
+        "turn": 3,
+        "text": "बीस हज़ार भेज दो",
+        "checks": {
+          "intent": {
+            "expected": "transfer_confirm",
+            "got": "transfer_confirm",
+            "ok": true
+          },
+          "language": {
+            "expected": "hi",
+            "got": "hi",
+            "ok": true
+          }
+        },
+        "reply": "कन्फ़र्म कर दूँ, आप ₹20,000 ट्रांसफर करना चाहते हैं?",
+        "state": {
+          "frustration": 0.0,
+          "confusion": 0.0,
+          "urgency": 0.0,
+          "engagement": 0.5
+        },
+        "signals": [],
+        "timings_ms": {
+          "understand": 0.15,
+          "adapt": 0.17,
+          "decide": 0.21,
+          "first_sentence": 0.25,
+          "total": 0.25
+        },
+        "used_fallback": false
+      },
+      {
+        "turn": 4,
+        "text": "हां",
+        "checks": {
+          "intent": {
+            "expected": "transfer_done",
+            "got": "transfer_done",
+            "ok": true
+          },
+          "language": {
+            "expected": "hi",
+            "got": "hi",
+            "ok": true
+          }
+        },
+        "reply": "हो गया। ₹20,000 ट्रांसफर हो गए हैं। आपका रेफ़रेंस नंबर TXN219504 है।",
+        "state": {
+          "frustration": 0.0,
+          "confusion": 0.0,
+          "urgency": 0.0,
+          "engagement": 0.41
+        },
+        "signals": [
+          "minimal reply"
+        ],
+        "timings_ms": {
+          "understand": 0.11,
+          "adapt": 0.12,
+          "decide": 0.15,
+          "first_sentence": 0.19,
+          "total": 0.2
+        },
+        "used_fallback": false
+      }
+    ],
+    "c018": [
+      {
+        "turn": 0,
+        "text": "check my balance",
+        "checks": {
+          "intent": {
+            "expected": "check_balance",
+            "got": "check_balance",
+            "ok": true
+          }
+        },
+        "reply": "Your current balance is ₹82,500.",
+        "state": {
+          "frustration": 0.0,
+          "confusion": 0.0,
+          "urgency": 0.0,
+          "engagement": 0.5
+        },
+        "signals": [],
+        "timings_ms": {
+          "understand": 0.12,
+          "adapt": 0.15,
+          "decide": 0.17,
+          "first_sentence": 0.2,
+          "total": 0.2
+        },
+        "used_fallback": false
+      },
+      {
+        "turn": 1,
+        "text": "tell me about the credit card thing",
+        "checks": {
+          "intent": {
+            "expected": "card_offer",
+            "got": "card_offer",
+            "ok": true
+          }
+        },
+        "reply": "You are pre-approved for a credit card with a limit of ₹1,50,000 and no annual fee in the first year. Would you like to apply?",
+        "state": {
+          "frustration": 0.0,
+          "confusion": 0.0,
+          "urgency": 0.0,
+          "engagement": 0.5
+        },
+        "signals": [],
+        "timings_ms": {
+          "understand": 0.16,
+          "adapt": 0.19,
+          "decide": 0.22,
+          "first_sentence": 0.26,
+          "total": 0.26
+        },
+        "used_fallback": false
+      },
+      {
+        "turn": 2,
+        "text": "no thanks",
+        "checks": {
+          "intent": {
+            "expected": "card_declined",
+            "got": "card_declined",
+            "ok": true
+          }
+        },
+        "reply": "No problem at all. Is there anything else I can help with?",
+        "state": {
+          "frustration": 0.0,
+          "confusion": 0.0,
+          "urgency": 0.0,
+          "engagement": 0.5
+        },
+        "signals": [],
+        "timings_ms": {
+          "understand": 0.13,
+          "adapt": 0.15,
+          "decide": 0.17,
+          "first_sentence": 0.2,
+          "total": 0.2
+        },
+        "used_fallback": false
+      },
+      {
+        "turn": 3,
+        "text": "i said no",
+        "checks": {
+          "intent": {
+            "expected": "card_declined_again",
+            "got": "unknown",
+            "ok": false
+          }
+        },
+        "reply": "Sorry, I didn't get that. I can help with balance, transfers, limits or a credit card.",
+        "state": {
+          "frustration": 0.0,
+          "confusion": 0.0,
+          "urgency": 0.0,
+          "engagement": 0.5
+        },
+        "signals": [],
+        "timings_ms": {
+          "understand": 0.12,
+          "adapt": 0.14,
+          "decide": 0.14,
+          "first_sentence": 0.17,
+          "total": 0.18
+        },
+        "used_fallback": false
+      },
+      {
+        "turn": 4,
+        "text": "bye",
+        "checks": {
+          "intent": {
+            "expected": "goodbye",
+            "got": "goodbye",
+            "ok": true
+          }
+        },
+        "reply": "Thank you for calling. Have a good day!",
+        "state": {
+          "frustration": 0.0,
+          "confusion": 0.0,
+          "urgency": 0.0,
+          "engagement": 0.5
+        },
+        "signals": [],
+        "timings_ms": {
+          "understand": 0.1,
+          "adapt": 0.12,
+          "decide": 0.13,
+          "first_sentence": 0.15,
+          "total": 0.16
+        },
+        "used_fallback": false
+      }
+    ],
+    "c019": [
+      {
+        "turn": 0,
+        "text": "balance quick im driving",
+        "checks": {
+          "intent": {
+            "expected": "check_balance",
+            "got": "check_balance",
+            "ok": true
+          }
+        },
+        "reply": "Your current balance is ₹12,000.",
+        "state": {
+          "frustration": 0.0,
+          "confusion": 0.0,
+          "urgency": 0.28,
+          "engagement": 0.5
+        },
+        "signals": [
+          "urgency phrase: quick"
+        ],
+        "timings_ms": {
+          "understand": 0.14,
+          "adapt": 0.17,
+          "decide": 0.19,
+          "first_sentence": 0.23,
+          "total": 0.23
+        },
+        "used_fallback": false
+      },
+      {
+        "turn": 1,
+        "text": "send five thousand to ramesh",
+        "checks": {
+          "intent": {
+            "expected": "transfer_confirm",
+            "got": "transfer_confirm",
+            "ok": true
+          }
+        },
+        "reply": "Just to confirm, you want to transfer ₹5,000?",
+        "state": {
+          "frustration": 0.0,
+          "confusion": 0.0,
+          "urgency": 0.196,
+          "engagement": 0.5
+        },
+        "signals": [],
+        "timings_ms": {
+          "understand": 0.15,
+          "adapt": 0.17,
+          "decide": 0.21,
+          "first_sentence": 0.25,
+          "total": 0.25
+        },
+        "used_fallback": false
+      },
+      {
+        "turn": 2,
+        "text": "yes yes",
+        "checks": {
+          "intent": {
+            "expected": "transfer_done",
+            "got": "transfer_done",
+            "ok": true
+          }
+        },
+        "reply": "Done. ₹5,000 has been transferred. Your reference number is TXN457380.",
+        "state": {
+          "frustration": 0.175,
+          "confusion": 0.0,
+          "urgency": 0.199,
+          "engagement": 0.5
+        },
+        "signals": [
+          "barge-in"
+        ],
+        "timings_ms": {
+          "understand": 0.13,
+          "adapt": 0.15,
+          "decide": 0.18,
+          "first_sentence": 0.22,
+          "total": 0.23
+        },
+        "used_fallback": false
+      },
+      {
+        "turn": 3,
+        "text": "bye",
+        "checks": {
+          "intent": {
+            "expected": "goodbye",
+            "got": "goodbye",
+            "ok": true
+          }
+        },
+        "reply": "Thank you for calling. Have a good day!",
+        "state": {
+          "frustration": 0.122,
+          "confusion": 0.0,
+          "urgency": 0.139,
+          "engagement": 0.5
+        },
+        "signals": [],
+        "timings_ms": {
+          "understand": 0.11,
+          "adapt": 0.13,
+          "decide": 0.14,
+          "first_sentence": 0.17,
+          "total": 0.17
+        },
+        "used_fallback": false
+      }
+    ],
+    "c020": [
+      {
+        "turn": 0,
+        "text": "i need to make a transfer",
+        "checks": {
+          "intent": {
+            "expected": "transfer_ask_amount",
+            "got": "transfer_ask_amount",
+            "ok": true
+          }
+        },
+        "reply": "Sure. How much would you like to transfer?",
+        "state": {
+          "frustration": 0.0,
+          "confusion": 0.0,
+          "urgency": 0.0,
+          "engagement": 0.5
+        },
+        "signals": [],
+        "timings_ms": {
+          "understand": 0.15,
+          "adapt": 0.17,
+          "decide": 0.2,
+          "first_sentence": 0.23,
+          "total": 0.23
+        },
+        "used_fallback": false
+      },
+      {
+        "turn": 1,
+        "text": "um twenty five thousand",
+        "checks": {
+          "intent": {
+            "expected": "transfer_confirm",
+            "got": "transfer_confirm",
+            "ok": true
+          }
+        },
+        "reply": "Just to confirm, you want to transfer ₹25,000?",
+        "state": {
+          "frustration": 0.0,
+          "confusion": 0.0,
+          "urgency": 0.0,
+          "engagement": 0.5
+        },
+        "signals": [],
+        "timings_ms": {
+          "understand": 0.14,
+          "adapt": 0.17,
+          "decide": 0.21,
+          "first_sentence": 0.24,
+          "total": 0.25
+        },
+        "used_fallback": false
+      },
+      {
+        "turn": 2,
+        "text": "wait so the money went or not",
+        "checks": {
+          "complexity": {
+            "expected": "low",
+            "got": "med",
+            "ok": false
+          }
+        },
+        "reply": "Sorry, I didn't get that. I can help with balance, transfers, limits or a credit card.",
+        "state": {
+          "frustration": 0.0,
+          "confusion": 0.0,
+          "urgency": 0.0,
+          "engagement": 0.5
+        },
+        "signals": [],
+        "timings_ms": {
+          "understand": 0.18,
+          "adapt": 0.21,
+          "decide": 0.23,
+          "first_sentence": 0.26,
+          "total": 0.27
+        },
+        "used_fallback": false
+      },
+      {
+        "turn": 3,
+        "text": "yes go ahead",
+        "checks": {
+          "intent": {
+            "expected": "transfer_done",
+            "got": "transfer_done",
+            "ok": true
+          }
+        },
+        "reply": "Done. ₹25,000 has been transferred. Your reference number is TXN953315.",
+        "state": {
+          "frustration": 0.0,
+          "confusion": 0.0,
+          "urgency": 0.0,
+          "engagement": 0.5
+        },
+        "signals": [],
+        "timings_ms": {
+          "understand": 0.15,
+          "adapt": 0.18,
+          "decide": 0.21,
+          "first_sentence": 0.25,
+          "total": 0.26
+        },
+        "used_fallback": false
+      },
+      {
+        "turn": 4,
+        "text": "thank you",
+        "checks": {
+          "intent": {
+            "expected": "goodbye",
+            "got": "goodbye",
+            "ok": true
+          }
+        },
+        "reply": "Thank you for calling. Have a good day!",
+        "state": {
+          "frustration": 0.0,
+          "confusion": 0.0,
+          "urgency": 0.0,
+          "engagement": 0.5
+        },
+        "signals": [],
+        "timings_ms": {
+          "understand": 0.12,
+          "adapt": 0.14,
+          "decide": 0.15,
+          "first_sentence": 0.18,
+          "total": 0.18
+        },
+        "used_fallback": false
+      }
+    ],
+    "c021": [
+      {
+        "turn": 0,
+        "text": "hello madam",
+        "checks": {
+          "intent": {
+            "expected": "greet",
+            "got": "greet",
+            "ok": true
+          }
+        },
+        "reply": "Hello Rahul, how can I help you today?",
+        "state": {
+          "frustration": 0.0,
+          "confusion": 0.0,
+          "urgency": 0.0,
+          "engagement": 0.5
+        },
+        "signals": [],
+        "timings_ms": {
+          "understand": 0.12,
+          "adapt": 0.14,
+          "decide": 0.16,
+          "first_sentence": 0.2,
+          "total": 0.2
+        },
+        "used_fallback": false
+      },
+      {
+        "turn": 1,
+        "text": "my debit card got blocked",
+        "checks": {
+          "intent": {
+            "expected": "unknown",
+            "got": "human_agent",
+            "ok": false
+          }
+        },
+        "reply": "Sure, I am connecting you to an agent now.",
+        "state": {
+          "frustration": 0.0,
+          "confusion": 0.0,
+          "urgency": 0.0,
+          "engagement": 0.5
+        },
+        "signals": [],
+        "timings_ms": {
+          "understand": 0.15,
+          "adapt": 0.17,
+          "decide": 0.19,
+          "first_sentence": 0.22,
+          "total": 0.22
+        },
+        "used_fallback": false
+      },
+      {
+        "turn": 2,
+        "text": "ok then balance please",
+        "checks": {
+          "intent": {
+            "expected": "check_balance",
+            "got": "check_balance",
+            "ok": true
+          }
+        },
+        "reply": "Your current balance is ₹82,500.",
+        "state": {
+          "frustration": 0.0,
+          "confusion": 0.0,
+          "urgency": 0.0,
+          "engagement": 0.5
+        },
+        "signals": [],
+        "timings_ms": {
+          "understand": 0.14,
+          "adapt": 0.17,
+          "decide": 0.18,
+          "first_sentence": 0.22,
+          "total": 0.22
+        },
+        "used_fallback": false
+      },
+      {
+        "turn": 3,
+        "text": "i want person to talk for card block",
+        "checks": {
+          "intent": {
+            "expected": "human_agent",
+            "got": "human_agent",
+            "ok": true
+          }
+        },
+        "reply": "Sure, I am connecting you to an agent now.",
+        "state": {
+          "frustration": 0.0,
+          "confusion": 0.0,
+          "urgency": 0.0,
+          "engagement": 0.71
+        },
+        "signals": [],
+        "timings_ms": {
+          "understand": 0.17,
+          "adapt": 0.2,
+          "decide": 0.22,
+          "first_sentence": 0.25,
+          "total": 0.25
+        },
+        "used_fallback": false
+      }
+    ],
+    "c022": [
+      {
+        "turn": 0,
+        "text": "uh how much can i send to day",
+        "checks": {
+          "intent": {
+            "expected": "transfer_limit",
+            "got": "transfer_limit",
+            "ok": true
+          }
+        },
+        "reply": "Your daily transfer limit is ₹25,000, and ₹25,000 is left for today.",
+        "state": {
+          "frustration": 0.0,
+          "confusion": 0.0,
+          "urgency": 0.0,
+          "engagement": 0.71
+        },
+        "signals": [],
+        "timings_ms": {
+          "understand": 0.15,
+          "adapt": 0.18,
+          "decide": 0.2,
+          "first_sentence": 0.25,
+          "total": 0.25
+        },
+        "used_fallback": false
+      },
+      {
+        "turn": 1,
+        "text": "okay send thirty thousand to my sister",
+        "checks": {},
+        "reply": "I can't send ₹30,000 because your balance is ₹12,000.",
+        "state": {
+          "frustration": 0.0,
+          "confusion": 0.0,
+          "urgency": 0.0,
+          "engagement": 0.647
+        },
+        "signals": [],
+        "timings_ms": {
+          "understand": 0.16,
+          "adapt": 0.19,
+          "decide": 0.24,
+          "first_sentence": 0.28,
+          "total": 0.28
+        },
+        "used_fallback": false
+      },
+      {
+        "turn": 2,
+        "text": "hmm ok ten thousand then",
+        "checks": {
+          "intent": {
+            "expected": "transfer_confirm",
+            "got": "transfer_confirm",
+            "ok": true
+          }
+        },
+        "reply": "Just to confirm, you want to transfer ₹10,000?",
+        "state": {
+          "frustration": 0.0,
+          "confusion": 0.0,
+          "urgency": 0.0,
+          "engagement": 0.603
+        },
+        "signals": [],
+        "timings_ms": {
+          "understand": 0.15,
+          "adapt": 0.17,
+          "decide": 0.21,
+          "first_sentence": 0.25,
+          "total": 0.25
+        },
+        "used_fallback": false
+      },
+      {
+        "turn": 3,
+        "text": "yeah",
+        "checks": {
+          "intent": {
+            "expected": "transfer_done",
+            "got": "transfer_done",
+            "ok": true
+          }
+        },
+        "reply": "Done. ₹10,000 has been transferred. Your reference number is TXN329296.",
+        "state": {
+          "frustration": 0.0,
+          "confusion": 0.0,
+          "urgency": 0.0,
+          "engagement": 0.572
+        },
+        "signals": [],
+        "timings_ms": {
+          "understand": 0.12,
+          "adapt": 0.14,
+          "decide": 0.17,
+          "first_sentence": 0.2,
+          "total": 0.21
+        },
+        "used_fallback": false
+      },
+      {
+        "turn": 4,
+        "text": "thats all thanks",
+        "checks": {
+          "intent": {
+            "expected": "goodbye",
+            "got": "goodbye",
+            "ok": true
+          }
+        },
+        "reply": "Thank you for calling. Have a good day!",
+        "state": {
+          "frustration": 0.0,
+          "confusion": 0.0,
+          "urgency": 0.0,
+          "engagement": 0.55
+        },
+        "signals": [],
+        "timings_ms": {
+          "understand": 0.13,
+          "adapt": 0.15,
+          "decide": 0.17,
+          "first_sentence": 0.19,
+          "total": 0.2
+        },
+        "used_fallback": false
+      }
+    ],
+    "c023": [
+      {
+        "turn": 0,
+        "text": "hello ji",
+        "checks": {
+          "intent": {
+            "expected": "greet",
+            "got": "greet",
+            "ok": true
+          }
+        },
+        "reply": "Hello Rahul, how can I help you today?",
+        "state": {
+          "frustration": 0.0,
+          "confusion": 0.0,
+          "urgency": 0.0,
+          "engagement": 0.5
+        },
+        "signals": [],
+        "timings_ms": {
+          "understand": 0.11,
+          "adapt": 0.13,
+          "decide": 0.14,
+          "first_sentence": 0.18,
+          "total": 0.18
+        },
+        "used_fallback": false
+      },
+      {
+        "turn": 1,
+        "text": "balance batao",
+        "checks": {
+          "intent": {
+            "expected": "check_balance",
+            "got": "check_balance",
+            "ok": true
+          }
+        },
+        "reply": "Your current balance is ₹82,500.",
+        "state": {
+          "frustration": 0.0,
+          "confusion": 0.0,
+          "urgency": 0.0,
+          "engagement": 0.5
+        },
+        "signals": [],
+        "timings_ms": {
+          "understand": 0.12,
+          "adapt": 0.15,
+          "decide": 0.17,
+          "first_sentence": 0.2,
+          "total": 0.2
+        },
+        "used_fallback": false
+      },
+      {
+        "turn": 2,
+        "text": "pachas hazaar bhejna hai",
+        "checks": {
+          "intent": {
+            "expected": "transfer_over_limit",
+            "got": "transfer_over_limit",
+            "ok": true
+          }
+        },
+        "reply": "Aapki daily limit ₹40,000 hai aur aaj sirf ₹25,000 baaki hai, isliye ₹50,000 nahi bhej sakte. Kya main ₹25,000 bhej doon?",
+        "state": {
+          "frustration": 0.0,
+          "confusion": 0.0,
+          "urgency": 0.0,
+          "engagement": 0.5
+        },
+        "signals": [],
+        "timings_ms": {
+          "understand": 0.15,
+          "adapt": 0.17,
+          "decide": 0.21,
+          "first_sentence": 0.25,
+          "total": 0.26
+        },
+        "used_fallback": false
+      },
+      {
+        "turn": 3,
+        "text": "ye limit wimit kya hai mujhe nahi pata",
+        "checks": {
+          "complexity": {
+            "expected": "low",
+            "got": "med",
+            "ok": false
+          }
+        },
+        "reply": "Theek hai, maine koi transfer nahi kiya. Aur kuch?",
+        "state": {
+          "frustration": 0.0,
+          "confusion": 0.0,
+          "urgency": 0.0,
+          "engagement": 0.71
+        },
+        "signals": [],
+        "timings_ms": {
+          "understand": 0.2,
+          "adapt": 0.23,
+          "decide": 0.24,
+          "first_sentence": 0.28,
+          "total": 0.28
+        },
+        "used_fallback": false
+      },
+      {
+        "turn": 4,
+        "text": "acha pachees hazaar kar do",
+        "checks": {
+          "intent": {
+            "expected": "transfer_confirm",
+            "got": "unknown",
+            "ok": false
+          }
+        },
+        "reply": "Sorry, main samjha nahi. Main balance, transfer, limit ya credit card mein help kar sakta hoon.",
+        "state": {
+          "frustration": 0.0,
+          "confusion": 0.0,
+          "urgency": 0.0,
+          "engagement": 0.647
+        },
+        "signals": [],
+        "timings_ms": {
+          "understand": 0.14,
+          "adapt": 0.17,
+          "decide": 0.18,
+          "first_sentence": 0.21,
+          "total": 0.21
+        },
+        "used_fallback": false
+      },
+      {
+        "turn": 5,
+        "text": "haan",
+        "checks": {
+          "intent": {
+            "expected": "transfer_done",
+            "got": "unknown",
+            "ok": false
+          }
+        },
+        "reply": "Sorry, main samjha nahi. Main balance, transfer, limit ya credit card mein help kar sakta hoon.",
+        "state": {
+          "frustration": 0.0,
+          "confusion": 0.0,
+          "urgency": 0.0,
+          "engagement": 0.513
+        },
+        "signals": [
+          "minimal reply"
+        ],
+        "timings_ms": {
+          "understand": 0.11,
+          "adapt": 0.12,
+          "decide": 0.13,
+          "first_sentence": 0.16,
+          "total": 0.17
+        },
+        "used_fallback": false
+      }
+    ],
+    "c024": [
+      {
+        "turn": 0,
+        "text": "can i get a credit card",
+        "checks": {
+          "intent": {
+            "expected": "card_ineligible",
+            "got": "card_ineligible",
+            "ok": true
+          }
+        },
+        "reply": "Right now you are not eligible for a credit card. I can check again later.",
+        "state": {
+          "frustration": 0.0,
+          "confusion": 0.0,
+          "urgency": 0.0,
+          "engagement": 0.5
+        },
+        "signals": [],
+        "timings_ms": {
+          "understand": 0.13,
+          "adapt": 0.16,
+          "decide": 0.18,
+          "first_sentence": 0.21,
+          "total": 0.22
+        },
+        "used_fallback": false
+      },
+      {
+        "turn": 1,
+        "text": "thoda mix karke bolo na hindi english dono",
+        "checks": {
+          "language": {
+            "expected": "hinglish",
+            "got": "en",
+            "ok": false
+          }
+        },
+        "reply": "Sorry, I didn't get that. I can help with balance, transfers, limits or a credit card.",
+        "state": {
+          "frustration": 0.0,
+          "confusion": 0.0,
+          "urgency": 0.0,
+          "engagement": 0.71
+        },
+        "signals": [],
+        "timings_ms": {
+          "understand": 0.17,
+          "adapt": 0.2,
+          "decide": 0.21,
+          "first_sentence": 0.24,
+          "total": 0.24
+        },
+        "used_fallback": false
+      },
+      {
+        "turn": 2,
+        "text": "acha balance kitna hai",
+        "checks": {
+          "intent": {
+            "expected": "check_balance",
+            "got": "check_balance",
+            "ok": true
+          },
+          "language": {
+            "expected": "hinglish",
+            "got": "hinglish",
+            "ok": true
+          }
+        },
+        "reply": "Aapka current balance ₹12,000 hai.",
+        "state": {
+          "frustration": 0.0,
+          "confusion": 0.0,
+          "urgency": 0.0,
+          "engagement": 0.773
+        },
+        "signals": [],
+        "timings_ms": {
+          "understand": 0.15,
+          "adapt": 0.18,
+          "decide": 0.2,
+          "first_sentence": 0.24,
+          "total": 0.24
+        },
+        "used_fallback": false
+      },
+      {
+        "turn": 3,
+        "text": "theek hai bye",
+        "checks": {
+          "intent": {
+            "expected": "goodbye",
+            "got": "goodbye",
+            "ok": true
+          }
+        },
+        "reply": "Call karne ke liye thank you. Aapka din accha ho!",
+        "state": {
+          "frustration": 0.0,
+          "confusion": 0.0,
+          "urgency": 0.0,
+          "engagement": 0.691
+        },
+        "signals": [],
+        "timings_ms": {
+          "understand": 0.13,
+          "adapt": 0.15,
+          "decide": 0.16,
+          "first_sentence": 0.19,
+          "total": 0.2
+        },
+        "used_fallback": false
+      }
+    ],
+    "c025": [
+      {
+        "turn": 0,
+        "text": "हेलो जी",
+        "checks": {
+          "intent": {
+            "expected": "greet",
+            "got": "greet",
+            "ok": true
+          }
+        },
+        "reply": "नमस्ते Rahul, मैं आपकी क्या मदद कर सकता हूँ?",
+        "state": {
+          "frustration": 0.0,
+          "confusion": 0.0,
+          "urgency": 0.0,
+          "engagement": 0.5
+        },
+        "signals": [],
+        "timings_ms": {
+          "understand": 0.11,
+          "adapt": 0.13,
+          "decide": 0.15,
+          "first_sentence": 0.19,
+          "total": 0.19
+        },
+        "used_fallback": false
+      },
+      {
+        "turn": 1,
+        "text": "कार्ड वाला ऑफर बताओ",
+        "checks": {
+          "intent": {
+            "expected": "card_offer",
+            "got": "card_offer",
+            "ok": true
+          }
+        },
+        "reply": "आपके लिए ₹1,50,000 लिमिट वाला क्रेडिट कार्ड pre-approved है, no annual fee in the first year। क्या आप apply करना चाहेंगे?",
+        "state": {
+          "frustration": 0.0,
+          "confusion": 0.0,
+          "urgency": 0.0,
+          "engagement": 0.5
+        },
+        "signals": [],
+        "timings_ms": {
+          "understand": 0.15,
+          "adapt": 0.18,
+          "decide": 0.2,
+          "first_sentence": 0.25,
+          "total": 0.25
+        },
+        "used_fallback": false
+      },
+      {
+        "turn": 2,
+        "text": "sorry english please",
+        "checks": {
+          "language": {
+            "expected": "en",
+            "got": "en",
+            "ok": true
+          }
+        },
+        "reply": "Sorry, I didn't get that. I can help with balance, transfers, limits or a credit card.",
+        "state": {
+          "frustration": 0.0,
+          "confusion": 0.0,
+          "urgency": 0.0,
+          "engagement": 0.5
+        },
+        "signals": [],
+        "timings_ms": {
+          "understand": 0.16,
+          "adapt": 0.2,
+          "decide": 0.2,
+          "first_sentence": 0.24,
+          "total": 0.24
+        },
+        "used_fallback": false
+      },
+      {
+        "turn": 3,
+        "text": "ok whats the limit on the card",
+        "checks": {
+          "language": {
+            "expected": "en",
+            "got": "en",
+            "ok": true
+          }
+        },
+        "reply": "Your daily transfer limit is ₹40,000, and ₹25,000 is left for today.",
+        "state": {
+          "frustration": 0.0,
+          "confusion": 0.0,
+          "urgency": 0.0,
+          "engagement": 0.5
+        },
+        "signals": [],
+        "timings_ms": {
+          "understand": 0.17,
+          "adapt": 0.19,
+          "decide": 0.22,
+          "first_sentence": 0.26,
+          "total": 0.26
+        },
+        "used_fallback": false
+      },
+      {
+        "turn": 4,
+        "text": "yes apply",
+        "checks": {
+          "intent": {
+            "expected": "card_apply_started",
+            "got": "card_apply_started",
+            "ok": true
+          },
+          "language": {
+            "expected": "en",
+            "got": "en",
+            "ok": true
+          }
+        },
+        "reply": "Great, I have started your application. You'll get an SMS link to complete it.",
+        "state": {
+          "frustration": 0.0,
+          "confusion": 0.0,
+          "urgency": 0.0,
+          "engagement": 0.5
+        },
+        "signals": [],
+        "timings_ms": {
+          "understand": 0.13,
+          "adapt": 0.14,
+          "decide": 0.19,
+          "first_sentence": 0.23,
+          "total": 0.24
+        },
+        "used_fallback": false
+      }
+    ],
+    "c026": [
+      {
+        "turn": 0,
+        "text": "paise bhejne hai",
+        "checks": {
+          "intent": {
+            "expected": "transfer_ask_amount",
+            "got": "transfer_ask_amount",
+            "ok": true
+          }
+        },
+        "reply": "Zaroor. Aap kitne paise transfer karna chahte hain?",
+        "state": {
+          "frustration": 0.0,
+          "confusion": 0.0,
+          "urgency": 0.0,
+          "engagement": 0.5
+        },
+        "signals": [],
+        "timings_ms": {
+          "understand": 0.12,
+          "adapt": 0.15,
+          "decide": 0.17,
+          "first_sentence": 0.2,
+          "total": 0.2
+        },
+        "used_fallback": false
+      },
+      {
+        "turn": 1,
+        "text": "das hazaar",
+        "checks": {
+          "intent": {
+            "expected": "transfer_confirm",
+            "got": "transfer_confirm",
+            "ok": true
+          }
+        },
+        "reply": "Confirm kar doon, aap ₹10,000 transfer karna chahte hain?",
+        "state": {
+          "frustration": 0.0,
+          "confusion": 0.0,
+          "urgency": 0.0,
+          "engagement": 0.5
+        },
+        "signals": [],
+        "timings_ms": {
+          "understand": 0.12,
+          "adapt": 0.14,
+          "decide": 0.18,
+          "first_sentence": 0.22,
+          "total": 0.22
+        },
+        "used_fallback": false
+      },
+      {
+        "turn": 2,
+        "text": "haan kar do",
+        "checks": {
+          "intent": {
+            "expected": "transfer_done",
+            "got": "transfer_done",
+            "ok": true
+          }
+        },
+        "reply": "Ho gaya. ₹10,000 transfer ho gaye hain. Aapka reference number TXN565875 hai.",
+        "state": {
+          "frustration": 0.0,
+          "confusion": 0.0,
+          "urgency": 0.0,
+          "engagement": 0.5
+        },
+        "signals": [],
+        "timings_ms": {
+          "understand": 0.14,
+          "adapt": 0.16,
+          "decide": 0.2,
+          "first_sentence": 0.24,
+          "total": 0.25
+        },
+        "used_fallback": false
+      },
+      {
+        "turn": 3,
+        "text": "credit card ka kya offer tha",
+        "checks": {
+          "intent": {
+            "expected": "card_offer",
+            "got": "card_offer",
+            "ok": true
+          }
+        },
+        "reply": "Aapke liye ₹1,50,000 limit ka credit card pre-approved hai, no annual fee in the first year. Kya aap apply karna chahenge?",
+        "state": {
+          "frustration": 0.0,
+          "confusion": 0.0,
+          "urgency": 0.0,
+          "engagement": 0.71
+        },
+        "signals": [],
+        "timings_ms": {
+          "understand": 0.16,
+          "adapt": 0.19,
+          "decide": 0.21,
+          "first_sentence": 0.25,
+          "total": 0.26
+        },
+        "used_fallback": false
+      },
+      {
+        "turn": 4,
+        "text": "nahi abhi nahi",
+        "checks": {
+          "intent": {
+            "expected": "card_declined",
+            "got": "card_declined",
+            "ok": true
+          }
+        },
+        "reply": "Koi baat nahi. Kya main kisi aur cheez mein help kar sakta hoon?",
+        "state": {
+          "frustration": 0.0,
+          "confusion": 0.0,
+          "urgency": 0.0,
+          "engagement": 0.647
+        },
+        "signals": [],
+        "timings_ms": {
+          "understand": 0.14,
+          "adapt": 0.17,
+          "decide": 0.18,
+          "first_sentence": 0.21,
+          "total": 0.21
+        },
+        "used_fallback": false
+      },
+      {
+        "turn": 5,
+        "text": "bas bye",
+        "checks": {
+          "intent": {
+            "expected": "goodbye",
+            "got": "goodbye",
+            "ok": true
+          }
+        },
+        "reply": "Call karne ke liye thank you. Aapka din accha ho!",
+        "state": {
+          "frustration": 0.0,
+          "confusion": 0.0,
+          "urgency": 0.0,
+          "engagement": 0.603
+        },
+        "signals": [],
+        "timings_ms": {
+          "understand": 0.11,
+          "adapt": 0.13,
+          "decide": 0.14,
+          "first_sentence": 0.17,
+          "total": 0.18
+        },
+        "used_fallback": false
+      }
+    ],
+    "c027": [
+      {
+        "turn": 0,
+        "text": "mera balance kitna hai",
+        "checks": {
+          "intent": {
+            "expected": "check_balance",
+            "got": "check_balance",
+            "ok": true
+          }
+        },
+        "reply": "Aapka current balance ₹12,000 hai.",
+        "state": {
+          "frustration": 0.0,
+          "confusion": 0.0,
+          "urgency": 0.0,
+          "engagement": 0.71
+        },
+        "signals": [],
+        "timings_ms": {
+          "understand": 0.14,
+          "adapt": 0.16,
+          "decide": 0.18,
+          "first_sentence": 0.23,
+          "total": 0.23
+        },
+        "used_fallback": false
+      },
+      {
+        "turn": 1,
+        "text": "bees hazaar transfer karna hai",
+        "checks": {
+          "intent": {
+            "expected": "transfer_insufficient",
+            "got": "transfer_insufficient",
+            "ok": true
+          }
+        },
+        "reply": "Main ₹20,000 nahi bhej sakta kyunki aapka balance ₹12,000 hai.",
+        "state": {
+          "frustration": 0.0,
+          "confusion": 0.0,
+          "urgency": 0.0,
+          "engagement": 0.647
+        },
+        "signals": [],
+        "timings_ms": {
+          "understand": 0.15,
+          "adapt": 0.18,
+          "decide": 0.22,
+          "first_sentence": 0.26,
+          "total": 0.26
+        },
+        "used_fallback": false
+      },
+      {
+        "turn": 2,
+        "text": "matlab mera paisa kam hai kya samjha nahi",
+        "checks": {
+          "complexity": {
+            "expected": "low",
+            "got": "low",
+            "ok": true
+          }
+        },
+        "reply": "Main ₹20,000 nahi bhej sakta kyunki aapka balance ₹12,000 hai.",
+        "state": {
+          "frustration": 0.0,
+          "confusion": 0.56,
+          "urgency": 0.0,
+          "engagement": 0.754
+        },
+        "signals": [
+          "confusion phrase: samjha nahi"
+        ],
+        "timings_ms": {
+          "understand": 0.18,
+          "adapt": 0.21,
+          "decide": 0.23,
+          "first_sentence": 0.28,
+          "total": 0.28
+        },
+        "used_fallback": false
+      },
+      {
+        "turn": 3,
+        "text": "acha theek hai das hazaar bhejo",
+        "checks": {
+          "intent": {
+            "expected": "transfer_confirm",
+            "got": "transfer_confirm",
+            "ok": true
+          }
+        },
+        "reply": "Confirm kar doon, aap ₹10,000 transfer karna chahte hain?",
+        "state": {
+          "frustration": 0.0,
+          "confusion": 0.392,
+          "urgency": 0.0,
+          "engagement": 0.678
+        },
+        "signals": [],
+        "timings_ms": {
+          "understand": 0.16,
+          "adapt": 0.18,
+          "decide": 0.22,
+          "first_sentence": 0.26,
+          "total": 0.26
+        },
+        "used_fallback": false
+      },
+      {
+        "turn": 4,
+        "text": "haan",
+        "checks": {
+          "intent": {
+            "expected": "transfer_done",
+            "got": "transfer_done",
+            "ok": true
+          }
+        },
+        "reply": "Ho gaya. ₹10,000 transfer ho gaye hain. Aapka reference number TXN300873 hai.",
+        "state": {
+          "frustration": 0.0,
+          "confusion": 0.274,
+          "urgency": 0.0,
+          "engagement": 0.535
+        },
+        "signals": [
+          "minimal reply"
+        ],
+        "timings_ms": {
+          "understand": 0.12,
+          "adapt": 0.13,
+          "decide": 0.16,
+          "first_sentence": 0.19,
+          "total": 0.2
+        },
+        "used_fallback": false
+      },
+      {
+        "turn": 5,
+        "text": "bye",
+        "checks": {
+          "intent": {
+            "expected": "goodbye",
+            "got": "goodbye",
+            "ok": true
+          }
+        },
+        "reply": "Call karne ke liye thank you. Aapka din accha ho!",
+        "state": {
+          "frustration": 0.0,
+          "confusion": 0.192,
+          "urgency": 0.0,
+          "engagement": 0.524
+        },
+        "signals": [],
+        "timings_ms": {
+          "understand": 0.1,
+          "adapt": 0.12,
+          "decide": 0.13,
+          "first_sentence": 0.16,
+          "total": 0.16
+        },
+        "used_fallback": false
+      }
+    ],
+    "c028": [
+      {
+        "turn": 0,
+        "text": "hello hello",
+        "checks": {
+          "intent": {
+            "expected": "greet",
+            "got": "greet",
+            "ok": true
+          }
+        },
+        "reply": "Hello Rahul, how can I help you today?",
+        "state": {
+          "frustration": 0.0,
+          "confusion": 0.0,
+          "urgency": 0.0,
+          "engagement": 0.5
+        },
+        "signals": [],
+        "timings_ms": {
+          "understand": 0.12,
+          "adapt": 0.14,
+          "decide": 0.16,
+          "first_sentence": 0.2,
+          "total": 0.2
+        },
+        "used_fallback": false
+      },
+      {
+        "turn": 1,
+        "text": "my pension came or not",
+        "checks": {
+          "intent": {
+            "expected": "check_balance",
+            "got": "unknown",
+            "ok": false
+          }
+        },
+        "reply": "Sorry, I didn't get that. I can help with balance, transfers, limits or a credit card.",
+        "state": {
+          "frustration": 0.0,
+          "confusion": 0.0,
+          "urgency": 0.0,
+          "engagement": 0.5
+        },
+        "signals": [],
+        "timings_ms": {
+          "understand": 0.14,
+          "adapt": 0.17,
+          "decide": 0.18,
+          "first_sentence": 0.21,
+          "total": 0.22
+        },
+        "used_fallback": false
+      },
+      {
+        "turn": 2,
+        "text": "बेटा हिंदी में बोलो",
+        "checks": {
+          "language": {
+            "expected": "hi",
+            "got": "hi",
+            "ok": true
+          }
+        },
+        "reply": "माफ़ कीजिए, मैं समझ नहीं पाया। मैं बैलेंस, ट्रांसफर, लिमिट या क्रेडिट कार्ड में मदद कर सकता हूँ।",
+        "state": {
+          "frustration": 0.0,
+          "confusion": 0.0,
+          "urgency": 0.0,
+          "engagement": 0.5
+        },
+        "signals": [],
+        "timings_ms": {
+          "understand": 0.16,
+          "adapt": 0.18,
+          "decide": 0.19,
+          "first_sentence": 0.22,
+          "total": 0.23
+        },
+        "used_fallback": false
+      },
+      {
+        "turn": 3,
+        "text": "पोते को दस हज़ार भेजना है",
+        "checks": {
+          "intent": {
+            "expected": "transfer_confirm",
+            "got": "transfer_confirm",
+            "ok": true
+          },
+          "language": {
+            "expected": "hi",
+            "got": "hi",
+            "ok": true
+          }
+        },
+        "reply": "कन्फ़र्म कर दूँ, आप ₹10,000 ट्रांसफर करना चाहते हैं?",
+        "state": {
+          "frustration": 0.0,
+          "confusion": 0.0,
+          "urgency": 0.0,
+          "engagement": 0.5
+        },
+        "signals": [],
+        "timings_ms": {
+          "understand": 0.16,
+          "adapt": 0.18,
+          "decide": 0.22,
+          "first_sentence": 0.26,
+          "total": 0.26
+        },
+        "used_fallback": false
+      },
+      {
+        "turn": 4,
+        "text": "हां",
+        "checks": {
+          "intent": {
+            "expected": "transfer_done",
+            "got": "transfer_done",
+            "ok": true
+          },
+          "language": {
+            "expected": "hi",
+            "got": "hi",
+            "ok": true
+          }
+        },
+        "reply": "हो गया। ₹10,000 ट्रांसफर हो गए हैं। आपका रेफ़रेंस नंबर TXN623511 है।",
+        "state": {
+          "frustration": 0.0,
+          "confusion": 0.0,
+          "urgency": 0.0,
+          "engagement": 0.41
+        },
+        "signals": [
+          "minimal reply"
+        ],
+        "timings_ms": {
+          "understand": 0.12,
+          "adapt": 0.13,
+          "decide": 0.16,
+          "first_sentence": 0.19,
+          "total": 0.2
+        },
+        "used_fallback": false
+      },
+      {
+        "turn": 5,
+        "text": "किसी आदमी से बात हो सकती है क्या",
+        "checks": {
+          "intent": {
+            "expected": "human_agent",
+            "got": "human_agent",
+            "ok": true
+          },
+          "language": {
+            "expected": "hi",
+            "got": "hi",
+            "ok": true
+          }
+        },
+        "reply": "ज़रूर, मैं आपको अभी एक एजेंट से जोड़ रहा हूँ।",
+        "state": {
+          "frustration": 0.0,
+          "confusion": 0.0,
+          "urgency": 0.0,
+          "engagement": 0.683
+        },
+        "signals": [],
+        "timings_ms": {
+          "understand": 0.17,
+          "adapt": 0.19,
+          "decide": 0.21,
+          "first_sentence": 0.24,
+          "total": 0.24
+        },
+        "used_fallback": false
+      }
+    ]
+  }
+}
