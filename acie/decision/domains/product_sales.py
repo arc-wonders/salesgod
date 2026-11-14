@@ -59,9 +59,35 @@ class Economics(BaseModel):
     price_terms: dict[str, str] = Field(default_factory=dict)  # the full offer at a new price, per language, with {price}
     ladder: list[Step] = Field(default_factory=list)           # value perks first, then price steps; each price at or above the floor
 
+    floor_price: float = 0.0     # optional explicit floor; the stricter (higher) of this and cost + margin wins
+    max_perks: int = Field(1, ge=0, le=5)  # perks per sale (default one: no stacking)
+
     @property
     def profit_floor(self) -> float:
-        return round(self.cost * (1 + self.min_margin_pct / 100.0), 2)
+        return round(max(self.cost * (1 + self.min_margin_pct / 100.0), self.floor_price), 2)
+
+    @model_validator(mode="after")
+    def _range_is_sane(self):
+        """The negotiation range is operator-provided: floor <= every price step <= list. A step outside the range is dropped (logged),
+        never trusted; a list price below the floor leaves the call with no concessions at all (the price is the price)."""
+        if not self.list_price:
+            return self
+        floor = self.profit_floor
+        if floor > self.list_price:
+            logging.getLogger("acie.decision").warning("economics: floor %.2f is above the list price %.2f: no concessions", floor, self.list_price)
+            self.ladder = []
+            return self
+        keep = []
+        for st in self.ladder:
+            if st.kind == "price" and not (floor <= st.price <= self.list_price):
+                logging.getLogger("acie.decision").warning("economics: price step %.2f outside [%.2f, %.2f] dropped", st.price, floor, self.list_price)
+                continue
+            if st.kind == "perk" and st.cost and self.list_price - st.cost < floor:
+                logging.getLogger("acie.decision").warning("economics: perk %s costs more than the room above the floor: dropped", st.id)
+                continue
+            keep.append(st)
+        self.ladder = keep
+        return self
 
 
 class Negotiation(BaseModel):
@@ -109,6 +135,7 @@ class Product(BaseModel):
     official_site: str = "claude.ai"
     negotiation: Negotiation = Field(default_factory=Negotiation)
     economics: Economics = Field(default_factory=Economics)
+    discovery_ladder: list[dict] = Field(default_factory=list)  # [{id, question{en,hi,hinglish}, answers_regex}] shallow -> deep; read by CustomerFacts.next_discovery
 
     @model_validator(mode="after")
     def _no_borrowed_content(self):
@@ -473,6 +500,8 @@ _NO_OBLIGATION = re.compile(r"what if i (do ?n.?t|do not|don.?t) (want|like|buy|
 _WEAK_BUY = re.compile(r"kar ?do|कर ?दो", re.I)
 _STRONG_BUY = re.compile(r"\bsend\b|bhej|भेज|le (lunga|lenge|leta|leti|lo)|ले (लूंगा|लूँगा|लेंगे|लेता|लेती|लो)|interested|chahiye|चाहिए|\bbuy\b|kharid|खरीद|subscribe|सब्सक्राइब|sign me up|"
                          r"i.?ll take it|join (karna|kar|krna)|जॉइन (करना|कर)|join करना|join कर|lena hai|लेना है|le leta|sign up|\bdeal\b|yes please|go for it", re.I)
+_DEFINE_MEMBERSHIP = re.compile(r"(membership|मेंबरशिप|subscription)\W+(\w+\W+){0,2}(kya|क्या)\W+(hota|होता|hai|है|hoti|होती)|what (is|does|do) (a |an |the )?(membership|subscription)( mean)?|"
+                                r"(membership|मेंबरशिप) (ka )?(matlab|मतलब)", re.I)
 _NOT_NOW_LINK = re.compile(r"(link|लिंक) (abhi )?(mat|मत|ना|nahi|नहीं)|(abhi|अभी) (mat|मत) bhej|मत भेजो|mat bhejo|don.?t send|"
                            r"not now|abhi nahi|अभी नहीं|i don.?t click|नहीं भेजना|nahi bhejna|मत भेजना|mat bhejna|कुछ नहीं भेज", re.I)
 # a price question with a twist goes to the conversation turn, not the price line ("is there an annual plan?")
@@ -1056,6 +1085,8 @@ class ProductSalesDomain:
             asked_link = d.get("link_asked_last") == "1" or d.get("last_intent") in ("price", "reoffer")
             # the price line already stated the full terms, so "yes, send it" right after it is consent
             if after_confirm or (strong and d.get("last_intent") == "price" and d.get("unclear", "0") == "0") \
+                    or (strong and honest.SEND_REQ.search(text) and "offer_price" in ctx.quoted and d.get("unclear", "0") == "0"
+                        and d.get("reason_asked") != "1" and d.get("reoffers", "0") == "0") \
                     or (d.get("terms_confirmed") == "1" and (strong or asked_link)):
                 u0 = self._nlu(d)
                 # "हाँ हाँ" from someone who sounds unsure (the elderly persona got a link she never wanted)
@@ -1253,12 +1284,30 @@ class ProductSalesDomain:
         price_core = bool(_PRICE_CORE.search(text)) and asks
         pure_price = ((intent == "price" or price_core) and len(text.split()) <= 6 and bool(_PRICE_ASK.search(text)) and self._faq_match(text) is None
                       and d.get("last_intent") != "price"  # asked again = about something else (trainer cost)
-                      and not decided and not _PRICE_DETAIL.search(text)
+                      and not decided and not _PRICE_DETAIL.search(text) and not (_RUPEE_ASK.search(text) and p.rupee_terms.get("en"))
                       and not self._other_topic(text, u, intent)  # "personal trainer session कितने का?" is about the trainer
                       and (u is None or u.question_topic in ("offer_terms", "none")))
         if pure_price or (pending == "pitch" and plain_go_on):
             d["pending"] = "discovery"
             return self._price_plan(lang, known=bool(d.get("need_known")))
+        if _RUPEE_ASK.search(text) and p.rupee_terms.get("en") and not _HAGGLE.search(text) and not _NEGOTIATE.search(text) and not decided \
+                and not re.search(r"डॉलर क्या|dollar kya|what.?s a dollar|डालर क्या", text, re.I) and not _RENEWAL_ASK.search(text):
+            n = int(d.get("rupee_n", "0"))  # "kitne rupaye?": always the same honest rupee figure (about X a month, then about Y), said fresh each time
+            d["rupee_n"] = str(n + 1)
+            lead = ("", "Ji, phir se: ", "Bilkul, ")[min(n, 2)]
+            d["pending"] = d.get("pending") or "close"
+            return TurnPlan(intent="price", llm_allowed=False, decision="the rupee price, exactly as in the facts",
+                            objective="They asked for the price in rupees: say the rupee figure from the facts, nothing invented",
+                            fallback={"en": ("" if n == 0 else "Sure, again: ") + "In rupees, " + re.sub(r"^that.s ", "", p.rupee_terms["en"]) + ".",
+                                      "hi": ("" if n == 0 else "जी, फिर से: ") + "रुपये में " + re.sub(r"^(यानी|yaani)\s*", "", p.rupee_terms.get("hi") or p.rupee_terms["en"]) + "।",
+                                      "hinglish": lead + "Rupaye mein " + re.sub(r"^(yaani|यानी)\s*", "", p.rupee_terms.get("hinglish") or p.rupee_terms["en"]) + "."})
+        if _DEFINE_MEMBERSHIP.search(text) and not self._faq_match(text) and d.get("sad_hold") != "1" and p.benefits and (p.benefits_hi or p.benefits_hinglish):
+            d["pending"] = d.get("pending") or "close"
+            return TurnPlan(intent="answer", llm_allowed=False, decision="explain the word they asked about",
+                            objective="Explain what a membership is, using what it includes; no price, no language switch",
+                            fallback=_tpl("A membership just means you can use what the gym offers for as long as it runs: " + "; ".join(p.benefits[:3]) + ".",
+                                          "मेंबरशिप का मतलब है कि जब तक वो चलती है, आप जिम की सुविधाएँ इस्तेमाल कर सकते हैं: " + "; ".join((p.benefits_hi or p.benefits)[:3]) + "।",
+                                          "Membership ka matlab hai ki jab tak wo chalti hai, aap gym ki suvidhayein use kar sakte hain: " + "; ".join((p.benefits_hinglish or p.benefits)[:3]) + "."))
         if price_core and quoted and len(text.split()) <= 10 and not decided and self._faq_match(text) is None and not _PRICE_DETAIL.search(text) and not _NEGOTIATE.search(text) \
                 and not _HAGGLE.search(text) and not self._other_topic(text, u, intent) and (u is None or u.question_topic in ("offer_terms", "none")):
             # asked for the price again ("आपने बताया था, कितना था?"): the same fact, a new shape each time, never "I don't have it"
@@ -1737,6 +1786,13 @@ class ProductSalesDomain:
         if _GOODBYE_NOW.search(text) or _FIRM_NO.search(text) or _OPT_OUT.search(text) or (
                 not now and intent in ("deny", "goodbye", "callback", "human_agent")):
             return None  # the caller is closing: the normal goodbye (never a re-offer) handles it
+        if honest.is_question(text) and not now and honest.FREE_WANT.search(text) and any("free" in k or "फ्री" in k for f in self.p.faqs for k in f.keywords):
+            n = int(d.get("sad_n", "0"))
+            d["sad_n"] = str(n + 1)
+            return TurnPlan(intent="answer", llm_allowed=False, decision="hard time + free plan question: a plain yes, no upsell",
+                            objective="Say yes, the free plan can do it; no upsell, no price",
+                            fallback=_tpl("Yes, the free plan works for that, and there's no need to pay anything.", "जी हाँ, उसके लिए फ्री प्लान से काम चल जाएगा, कुछ देने की ज़रूरत नहीं है।",
+                                          "Ji haan, uske liye free plan se kaam chal jaayega, kuch dene ki zaroorat nahi hai."))
         if honest.is_question(text) and not now and (self._faq_match(text) or _PRICE_ASK.search(text) or self._on_topic(text)):
             return None  # a real question about the product: the conversation answers it (its stage says: no selling)
         n = int(d.get("sad_n", "0"))
@@ -1885,8 +1941,13 @@ class ProductSalesDomain:
     def _confirm_plan(self, lang: str = "en", d: dict | None = None) -> TurnPlan:
         """Before any link: one confirmation that states the complete terms (persona reviews: it never said
         that $8 lasts only 3 months). Once confirmed, a later clear yes sends the link (no confirm loop)."""
+        short = d is not None and d.get("last_intent") in ("price", "reoffer") and d.get("terms_confirmed") != "1"
         if d is not None:
             d["terms_confirmed"] = "1"
+        if short:  # the terms were just said in the previous line: don't paste them again, just ask
+            return TurnPlan(intent="confirm_close", llm_allowed=False, objective="Ask once whether to send the payment link; the terms were just stated", ask="confirm?",
+                            fallback=_tpl("Alright, shall I send the payment link to this number?", "ठीक है, तो क्या मैं इसी नंबर पर पेमेंट लिंक भेज दूँ?",
+                                          "Theek hai, to kya main isi number par payment link bhej doon?"))
         return TurnPlan(intent="confirm_close", llm_allowed=False,
                         facts={"offer": Fact(value=self._terms(lang), description="the full offer")},
                         objective="Confirm once, with the full terms, before sending the payment link", ask="confirm?",

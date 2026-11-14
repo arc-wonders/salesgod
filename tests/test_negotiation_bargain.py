@@ -127,3 +127,19 @@ def test_real_company_without_a_ladder_keeps_the_no_invented_discount_path():
     r = negotiation.step(CLAUDE, "can you reduce it", negotiation.NegState(), "", None)
     assert r.intent == "price_floor" and not r.offer
     assert negotiation.FLOOR[0]["en"].split("{")[0] in r.text["en"]
+
+
+def test_operator_range_is_validated_steps_outside_it_are_dropped():
+    from acie.decision.domains.product_sales import Economics, Step
+    eco = Economics(list_price=3000, cost=2000, min_margin_pct=20,  # floor 2400
+                    ladder=[Step(kind="price", price=3100), Step(kind="price", price=2700), Step(kind="price", price=2000),
+                            Step(kind="perk", id="p", text={"en": "x", "hi": "x", "hinglish": "x"}, cost=700)])
+    assert [s.price for s in eco.ladder if s.kind == "price"] == [2700]
+    assert not [s for s in eco.ladder if s.kind == "perk"]  # costs more than the room above the floor (3000-700 < 2400)
+    assert Economics(list_price=2000, cost=2000, min_margin_pct=20, ladder=[Step(kind="price", price=1900)]).ladder == []
+    assert Economics(list_price=3000, floor_price=2600, cost=2000, min_margin_pct=20).profit_floor == 2600
+
+
+def test_max_perks_default_one_and_configurable():
+    from acie.decision.domains.product_sales import Economics
+    assert Economics().max_perks == 1 and Economics(max_perks=2).max_perks == 2

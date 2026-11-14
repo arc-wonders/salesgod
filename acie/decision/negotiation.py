@@ -289,7 +289,7 @@ def effective_floor(eco, st: NegState) -> float:
 
 def _remaining(eco, st: NegState, cur: float, floor: float):
     # at most ONE perk per sale (a second perk would be stacking); cost counts against the margin through effective_floor()
-    perks = [x for x in eco.ladder if x.kind == "perk" and not st.perks and x.id not in st.perks and all(x.text.get(l) for l in LANGS)
+    perks = [x for x in eco.ladder if x.kind == "perk" and len(st.perks) < eco.max_perks and x.id not in st.perks and all(x.text.get(l) for l in LANGS)
              and cur >= eco.profit_floor + x.cost]
     prices = sorted((x for x in eco.ladder if x.kind == "price" and floor <= x.price < cur), key=lambda x: -x.price)
     return perks, prices

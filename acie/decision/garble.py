@@ -10,6 +10,7 @@ from __future__ import annotations
 import re
 
 _TOK = re.compile(r"[ऀ-ॿ]+|[A-Za-z']+")
+_DEV = re.compile(r"[ऀ-ॿ]")
 _Q = re.compile(r"\?|क्या|कैसे|कब|कहाँ|कहां|कौन|कितन|kya|kaise|kab|kahan|kaun|kitn|what|how|when|where|who|why|is |are |do |can ", re.I)
 
 # everyday words that make a short fragment "meaningful" (it is then handled by the normal flow)
@@ -25,7 +26,7 @@ chahiye bolo bataiye batao sunao suno samajh aaya aana milega milta price rate f
 time baad abhi kal aaj subah shaam raat baje din mahine hafte saal ghar kaam aur ya par lekin to bhi hi bas toh
 the a an is are am was were be i you we me my your it this that these those and or but if so to of in on at for with from not do does did can could will would
 please sorry what why how when where who which price cost much many call back later now today tomorrow money pay link send want need like know tell
-बस रखो रख रखिए फ़ोन फोन bas rakho rakh phone fon mean hear audible sound voice line speak hindi english hmm hm hmmm acha achha accha अच्छा हम्म हम्मम umm uh refund upi cancel branch timing parking
+के की का को से में पर लिए बारे बात काम चीज़ चीज कोडिंग पढ़ाई ऑफिस नौकरी स्टूडेंट सोचना पड़ेगा सोचूँगा सोचूंगा बेटा बेटी जी सर मैडम देखते देखेंगे बाद फिर बस रखो रख रखिए फ़ोन फोन bas rakho rakh phone fon mean hear audible sound voice line speak hindi english hmm hm hmmm acha achha accha अच्छा हम्म हम्मम umm uh refund upi cancel branch timing parking
 """.split())
 
 
@@ -49,8 +50,10 @@ def looks_garbled(text: str, extra_words: set[str] | None = None, turn=None, sig
         return bool(text.strip()) and len(text.strip()) <= 12  # punctuation / digits noise only
     if len(toks) > 4 or _Q.search(text):
         return False
-    if len(toks) == 1 and re.fullmatch(r"[a-z']+", toks[0]):
-        return False  # one Latin word is a keyword (refund, upi, ...), not noise
+    if not _DEV.search(text):
+        return False  # romanised / English words: no reliable lexicon, only the NLU / STT signals can say garbled
     known = _LEX | (extra_words or set())
     hits = sum(1 for t in toks if t in known)
-    return hits == 0 and len(toks) >= 1 and not (len(toks) == 1 and len(toks[0]) <= 2)
+    if len(toks) == 1:
+        return hits == 0 and len(toks[0]) > 2
+    return hits == 0 or (len(toks) >= 3 and hits / len(toks) < 0.5)

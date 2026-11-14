@@ -697,6 +697,44 @@
    "hi": "आपका fitness goal क्या है: weight कम करना, muscle बनाना, या बस fit रहना?",
    "hinglish": "Aapka fitness goal kya hai: weight kam karna, muscle banana, ya bas fit rehna?"
   },
+  "discovery_ladder": [
+   {
+    "id": "goal",
+    "question": {
+     "en": "What's your fitness goal: losing weight, building muscle, or just staying fit?",
+     "hi": "आपका fitness goal क्या है: weight कम करना, muscle बनाना, या बस fit रहना?",
+     "hinglish": "Aapka fitness goal kya hai: weight kam karna, muscle banana, ya bas fit rehna?"
+    },
+    "answers_regex": "muscle|bulk|मसल|बॉडी|body ?build|weight ?(loss|lose|gain)|lose weight|fat ?loss|वज़न|वजन|stay fit|fitness|fit rehna|फिट रहना|toning|strength|power ?lift|stamina"
+   },
+   {
+    "id": "subgoal",
+    "question": {
+     "en": "Is that for the aesthetic look, or for strength and powerlifting?",
+     "hi": "वो दिखने के लिए है, या strength और powerlifting के लिए?",
+     "hinglish": "Wo look ke liye hai, ya strength aur powerlifting ke liye?"
+    },
+    "answers_regex": "aesthetic|\\blook\\b|physique|\\bshape\\b|दिखने|लुक|power ?lift|strength|competition|stamina|toning|flexib"
+   },
+   {
+    "id": "experience",
+    "question": {
+     "en": "Are you just starting out, or have you trained before?",
+     "hi": "आप अभी शुरुआत कर रहे हैं, या पहले ट्रेनिंग की है?",
+     "hinglish": "Aap abhi shuru kar rahe hain, ya pehle training ki hai?"
+    },
+    "answers_regex": "beginner|first time|pehli baar|पहली बार|new to|never (done|tried|trained)|trained before|lifted before|already (go|train|lift)|\\d+\\s*(years?|saal|साल|months?|mahine)|experience|pehle se|पहले से|just start"
+   },
+   {
+    "id": "schedule",
+    "question": {
+     "en": "How many days a week can you come, and is morning or evening better?",
+     "hi": "आप हफ़्ते में कितने दिन आ सकते हैं, और सुबह या शाम कब ठीक रहेगा?",
+     "hinglish": "Aap hafte mein kitne din aa sakte hain, aur subah ya shaam kab theek rahega?"
+    },
+    "answers_regex": "\\b(\\d+|one|two|three|four|five|six|ek|do|teen|char|chaar|paanch|panch)\\s*(to|-|se)?\\s*(\\d+|four|five|six|char|paanch)?\\s*(days?|din)\\b|morning|evening|weekend|subah|shaam|सुबह|शाम|रोज़|daily"
+   }
+  ],
   "tenant": "default",
   "use_playbook": true,
   "benefits_hi": [
