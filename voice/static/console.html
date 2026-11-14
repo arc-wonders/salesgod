@@ -318,6 +318,7 @@ select.inline{width:auto}
 </head>
 <body>
 <div id="app"></div>
+<script src="/ui/platform.js"></script>
 <script>
 (() => {
 'use strict';
@@ -369,7 +370,7 @@ async function api(path, opts) {
   const r = await fetch(path, { headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin', ...(opts || {}) });
   if (r.status === 401) { S.authed = false; render(); throw new Error('Please sign in'); }
   const j = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(j.detail || r.statusText);
+  if (!r.ok) { const e = new Error(typeof j.detail === 'string' ? j.detail : (j.detail ? JSON.stringify(j.detail) : r.statusText)); e.status = r.status; throw e; }
   return j;
 }
 const store = { get(k, d) { try { return localStorage.getItem(k) ?? d; } catch { return d; } }, set(k, v) { try { localStorage.setItem(k, v); } catch {} } };
@@ -395,11 +396,17 @@ async function boot() {
   render(); listen();
   setInterval(() => loadCalls().then(() => { if (S.page === 'live') renderPage(); updateNavCount(); }).catch(() => {}), 8000);
 }
-const loadTenants = async () => { S.tenants = (await api('/api/tenants')).tenants; };
+/* Projects (= tenants). /api/projects first; the old /api/tenants keeps working as the fallback. */
+const loadTenants = async () => {
+  let list = null;
+  try { const j = await api('/api/projects'); list = Array.isArray(j) ? j : (j.projects || null); S.projectsApi = true; } catch (e) { if (e.status && e.status !== 404 && e.status !== 405) throw e; S.projectsApi = false; }
+  if (!list) list = (await api('/api/tenants')).tenants || [];
+  S.tenants = list.map((t) => ({ color: '#4f7cff', products: [], ...t }));
+};
 const loadProducts = async () => { const j = await api('/api/products'); S.products = Object.fromEntries((j.products || []).map((p) => [p.id, p])); };
 const loadCalls = async () => { S.calls = (await api('/api/calls')).calls || []; };
-const tenantProducts = () => Object.values(S.products).filter((p) => (p.tenant || 'default') === S.tenant);
-const tenantOf = (c) => S.products[c.campaign]?.tenant || 'default';
+const tenantProducts = () => Object.values(S.products).filter((p) => (p.project_id || p.tenant || 'default') === S.tenant);
+const tenantOf = (c) => c.project_id || S.products[c.campaign]?.project_id || S.products[c.campaign]?.tenant || 'default';
 const tenantCalls = () => S.calls.filter((c) => tenantOf(c) === S.tenant);
 const pname = (id) => S.products[id]?.product_name || id;
 const lastAgent = (c) => c && [...(c.turns || [])].reverse().find((t) => t.role === 'agent' && t.trace);
@@ -611,44 +618,19 @@ function negEditor(base, real) {
 }
 
 /* ---------------------------------------------------------------- shell */
-const NAV = [
-  ['Operate', [['live', 'Live calls', 'phone'], ['sim', 'Simulator', 'chat']]],
-  ['Build', [['tree', 'Decision tree', 'tree'], ['tenants', 'Tenants & products', 'building']]],
-  ['Track', [['progress', 'Progress', 'activity']]],
-];
-const TITLES = { live: 'Live calls', sim: 'Simulator', tree: 'Decision tree', tenants: 'Tenants & products', progress: 'Progress' };
-function go(p) { S.page = p; store.set('sg_page', p); render(); }
+/* The shell (sidebar, router, breadcrumbs, search) and every new page live in /ui/platform.js. */
+const SG = { h, sv, ic, ICONS, api, store, S, $, modal, notice, head, ago, mask, pct, money, mapView, pathView, turnView, loadCalls, loadProducts, loadTenants, editProduct, tenantProducts, pname, drawMap, loadMap, setConn, updateNavCount, tenantCalls,
+  pages: { live: (p) => pageLive(p), tree: (p) => pageTree(p), sim: (p) => pageSim(p), progress: (p) => pageProgress(p) }, boot: () => boot() };
+const P = window.SGP ? window.SGP(SG) : null;
+function go(p, args) { P.go(p, args); }
 function render() {
   const app = $('#app'); app.innerHTML = '';
   if (S.authed === false) { app.append(loginView()); return; }
   if (S.authed === null) return;
-  const t = S.tenants.find((x) => x.id === S.tenant) || { name: '—', color: '#888' };
-  const dark = !document.documentElement.classList.contains('light');
-  app.append(h('div', { class: 'gs' },
-    h('aside', { class: 'side' },
-      h('div', { class: 'brand' }, h('span', { class: 'mk' }, h('i')), h('b', {}, 'SalesGod'), h('small', {}, 'Voice')),
-      h('nav', { class: 'nav' }, NAV.map(([g, items]) => [h('div', { class: 'group' }, g),
-        items.map(([id, label, icon]) => h('button', { class: 'nav-item' + (S.page === id ? ' on' : ''), onclick: () => go(id) }, ic(icon), h('span', {}, label), id === 'live' ? h('span', { class: 'cnt', id: 'livecnt' }) : null))])),
-      h('div', { class: 'side-foot' },
-        S.menu ? h('div', { class: 'menu' },
-          h('div', { class: 'group', style: 'padding:6px 9px 6px' }, 'Switch tenant'),
-          S.tenants.map((x) => h('button', { onclick: () => { S.tenant = x.id; store.set('sg_tenant', x.id); S.menu = false; S.sel = null; S.tree.pid = null; S.sim.sid = null; S.sim.turns = []; render(); } },
-            h('span', { style: `width:8px;height:8px;border-radius:2px;flex:none;background:${x.color}` }), x.name, x.id === S.tenant ? h('span', { class: 'hint', style: 'margin-left:auto' }, 'current') : null)),
-          h('div', { class: 'sep' }),
-          h('button', { onclick: () => { S.menu = false; render(); addTenant(); } }, ic('plus', 'sm'), 'New tenant')) : null,
-        h('button', { class: 'org', onclick: () => { S.menu = !S.menu; render(); } },
-          h('span', { class: 'dot', style: `background:${t.color}` }), h('span', { style: 'min-width:0;flex:1' }, h('b', {}, t.name), h('small', {}, (t.products || []).length + ' product' + ((t.products || []).length === 1 ? '' : 's'))), ic('chev', 'sm')))),
-    h('div', { class: 'main' },
-      h('header', { class: 'topbar' },
-        h('div', { class: 'crumbs' }, h('span', {}, 'SalesGod'), h('i', {}, '/'), h('span', {}, t.name), h('i', {}, '/'), h('b', {}, TITLES[S.page] || '')),
-        h('span', { class: 'conn ' + S.conn, id: 'conn', title: 'Live event stream' }, h('i'), h('span', {}, S.conn === 'ok' ? 'LIVE' : S.conn === 'bad' ? 'RECONNECTING' : 'CONNECTING')),
-        h('a', { class: 'btn ghost sm', href: '/productgen' }, 'Add product'),
-        h('a', { class: 'btn ghost sm', href: '/classic' }, 'Classic view'),
-        h('button', { class: 'icon-btn', title: dark ? 'Light theme' : 'Dark theme', onclick: () => { const l = document.documentElement.classList.toggle('light'); store.set('sg_theme', l ? 'light' : 'dark'); render(); } }, ic(dark ? 'sun' : 'moon'))),
-      h('main', { class: 'content', id: 'page' }))));
-  renderPage(); updateNavCount();
+  if (!P) { app.append(h('div', { class: 'empty' }, h('b', {}, 'The interface module did not load'), 'Reload the page; if it stays like this, /ui/platform.js is missing on the server.')); return; }
+  P.render(app); updateNavCount();
 }
-function renderPage() { const p = $('#page'); if (!p) return; ({ live: pageLive, tree: pageTree, sim: pageSim, tenants: pageTenants, progress: pageProgress }[S.page] || pageLive)(p); }
+function renderPage() { if (P) P.renderPage(); }
 function head(title, desc, ...acts) { return h('div', { class: 'head' + (desc ? '' : ' compact') }, h('div', {}, h('h1', {}, title), desc ? h('p', {}, desc) : null), h('span', { class: 'sp' }), h('div', { class: 'acts' }, acts)); }
 function loginView() {
   let pw, err;
@@ -721,7 +703,7 @@ function pageLive(p) {
   const last = lastAgent(c);
   const active = (s) => ['live', 'ringing', 'dialing'].includes(s);
   const list = h('section', { id: 'clist' },
-    h('div', { class: 'pane-head' }, h('span', { class: 'sec-lbl' }, 'Calls'), h('span', { class: 'hint' }, calls.length), h('span', { style: 'flex:1' }), h('button', { class: 'btn pri sm', onclick: newCall }, ic('plus', 'sm'), 'New call')),
+    h('div', { class: 'pane-head' }, h('span', { class: 'sec-lbl' }, 'Calls'), h('span', { class: 'hint' }, calls.length), h('span', { style: 'flex:1' }), h('button', { class: 'btn sm', onclick: () => go('sim') }, ic('chat', 'sm'), 'Simulator'), h('button', { class: 'btn pri sm', onclick: newCall }, ic('plus', 'sm'), 'New call')),
     calls.length ? calls.map((x) => h('button', { class: 'ci' + (x.call_id === S.sel ? ' on' : ''), onclick: () => { S.sel = x.call_id; renderPage(); } },
       h('div', { class: 't' }, x.status === 'live' ? h('span', { class: 'pulse' }) : null, h('span', {}, x.customer_name || mask(x.to)), h('span', { class: 'st ' + x.status }, x.status)),
       h('div', { class: 'm' }, [pname(x.campaign), x.backend, x.language, ago(x.created_at)].filter(Boolean).join(' · ')),
@@ -753,7 +735,7 @@ function pageLive(p) {
 }
 function newCall() {
   const ps = tenantProducts();
-  if (!ps.length) return notice('This tenant has no products yet. Add one under Tenants & products.');
+  if (!ps.length) return notice('This project has no products yet. Add one under Products.');
   modal('New call', 'Calls from ' + (S.from || 'the Plivo number') + '. One number per line.', (b, f, close) => {
     let pid, num, name, age, lang, model, err;
     b.append(
@@ -783,7 +765,7 @@ async function pageTree(p) {
   const ps = tenantProducts();
   if (!S.tree.pid || !ps.find((x) => x.id === S.tree.pid)) { S.tree.pid = ps[0]?.id || null; S.tree.pb = null; }
   p.innerHTML = '';
-  if (!S.tree.pid) { p.append(h('div', { class: 'pad' }, head('Decision tree', null), h('div', { class: 'empty' }, h('b', {}, 'No products for this tenant'), 'Add one under Tenants & products.'))); return; }
+  if (!S.tree.pid) { p.append(h('div', { class: 'pad' }, head('Decision tree', null), h('div', { class: 'empty' }, h('b', {}, 'No products for this project'), 'Add one under Products.'))); return; }
   if (!S.tree.pb || S.tree.pb.product_id !== S.tree.pid) {
     p.append(h('div', { class: 'empty' }, 'Loading tree…'));
     try {
@@ -893,7 +875,7 @@ function drawInspector() {
     const g = S.gates.find((x) => x.id === sel.id), i = S.gates.indexOf(g);
     el.append(hd('k-gate k-gate-' + g.id, 'Gate ' + (i + 1), g.title, g.rule),
       h('div', { class: 'insp-body' }, h('label', { class: 'lbl' }, 'Plans this gate can produce'), h('div', { class: 'row', style: 'flex-wrap:wrap;gap:5px' }, g.intents.map((x) => h('span', { class: 'tag' }, x))),
-        h('p', { class: 'hint', style: 'margin-top:16px' }, 'Gates are the safety and compliance floor, the same for every tenant. Their wording (tone, re-offers, terms) is set per product under Tenants & products.')));
+        h('p', { class: 'hint', style: 'margin-top:16px' }, 'Gates are the safety and compliance floor, the same for every tenant. Their wording (tone, re-offers, terms) is set per product under Products.')));
     return;
   }
   const n = pb.nodes.find((x) => x.id === sel.id); if (!n) return;
@@ -1013,34 +995,7 @@ function pageSim(p) {
   if (S.sim.sid && !S.sim.busy) inp.focus();
 }
 
-/* ---------------------------------------------------------------- tenants & products */
-function pageTenants(p) {
-  p.innerHTML = '';
-  const t = S.tenants.find((x) => x.id === S.tenant) || {};
-  const ps = tenantProducts();
-  p.append(h('div', { class: 'pad' },
-    head('Tenants & products', 'Each tenant has its own products, and each product its own offer, knowledge and decision tree.',
-      h('button', { class: 'btn', onclick: addTenant }, ic('plus', 'sm'), 'New tenant'), h('button', { class: 'btn pri', onclick: () => editProduct(null) }, ic('plus', 'sm'), 'New product')),
-    h('div', { class: 'sec-lbl', style: 'margin-bottom:10px' }, 'Tenants'),
-    h('div', { class: 'cards', style: 'margin-bottom:28px' }, S.tenants.map((x) => h('button', { class: 'pcard', style: x.id === S.tenant ? 'box-shadow:inset 0 0 0 1px hsl(var(--signal)/.5)' : '', onclick: () => { S.tenant = x.id; store.set('sg_tenant', x.id); S.tree.pid = null; S.sel = null; render(); } },
-      h('div', { class: 'k', style: `color:${x.color}` }, x.id === S.tenant ? 'Current tenant' : 'Tenant'), h('b', {}, x.name),
-      h('dl', {}, h('dt', {}, 'id'), h('dd', { class: 'mono' }, x.id), h('dt', {}, 'products'), h('dd', {}, (x.products || []).map(pname).join(', ') || '—'))))),
-    h('div', { class: 'sec-lbl', style: 'margin-bottom:10px' }, 'Products · ' + (t.name || '')),
-    ps.length ? h('div', { class: 'cards' }, ps.map((x) => h('button', { class: 'pcard', onclick: () => editProduct(x.id) },
-      h('div', { class: 'k' }, x.seller_name || 'Product'), h('b', {}, x.product_name),
-      h('dl', {}, h('dt', {}, 'offer'), h('dd', {}, `${x.offer_price} · ${x.discount}`), h('dt', {}, 'normal'), h('dd', {}, x.original_price), h('dt', {}, 'validity'), h('dd', {}, x.offer_validity || '—'),
-        h('dt', {}, 'agent'), h('dd', {}, x.agent_name || '—'), h('dt', {}, 'can call'), h('dd', {}, (x.allowed_numbers || []).length ? (x.allowed_numbers.length + ' test numbers only') : 'any number')))))
-      : h('div', { class: 'empty' }, h('b', {}, 'No products'), 'Create one with New product.')));
-}
-function addTenant() {
-  modal('New tenant', 'A company that sells through the agent.', (b, f, close) => {
-    let id, name, color, err;
-    b.append(h('label', { class: 'lbl' }, 'Name'), name = h('input', { oninput: () => { id.value = name.value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''); } }),
-      h('label', { class: 'lbl' }, 'Id'), id = h('input', { class: 'mono' }),
-      h('label', { class: 'lbl' }, 'Colour'), color = h('input', { type: 'color', value: '#4f7cff', style: 'width:64px;padding:2px' }), err = h('div', { class: 'err' }));
-    f.append(h('button', { class: 'btn pri', onclick: async () => { try { await api('/api/tenants/' + id.value.trim(), { method: 'PUT', body: JSON.stringify({ name: name.value, color: color.value }) }); await loadTenants(); S.tenant = id.value.trim(); store.set('sg_tenant', S.tenant); close(); render(); } catch (e) { err.textContent = e.message; } } }, 'Create'), h('button', { class: 'btn ghost', onclick: close }, 'Cancel'));
-  });
-}
+/* ---------------------------------------------------------------- product editor (the Products page opens it) */
 function editProduct(pid) {
   const base = pid ? JSON.parse(JSON.stringify(S.products[pid])) : { id: '', tenant: S.tenant, product_name: '', seller_name: S.tenants.find((t) => t.id === S.tenant)?.name || '', agent_name: 'Arjun', original_price: '', offer_price: '', discount: '', offer_validity: '', benefits: [], knowledge: '', pitch_en: '', pitch_hi: '', pitch_hinglish: '', faqs: [], allowed_numbers: [], price_note: '', rupee_terms: {}, renewal_note: {}, annual_note: {}, sms_text: '' };
   modal(pid ? base.product_name : 'New product', pid ? 'Changes apply to the next call.' : 'What the agent sells, and the facts it may use.', (b, f, close) => {
@@ -1054,9 +1009,13 @@ function editProduct(pid) {
       else el = h('input', { value: v ?? '' });
       F[k] = [el, type]; return [h('label', { class: 'lbl' }, label), el];
     };
+    const tone = P.toneField(base.tone_level); F.tone_level = [tone.sel, 'text'];
     const tsel = h('select', {}, S.tenants.map((t) => h('option', { value: t.id, selected: t.id === (base.tenant || S.tenant) }, t.name)));
     F.tenant = [tsel, 'text'];
+    const collectNow = () => { const o = {}; for (const [k, [el, type]] of Object.entries(F)) o[k] = type === 'lines' ? el.value.split('\n').map((x) => x.trim()).filter(Boolean) : el.value; return o; };
+    const applyDraft = (d) => { for (const [k, v] of Object.entries(d)) { const f = F[k]; if (!f) continue; const [el, type] = f; el.value = type === 'lines' ? [].concat(v).join('\n') : type === 'lang' && v && typeof v === 'object' ? ['en', 'hi', 'hinglish'].map((x) => x + ': ' + (v[x] || '')).join('\n') : (v ?? ''); } };
     b.append(...flat([
+      P ? P.aiBox({ kind: 'product', placeholder: 'e.g. a monthly coffee subscription for office teams in Pune, \u20b9899/month', context: () => ({ project: S.tenant, product: collectNow() }), current: collectNow, apply: applyDraft }) : null,
       !pid ? fld('id', 'Id · letters, digits, -') : null,
       h('label', { class: 'lbl' }, 'Tenant'), tsel,
       h('div', { class: 'grid2' }, h('div', {}, fld('product_name', 'Product name')), h('div', {}, fld('seller_name', 'Calling for (company)'))),
@@ -1069,7 +1028,7 @@ function editProduct(pid) {
       fld('benefits', 'Benefits · one per line', 'lines'),
       fld('knowledge', 'Knowledge the agent may use · facts only', 'area'),
       fld('tone', 'Tone'), fld('allowed_numbers', 'Only call these numbers · one per line · empty = any', 'lines'),
-      neg.el, err = h('div', { class: 'err' })]));
+      tone.el, neg.el, err = h('div', { class: 'err' })]));
     const save = async () => {
       const out = { ...base };
       for (const [k, [el, type]] of Object.entries(F)) {
@@ -1115,7 +1074,6 @@ async function pageProgress(p) {
   S.progTimer = setInterval(() => { if (S.page === 'progress') load(); else clearInterval(S.progTimer); }, 10000);
 }
 
-document.addEventListener('click', (e) => { if (S.menu && !e.target.closest('.side-foot')) { S.menu = false; render(); } });
 window.addEventListener('resize', () => { if (S.page === 'tree' && S.tree.pb) { S.tree.view = null; drawCanvas(); } });
 boot();
 })();

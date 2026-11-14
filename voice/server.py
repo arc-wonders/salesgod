@@ -307,6 +307,14 @@ def build_app() -> tuple[FastAPI, App]:
     async def index() -> FileResponse:
         return FileResponse(STATIC / "console.html", headers={"Cache-Control": "no-cache"})
 
+    @api.get("/ui/{name}")
+    async def ui_asset(name: str) -> FileResponse:
+        # console scripts/styles (static, no secrets); plain file names only
+        path = STATIC / name
+        if "/" in name or "\\" in name or name.startswith(".") or path.suffix not in (".js", ".css") or not path.is_file():
+            raise HTTPException(404, "not found")
+        return FileResponse(path, headers={"Cache-Control": "no-cache"})
+
     @api.get("/classic")
     async def classic() -> FileResponse:
         return FileResponse(STATIC / "index.html")
