@@ -93,6 +93,11 @@ class CallRecord:
                                               "created_at", "answered_at", "ended_at", "end_reason", "turns", "events", "sms", "context")}
 
 
+class _SafeMap(dict):
+    def __missing__(self, key):  # an unknown {placeholder} in sms_text stays as typed, it never crashes the send
+        return "{" + key + "}"
+
+
 class CallSession:
     def __init__(self, app: App, call: CallRecord, ws, stream_id: str):
         self.app, self.call, self.ws, self.stream_id = app, call, ws, stream_id
@@ -489,8 +494,12 @@ class CallSession:
         p = self.product
         if not p or not p.sms_text or self.call.sms:
             return
-        text = p.sms_text.format_map({"seller": p.seller_name, "product": p.product_name,
-                                      "offer_price": p.offer_price, "link": p.payment_link})
+        if p.allowed_numbers and self.call.to not in p.allowed_numbers:
+            return  # same guard as the dial gate: a restricted campaign never texts other numbers
+        sess = getattr(getattr(self, "pipeline", None), "sessions", {}).get(getattr(self, "session_id", ""))
+        link = (sess.dialog.get("payment_link_url") if sess is not None else "") or p.payment_link  # business API link
+        text = p.sms_text.format_map(_SafeMap({"seller": p.seller_name, "product": p.product_name,
+                                               "offer_price": p.offer_price, "link": link}))
         res = await self.app.plivo.send_sms(self.call.to, text)
         self.call.sms.append({"text": text, "to": self.call.to, "at": time.time(), **res})
         self.event("sms", res)

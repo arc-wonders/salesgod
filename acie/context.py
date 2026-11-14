@@ -61,9 +61,19 @@ _AGENT_EVENTS: dict[str, tuple[str, str]] = {
     "identify": ("told", "who_is_calling"),
     "opening": ("told", "who_is_calling"),
     "safety_distress": ("promised", "helpline_given_call_stopped"),
+    "constraint_stop": ("promised", "call_ended_by_policy"),
 }
 _DECISIONS = {"link_sent": "accepted", "declined": "declined", "declined_price": "declined",
-              "annoyed_exit": "declined", "opt_out": "declined", "callback": "later"}
+              "annoyed_exit": "declined", "opt_out": "declined", "opt_out_confirmed": "declined",
+              "callback": "later"}
+# terminal paths -> the call's outcome label (what the feedback lane reads next to `decision`):
+# accepted | declined | later | opt_out | safety | human_agent | blocked ("" = still open)
+_OUTCOMES = {"link_sent": "accepted", "declined": "declined", "declined_price": "declined", "annoyed_exit": "declined",
+             "callback": "later", "opt_out": "opt_out", "opt_out_confirmed": "opt_out", "safety_distress": "safety",
+             "safety_followup": "safety", "safety_goodbye": "safety", "safety_noted": "safety",
+             "human_agent": "human_agent", "constraint_stop": "blocked"}
+# the customer takes the answer back / reconsiders: the open question is open again
+_REOPEN = {"link_cancelled", "confirm_close"}
 
 
 class CallContext(BaseModel):
@@ -74,6 +84,7 @@ class CallContext(BaseModel):
     questions: list[dict] = Field(default_factory=list)  # {"q": text, "answer": intent}
     objections: list[str] = Field(default_factory=list)
     decision: str = "undecided"
+    outcome: str = ""  # see _OUTCOMES
 
     def has(self, promise: str) -> bool:
         return promise in self.promised
@@ -111,6 +122,12 @@ class CallContext(BaseModel):
         if intent in _DECISIONS and self.decision != _DECISIONS[intent]:
             self.decision = _DECISIONS[intent]
             add("customer", "decision", self.decision)
+        if intent in _OUTCOMES:
+            if self.outcome != _OUTCOMES[intent]:
+                self.outcome = _OUTCOMES[intent]
+                add("system", "outcome", self.outcome)
+        elif intent in _REOPEN and self.decision == "undecided" and self.outcome in ("accepted", "declined", "later"):
+            self.outcome = ""
         if intent == "declined" and "payment_link" in self.promised:  # cancelled after agreeing
             self.promised.remove("payment_link")
         return new
