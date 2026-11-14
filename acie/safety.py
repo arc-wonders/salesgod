@@ -13,27 +13,422 @@ from __future__ import annotations
 import re
 
 from .schemas import Fact, TurnPlan
-from .text import normalize
+from .text import normalize, tokens
 
-_PATTERNS = [
-    # Hindi (Devanagari, normalized: no nukta, anusvara)
-    r"मरने का (मन|दिल|सोच)", r"मर जाना चाहत", r"मर जाऊं", r"मर जाउं", r"मरना चाहत", r"जीने का (मन|दिल) नहीं",
-    r"जीना नहीं चाहत", r"आत्महत्या", r"खुदकुशी", r"जान दे (दूं|दूंगा|दूंगी|दू)", r"अपनी जान", r"खुद को (मार|खत्म)",
-    r"सब खत्म कर (दूं|लूं)", r"जिंदगी से (तंग|परेशान) हो", r"मरना है", r"मर जाऊंगा", r"मर जाऊंगी",
-    r"जीना नहीं", r"जी कर क्या", r"मौत", r"फांसी", r"सुसाइड",
-    # Hinglish
-    r"marne ka (man|mann|dil)", r"mar jana chah", r"mar jaun", r"jeene ka (man|mann|dil) nahi", r"jeena nahi chah",
-    r"aatmahatya", r"atmahatya", r"khudkushi", r"jaan de (dunga|dungi|du)", r"khud ko (maar|khatam)",
-    r"marna hai", r"mar jaunga", r"mar jaungi", r"suicide",
-    # English
-    r"\bkill myself\b", r"\bwant to die\b", r"\bwanna die\b", r"\bfeel like dying\b", r"\bend my life\b",
-    r"\bsuicid", r"\bdon'?t want to live\b", r"\bno reason to live\b", r"\bhurt myself\b",
+# ---------------------------------------------------------------------------------------------------------
+# Detection. Deterministic (same text -> same score, always); no model, no randomness.
+#
+# Live call 2ccf3f1387: Whisper heard "मेरा गोल है छत से कूदना" as "...छट से कूदना" and "जिंदगी से हारा, मुझे नहीं
+# जीना" as "जिन्दगी ते खारा हुआ हूँ मुझे नहीं दीना", and the old exact-spelling regex missed both. So every
+# word is first reduced to a PHONETIC SKELETON that is the same for Devanagari and Roman spellings and
+# survives typical ASR slips:
+#   consonants -> classes  K (क ख ग घ ह k kh g gh h)   J (ज झ द ध ड ढ य j z d dh y)   S (च छ श ष स c ch s sh)
+#                          T (त थ ट ठ)   P (प फ ब भ व f p b v w)   M   N   R (र ल)
+#   vowels     -> I (इ ई ि ी i ee)  E (ए ऐ े ै e ai)  U (उ ऊ ो ौ u oo o)  ; the short "a" is dropped (the
+#                 Devanagari inherent vowel is unwritten in Roman and vice versa), so मरना == marna == MRN
+#   dropped    -> nukta, aspiration h, nasal before a consonant (जिन्दगी == zindagi), word-final nasal after
+#                 I/E/U (नहीं == nahin == NK), word-final vowel (जीने == jeena == JIN)
+# so छत/छट -> ST, जीना/दीना/जिना -> JIN, हारा/खारा -> KR, ज़िंदगी/जिन्दगी/zindagi -> JIJKI->JIJK, से/ते -> S/T.
+# (देना "to give" stays JEN: e and ee are different classes, so "नहीं देना" is not "नहीं जीना".)
+#
+# Evidence is then built from word-window co-occurrence. Each piece of evidence has a GROUP and a WEIGHT
+# (a documented, fixed probability-like score); within a group the max counts, across groups the scores
+# combine as a noisy-or (1 - prod(1 - w)), so two independent worrying signals add up:
+#   ideation   not wanting to live / wanting to die / self-harm phrases            0.55 - 0.95
+#   method     jump from a height, train, wrist, poison, hanging, pills            0.55 alone, 0.85-0.9 with
+#              a self-reference ("my goal is...", "I will...") within the window
+#   hopeless   life + defeat words, "everything is over", no way out                 0.4 - 0.65
+# HYPERBOLE guard: slang like "mar jaunga hans hans ke", "deadlift se jaan nikal gayi", "price se mar gaya" only
+# lowers the entries marked hyper (x0.25) and only when a gym/price/laughing word is in the same turn.
+# Explicit suicide words, methods and "नहीं जीना" are never lowered.
+# Thresholds: score >= DISTRESS_T (0.75) is a crisis; CONCERN_T (0.45) <= score < DISTRESS_T gets a gentle
+# check-in (concern_plan) instead of selling. Evidence from the previous 2 customer turns counts (x0.85,
+# x0.7) when the current turn itself carries some signal (>= 0.30); cross-turn word windows work through
+# the concatenated tokens ("मेरा गोल है" / "छत से कूदना").
+# Wrong in the safe direction is the design: a false check-in costs one sentence, a miss costs a life.
+# ---------------------------------------------------------------------------------------------------------
+
+DISTRESS_T = 0.75
+CONCERN_T = 0.45
+
+_DEV = {}
+for _chars, _cls in (("कखगघहङ", "K"), ("जझदधडढय", "J"), ("चछशषस", "S"), ("तथटठ", "T"), ("पफबभव", "P"),
+                     ("म", "M"), ("नणञ", "N"), ("रलळ", "R")):
+    for _c in _chars:
+        _DEV[_c] = _cls
+_DEV_VOWEL = {"अ": "a", "आ": "a", "इ": "I", "ई": "I", "उ": "U", "ऊ": "U", "ए": "E", "ऐ": "E", "ओ": "U", "औ": "U",
+              "ऑ": "a", "ा": "a", "ि": "I", "ी": "I", "ु": "U", "ू": "U", "े": "E", "ै": "E", "ो": "U", "ौ": "U",
+              "ॉ": "a", "ृ": "I"}
+_ROM_C = {"k": "K", "g": "K", "q": "K", "h": "K", "j": "J", "z": "J", "d": "J", "y": "J", "c": "S", "s": "S",
+          "t": "T", "p": "P", "b": "P", "f": "P", "v": "P", "w": "P", "m": "M", "n": "N", "r": "R", "l": "R",
+          "x": "K", "ṭ": "T"}
+_ROM_V = {"a": "a", "i": "I", "e": "E", "o": "U", "u": "U"}
+_CONS = set(_DEV) | set(_ROM_C)
+
+
+def _skel_word(w: str) -> str:
+    """Phonetic skeleton of ONE (already normalized) word. See the block comment above."""
+    out: list[str] = []
+    if w.isascii():
+        w = w.replace("ee", "i").replace("ii", "i").replace("oo", "u").replace("ie", "i")
+    n = len(w)
+    i = 0
+    while i < n:
+        ch = w[i]
+        nxt = w[i + 1] if i + 1 < n else ""
+        if ch in _DEV:
+            cls = _DEV[ch]
+            # nasal + virama + consonant (जिन्दगी): the nasal is not pronounced separately
+            if cls in "NM" and nxt == "्" and i + 2 < n and w[i + 2] in _DEV:
+                i += 2
+                continue
+            out.append(cls)
+        elif ch in _DEV_VOWEL:
+            out.append(_DEV_VOWEL[ch])
+        elif ch in ("ं", "ँ", "ः", "्", "ॅ"):
+            pass
+        elif ch in _ROM_C:
+            cls = _ROM_C[ch]
+            prev = w[i - 1] if i else ""
+            if ch == "h" and prev and prev in _ROM_C and prev not in "aeiou" and out:
+                i += 1  # aspiration: kh gh ch sh th dh ph bh jh chh
+                continue
+            if ch in "nm" and nxt in _ROM_C and nxt not in "aeiou" and i > 0:
+                i += 1  # zindagi: n before a consonant is not pronounced
+                continue
+            if ch == "c" and nxt == "k":
+                cls = "K"
+            out.append(cls)
+        elif ch in _ROM_V:
+            out.append(_ROM_V[ch])
+        # digits / anything else: ignored
+        i += 1
+    # roman 'ai'/'ei'/'ay' -> E ; 'aa','ee','ii','oo' collapse by the dedupe below
+    s: list[str] = []
+    k = 0
+    while k < len(out):
+        if out[k] == "a" and k + 1 < len(out) and out[k + 1] == "I" and k + 1 < len(out):
+            # "ai" (roman) is the vowel E; a Devanagari ा + ि sequence is rare, same reading is fine
+            s.append("E")
+            k += 2
+            continue
+        s.append(out[k])
+        k += 1
+    # roman "ee"/"ii" are one long I, but the Devanagari/roman "ie" etc. stay as they are
+    dedup: list[str] = []
+    for c in s:
+        if not dedup or dedup[-1] != c:
+            dedup.append(c)
+    # word-final nasal directly after I/E/U (नहीं, nahin, main, hoon, jaun, train)
+    if len(dedup) >= 3 and dedup[-1] == "N" and dedup[-2] in "IEU":
+        dedup.pop()
+    elif len(dedup) >= 2 and dedup[-1] == "N" and dedup[-2] in "IEU":
+        dedup.pop()
+    dedup = [c for c in dedup if c != "a"]
+    if len(dedup) >= 2 and dedup[-1] in "IEU":
+        dedup.pop()  # word-final vowel is noise
+    sk = "".join(dedup)
+    sk = re.sub(r"(.)\1+", r"\1", sk)
+    return sk or "-"
+
+
+def skeletons(text: str) -> list[str]:
+    return [_skel_word(t) for t in tokens(text)]
+
+
+def _set(words: str) -> frozenset[str]:
+    return frozenset(_skel_word(normalize(w)) for w in words.split())
+
+
+# --- single-word concepts (written in Roman; the Devanagari spelling reaches the same skeleton) -----------
+_SELF = _set("main mai me mein mujhe mujhko mujhse mujhme mera meri mere merko meko mko apna apni apne khud i my "
+             "myself mere hum hume")
+_NEG = _set("nahi nahin nhi nai nahee na mat no not dont never cant")
+_LIVE = _set("jeena jeene jina jine jeenaa jeeni jiyna jeenea")  # jeena / जीना / जिना / दीना (garbled)
+_JUMP = _set("kud kuda kudna kudne kudu kudun kudoon kudke kudunga kudungi kood koodna koodne koodun koodunga "
+             "kuddna kuuda")
+_JUMP_RAW = frozenset(("jump", "jumps", "jumping", "jumped", "जंप", "जम्प"))
+_PLACE = _set("chhat chhath terrace balcony balkani manzil mazil manjil pahad pahadi nadi naher samundar talab "
+              "flyover overbridge ghati khidki pul")
+_PLACE_RAW = frozenset(normalize(w) for w in (
+    "chat roof rooftop building bildin bilding bridge cliff tower river sea window terrace "
+    "बिल्डिंग ब्रिज रूफ रूफटॉप टैरेस बालकनी टावर नदी").split())
+_TRAIN = _set("trein patri")
+_TRAIN_RAW = frozenset(normalize(w) for w in "train trains railway track metro ट्रेन रेलवे पटरी मेट्रो".split())
+_DIEV = _set("marna marne maarna maarne")
+_MAR = _set("mar maar")
+_JA = _set("ja jao jau jaun jaoon jaunga jaungi jaye jaaye jayenge jaana jaane jana jane jaoonga jaungaa")
+_WANT = _set("chahta chahti chahte chahiye chahun chahu chaahta chaahti man mann dil mood soch sochta sochti "
+             "sochte ichha irada iraada plan goal ")
+_ZINDAGI = _set("zindagi jindagi jindgi zindgi zindagee jeevan jivan life lyf lif")
+_HOPE_W = {  # defeat words near "life": skeleton -> weight
+    **{_skel_word(w): 0.55 for w in "haar haara hara hare haari tang pareshan pareshaan bezaar bekar nafrat".split()},
+    **{_skel_word(w): 0.40 for w in "thak thaka thaki thakk".split()},
+    **{_skel_word(w): 0.55 for w in "bojh bhoj tut toot tuta toota".split()},
+}
+_KHATAM = _set("khatam khatm khtm")
+_SAB = _set("sab sabkuch sabhi")
+_KHUD = _set("khud")
+_CUT = _set("kaat kaatna katna kat katlu kaatunga kaat lunga")
+_NAS = _set("nas nass")
+_POISON = _set("zeher zehar jahar jehar zahar poison vish")
+_POISON_V = _set("khana khale khalun khaunga khakar pee peena pina pi piunga pikar pee lunga pi lunga")
+_FANSI_RAW = frozenset(normalize(w) for w in "fansi phansi phaansi fanda phanda फांसी फाँसी फंदा फांसि".split())
+_LATAK = _set("latak latakna latakke latkar latka")
+_PANKHA = _set("pankha pankhe pankhey")
+_NEEND = _set("neend nind nid")
+_SUICIDE = _set("suicide susaid sucide suiside suiciide सुसाइड सुसाईड सुइसाइड aatmahatya atmahatya aatmhatya atmhatya "
+                "aatmahatyaa आत्महत्या khudkushi khudkhushi khudkusi khudkashi खुदकुशी")
+_GOLI = _set("goli goliyan goliya goliyaan golian goliyo")
+_GOLI_BIG = _set("saari sari sab bahut bohot zyada ek saath overdose ")
+_GALA = _set("gala gale")
+_HYPER_RAW = frozenset(normalize(w) for w in (
+    "hans hansi hanste hasna hasi haste hanskar mazak mazaak joke jokes lol haha hehe funny comedy price rate kimat "
+    "qeemat daam mehnga mehngi mehngai discount offer bill fees deadlift deadlifts squat squats workout exercise gym "
+    "cardio treadmill reps mehnat thakan pasina garmi bhookh bhukh pyaas traffic "
+    "हंस हँस हंसी हँसी हंसते हंसकर मजाक मज़ाक जोक लोल प्राइस रेट कीमत दाम महंगा महंगाई डिस्काउंट ऑफर बिल फीस डेडलिफ्ट "
+    "स्क्वाट वर्कआउट एक्सरसाइज जिम कार्डियो ट्रेडमिल मेहनत थकान पसीना गर्मी भूख प्यास ट्रैफिक").split())
+_FILLER = _set("hi to bhi ho hai he ki ka ke ko")  # tolerated between "mar" and "jaun"
+
+
+def _idx(tok: list[str], conc) -> list[int]:
+    return [i for i, t in enumerate(tok) if t in conc]
+
+
+def _near(a: list[int], b: list[int], window: int, ordered: bool = False) -> bool:
+    for i in a:
+        for j in b:
+            if i != j and (j - i if ordered else abs(j - i)) <= window and (not ordered or j > i):
+                return True
+    return False
+
+
+_EN = [  # (regex over the normalized text, weight, group, hyper_capable)
+    (r"\bkill(ing)? (my ?self)\b", 0.95, "ideation", False),
+    (r"\bkill me\b", 0.5, "ideation", True),
+    (r"\bend(ing)? (my|this) life\b", 0.95, "ideation", False),
+    (r"\bend (it all|everything)\b", 0.85, "ideation", False),
+    (r"\btake my (own )?life\b", 0.95, "ideation", False),
+    (r"\bsuicid\w*|\bsucide\b|\bsuside\b|\bsuiside\b", 0.95, "ideation", False),
+    (r"\bwant(ed|s)? to die\b|\bwanna die\b|\bwant to be dead\b|\bwish (i|id) (was|were|be) dead\b|\bbetter off dead\b"
+     r"|\bbetter off without me\b|\brather be dead\b|\bwish i was never born\b", 0.95, "ideation", False),
+    (r"\b(dont|do not|didnt|no longer) want to (live|be alive|be here|exist|go on)\b", 0.95, "ideation", False),
+    (r"\bno (reason|point|use) (in |to |of )?(living|live|life|going on|being alive)\b|\bnot worth living\b"
+     r"|\bnothing to live for\b|\blife (is|isnt|is not) (worth|worthless)\b", 0.9, "ideation", False),
+    (r"\b(cant|can not|cannot) (go on|do this anymore|take it anymore|take this anymore)\b", 0.6, "ideation", False),
+    (r"\bhang(ing)? my ?self\b|\bcut(ting)? my (wrist|wrists|self)\b|\bslit my\b|\bhurt(ing)? my ?self\b"
+     r"|\bharm(ing)? my ?self\b|\boverdose\b", 0.9, "method", False),
+    (r"\bjump(ing)? (off|from|out of) (the |a |my |this )?(roof|rooftop|building|bridge|terrace|balcony|window|cliff|"
+     r"tower)\b", 0.85, "method", False),
+    (r"\b(in front of|under) (a |the )?train\b", 0.6, "method", False),
+    (r"\bhopeless\b|\bworthless\b|\bno way out\b|\btired of (life|living)\b|\bsick of (life|living)\b"
+     r"|\bgive up on life\b|\blife is over\b|\bnobody (would )?(care|miss me)\b", 0.5, "hopeless", False),
 ]
-_RX = re.compile("|".join(_PATTERNS), re.IGNORECASE)
+_EN_RX = [(re.compile(p), w, g, h) for p, w, g, h in _EN]
+_EN_NEG = re.compile(r"\b(dont|do not|didnt|never|not|no)\b")
 
 
-def is_distress(text: str) -> bool:
-    return bool(_RX.search(normalize(text))) or bool(_RX.search(text.lower()))
+def _evidence(tok: list[str], turn: list[int], hyper: set[int], raw: list[str]) -> list[tuple[str, float, int, str]]:
+    """-> [(group, weight, turn_index_of_last_word, rule)] ; tok = skeletons, turn = turn index per token."""
+    ev: list[tuple[str, float, int, str]] = []
+    def add(group, w, pos, rule, hyper_ok=False):
+        t = turn[min(pos, len(turn) - 1)] if turn else 0
+        if hyper_ok and t in hyper:
+            w *= 0.25
+        ev.append((group, w, t, rule))
+
+    SELF, NEG, LIVE = _idx(tok, _SELF), _idx(tok, _NEG), _idx(tok, _LIVE)
+    # 1. not wanting to live: "नहीं जीना", "जीना नहीं", "जीने का मन नहीं", "मुझे नहीं दीना" (window 4)
+    for i in LIVE:
+        for j in NEG:
+            if abs(i - j) <= 4:
+                near_self = any(abs(i - s) <= 6 for s in SELF)
+                add("ideation", 0.95 if near_self else 0.85, max(i, j), "not_live")
+                break
+    # 2. dying: marna/marne + wanting; "mar jaun"; die-verb with self
+    DIEV, MAR = _idx(tok, _DIEV), _idx(tok, _MAR)
+    for i in DIEV:
+        negd = any(0 < j - i <= 3 for j in NEG)
+        if negd:
+            continue
+        wants = any(abs(i - j) <= 4 for j in _idx(tok, _WANT))
+        near_self = any(abs(i - s) <= 4 for s in SELF)
+        if wants:
+            add("ideation", 0.92, i, "die_want", True)
+        elif near_self:
+            add("ideation", 0.8, i, "die_self", True)
+        else:
+            add("ideation", 0.35, i, "die_bare", True)
+    for i in MAR:
+        for k in (1, 2):
+            if i + k < len(tok) and tok[i + k] in _JA and all(tok[i + x] in _FILLER for x in range(1, k)):
+                if any(0 < j - (i + k) <= 3 for j in NEG):
+                    break
+                add("ideation", 0.8, i + k, "mar_jaun", True)
+                break
+    for i in _idx(tok, _SUICIDE):
+        if not any(0 < j - i <= 3 for j in NEG):
+            add("ideation", 0.95, i, "suicide_word")
+    for i, r in enumerate(raw):  # "जान दे दूंगा": hyperbole-capable
+        if r in ("jaan", "जान") and any(0 < j - i <= 3 and raw[j] in ("dunga", "dungi", "du", "दूंगा", "दूंगी", "दूं", "दू") for j in range(len(raw))):
+            if any(abs(s - i) <= 5 for s in SELF):
+                add("ideation", 0.78, i, "jaan_de", True)
+    # 3. hopelessness around life: "जिंदगी से हारा / थक / तंग"
+    ZIN = _idx(tok, _ZINDAGI)
+    for i in ZIN:
+        for j, t in enumerate(tok):
+            if t in _HOPE_W and 0 < abs(i - j) <= 4:
+                near_self = any(abs(i - s) <= 6 for s in SELF)
+                add("hopeless", min(0.65, _HOPE_W[t] + (0.1 if near_self else 0)), max(i, j), "life_defeat", True)
+        for j in _idx(tok, _KHATAM):
+            if abs(i - j) <= 3:
+                near_self = any(abs(i - s) <= 6 for s in SELF)
+                add("ideation", 0.9 if near_self else 0.8, max(i, j), "life_khatam", True)
+    for j in _idx(tok, _KHATAM):
+        if any(0 < j - s <= 2 for s in _idx(tok, _SAB)):
+            add("hopeless", 0.45, j, "sab_khatam", True)
+        if any(0 < j - s <= 4 for s in _idx(tok, _KHUD)):
+            add("ideation", 0.9, j, "khud_ko_khatam", True)
+    for i in _idx(tok, _KHUD):
+        for j in MAR + _idx(tok, _DIEV):
+            if 0 < j - i <= 3:
+                add("ideation", 0.9, j, "khud_ko_maar", True)
+    # 4. methods
+    JUMP = sorted(set(_idx(tok, _JUMP) + [i for i, r in enumerate(raw) if r in _JUMP_RAW]))
+    TRAIN = sorted(set(_idx(tok, _TRAIN) + [i for i, r in enumerate(raw) if r in _TRAIN_RAW]))
+    PLACE = sorted(set(_idx(tok, _PLACE) + [i for i, r in enumerate(raw) if r in _PLACE_RAW] + TRAIN))
+    for i in JUMP:
+        for j in PLACE:
+            if abs(i - j) <= 5 and i != j:
+                near_self = any(min(abs(s - i), abs(s - j)) <= 6 for s in SELF)
+                wants = any(abs(w - i) <= 5 for w in _idx(tok, _WANT))
+                add("method", 0.9 if (near_self or wants) else 0.55, max(i, j), "jump_place")
+                break
+    for i in TRAIN:
+        for j, t in enumerate(tok):
+            if t in _skel_word("aage") and 0 < j - i <= 2:
+                near_self = any(abs(s - i) <= 6 for s in SELF)
+                add("method", 0.85 if near_self else 0.4, j, "train_aage")
+    for i in _idx(tok, _NAS):
+        if any(0 < abs(i - j) <= 2 for j in _idx(tok, _CUT)):
+            near_self = any(abs(s - i) <= 5 for s in SELF)
+            add("method", 0.9 if near_self else 0.7, i, "nas_kaatna")
+    for i in _idx(tok, _POISON):
+        if any(0 < j - i <= 3 or 0 < i - j <= 2 for j in _idx(tok, _POISON_V)):
+            near_self = any(abs(s - i) <= 5 for s in SELF)
+            add("method", 0.9 if near_self else 0.7, i, "poison")
+    for i in [i for i, r in enumerate(raw) if r in _FANSI_RAW]:
+        near_self = any(abs(s - i) <= 5 for s in SELF)
+        add("method", 0.9 if near_self else 0.55, i, "fansi")
+    for i in _idx(tok, _LATAK):
+        near_self = any(abs(s - i) <= 5 for s in SELF)
+        pk = any(abs(i - j) <= 3 for j in _idx(tok, _PANKHA))
+        add("method", 0.9 if (near_self or pk) else 0.5, i, "latak")
+    for i in _idx(tok, _NEEND):
+        if any(0 < j - i <= 3 for j in _idx(tok, _GOLI)):
+            big = any(abs(j - i) <= 6 for j in _idx(tok, _GOLI_BIG))
+            near_self = any(abs(s - i) <= 6 for s in SELF)
+            add("method", 0.85 if big else (0.6 if near_self else 0.35), i, "sleeping_pills")
+    # 5. "जी कर क्या" (what is the use of living)
+    kr, kj = _skel_word("kar"), _skel_word("kya")
+    for i in range(len(tok) - 2):
+        if (tok[i] == _skel_word("jeekar") and tok[i + 1] == kj) or (tok[i] == "J" and tok[i + 1] == kr and tok[i + 2] == kj):
+            add("ideation", 0.8 if any(abs(s - i) <= 6 for s in SELF) else 0.7, i + 1, "jee_kar_kya")
+    return ev
+
+
+def _english_evidence(norm_text: str, turn_idx: int) -> list[tuple[str, float, int, str]]:
+    ev = []
+    for rx, w, g, h in _EN_RX:
+        for m in rx.finditer(norm_text):
+            before = norm_text[max(0, m.start() - 14):m.start()]
+            if g == "ideation" and _EN_NEG.search(before) and not rx.pattern.startswith(r"\b(dont"):
+                continue  # "dont want to die", "never wanted to kill myself"
+            if h and re.search(r"\b(workout|gym|traffic|heat|price|laughing|joke|jokes|lol|haha)\b", norm_text):
+                w *= 0.25
+            ev.append((g, w, turn_idx, "en:" + rx.pattern[:24]))
+    return ev
+
+
+def _combine(ev: list[tuple[str, float, int, str]], cur: int) -> tuple[float, list[str]]:
+    """Group max, then noisy-or across groups. Earlier turns are decayed and only count when the current
+    turn carries a signal of its own (>= 0.30)."""
+    decay = {0: 1.0, 1: 0.85, 2: 0.7}
+    scored = [(g, w * decay.get(cur - t, 0.0), t, r) for g, w, t, r in ev]
+    current = [e for e in scored if e[2] == cur]
+    if not current or max(w for _, w, _, _ in current) < 0.30:
+        scored = current
+    best: dict[str, tuple[float, str]] = {}
+    for g, w, t, r in scored:
+        label = r if t == cur else f"{r}@-{cur - t}"
+        if w > best.get(g, (0.0, ""))[0]:
+            best[g] = (w, label)
+    prod = 1.0
+    for w, _ in best.values():
+        prod *= 1.0 - w
+    return round(1.0 - prod, 3), [f"{g}:{lab}={w:.2f}" for g, (w, lab) in sorted(best.items())]
+
+
+def _customer_texts(history) -> list[str]:
+    out: list[str] = []
+    for h in history or []:
+        if isinstance(h, str):
+            out.append(h)
+        elif isinstance(h, (tuple, list)) and len(h) == 2:
+            if str(h[0]) in ("customer", "user", "caller"):
+                out.append(str(h[1]))
+        else:
+            role, txt = getattr(h, "role", "customer"), getattr(h, "text", "")
+            if role == "customer":
+                out.append(txt)
+    return out[-2:]
+
+
+def distress_score(text: str, history=None) -> tuple[float, list[str]]:
+    """(score 0..1, evidence). history = previous turns (strings, or (role, text) pairs, or Utterances);
+    only the last 2 CUSTOMER turns are used. Deterministic."""
+    turns = _customer_texts(history) + [text or ""]
+    cur = len(turns) - 1
+    tok: list[str] = []
+    raw: list[str] = []
+    turn: list[int] = []
+    ev: list[tuple[str, float, int, str]] = []
+    hyper: set[int] = set()
+    for ti, t in enumerate(turns):
+        if any(w in _HYPER_RAW for w in tokens(t)):
+            hyper.add(ti)
+        sk = skeletons(t)
+        if ti:  # turn boundary: a little distance so windows do not glue unrelated turns tightly
+            tok += ["-", "-"]
+            raw += ["-", "-"]
+            turn += [ti, ti]
+        tok += sk
+        raw += tokens(t)
+        turn += [ti] * len(sk)
+        ev += _english_evidence(normalize(t), ti)
+    ev += _evidence(tok, turn, hyper, raw)
+    # dedupe identical evidence found twice
+    seen, uniq = set(), []
+    for e in ev:
+        if e not in seen:
+            seen.add(e)
+            uniq.append(e)
+    return _combine(uniq, cur)
+
+
+def is_distress(text: str, history=None) -> bool:
+    return distress_score(text, history)[0] >= DISTRESS_T
+
+
+def is_concern(text: str, history=None) -> bool:
+    """Worrying but not clear enough to call a crisis: check in gently instead of selling."""
+    return CONCERN_T <= distress_score(text, history)[0] < DISTRESS_T
+
+
+def crisis_from_nlu(understanding) -> bool:
+    """Second net: the NLU model flagged a possible crisis. The pipeline ORs this in; it can only ADD a
+    safety trigger, never suppress one."""
+    return bool(getattr(understanding, "crisis", False))
 
 
 _SLOWLY = re.compile(r"number|नंबर|dhire|धीरे|slow|फिर से|phir se|again|repeat|likh|लिख|दोबारा|dobara", re.I)
