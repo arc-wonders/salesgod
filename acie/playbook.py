@@ -61,13 +61,15 @@ class Playbook(BaseModel):
     @staticmethod
     def _score(n: "Node", low: str, nlu, intent: str) -> float | None:
         """A node's match score, or None when one of its signal ranges rules it out."""
+        from .signals import as_signals
+        nlu = as_signals(nlu)  # TurnSignals (or a legacy Understanding, coerced): the playbook never sees a provider's object
         w, score = n.when, 0.0
         if any(re.search(k, low, re.I) for k in w.keywords if k):
             score += 2.5
         if intent and intent in w.intents:
             score += 1.0
         if nlu is not None:
-            if nlu.intent in w.intents:
+            if any(v in w.intents for v in nlu.votes.values()):
                 score += 1.0
             if nlu.objection != "none" and nlu.objection in w.objections:
                 score += 2.0

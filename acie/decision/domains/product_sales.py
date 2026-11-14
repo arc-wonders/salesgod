@@ -420,6 +420,8 @@ class ProductSalesDomain:
         "small_talk": "chit-chat or a question unrelated to the product (weather, time, news, facts, recipes)",
     }
     confident_intents = {"callback", "human_agent"}
+    # foreign intent label -> this domain's label (added to acie.signals.DEFAULT_ALIASES); unmapped labels are "unknown"
+    intent_aliases: dict[str, str] = {}
 
     def __init__(self, product: Product, customer_name: str = "", world=None, customer_age: int | None = None,
                  playbook=None, business=None, customer: Customer | dict | None = None, turn_model=None,
@@ -571,9 +573,10 @@ class ProductSalesDomain:
 
     @staticmethod
     def _nlu(d: dict):
-        from ...understanding import Understanding
-        raw = d.get("_nlu")
-        return Understanding.model_validate_json(raw) if raw else None
+        """The learned providers' fused signals for this turn (acie.signals.TurnSignals), or None when only the
+        rules heard it. The decision layer never sees a provider's own object."""
+        from ...signals import signals_from_dialog
+        return signals_from_dialog(d)
 
     def _asks(self, text: str, d: dict) -> bool:
         u = self._nlu(d)
@@ -582,7 +585,7 @@ class ProductSalesDomain:
     def _general(self, text: str, d: dict) -> bool:
         u = self._nlu(d)
         if u is not None:
-            return (u.question_topic == "general" or u.intent == "small_talk") and not _SALE_WORDS.search(text.lower())
+            return (u.question_topic == "general" or u.heard("small_talk")) and not _SALE_WORDS.search(text.lower())
         return _is_question(text) and not self._on_topic(text)
 
     def _on_topic(self, text: str) -> bool:
@@ -611,7 +614,7 @@ class ProductSalesDomain:
         if _clean_yes(text) and intent in ("affirm", "tell_more", "unknown", "goodbye"):
             return "explicit"
         u = self._nlu(d)
-        if u is not None and u.intent == "affirm" and u.buying_signal >= 0.8 and not _weak_yes(text):
+        if u is not None and u.heard("affirm") and u.buying_interest >= 0.8 and not _weak_yes(text):
             return "model"
         return None
 
@@ -621,7 +624,7 @@ class ProductSalesDomain:
         if self._asks(text, d):
             return False  # "is it fake? will it get costlier later?" is a question, not a no
         u = self._nlu(d)
-        if u is not None and u.intent in ("personal", "small_talk"):
+        if u is not None and u.heard("personal", "small_talk"):
             return False  # loneliness / weather chat is not a refusal
         return intent == "deny"
 
@@ -722,7 +725,7 @@ class ProductSalesDomain:
     def _nba(self, d: dict, ctx) -> None:
         u = self._nlu(d)
         stage = d.get("pending") or "intro"
-        action, scores = nba.next_best_action(stage, u.buying_signal if u is not None else 0.0,
+        action, scores = nba.next_best_action(stage, u.buying_interest if u is not None else 0.0,
                                               list(ctx.objections) if ctx is not None else [], ctx,
                                               benefit_turns=int(d.get("benefit_turns", "0")))
         d["nba"] = action
@@ -786,11 +789,11 @@ class ProductSalesDomain:
 
         # ---------------- policy: consent and closing
         u_ = self._nlu(d)
-        if u_ is not None and re.search(r"unclear|unrelated|garbled|nonsens|not clear|incomprehensible", u_.gist, re.I):
+        if u_ is not None and u_.garbled:
             d["unclear"] = str(int(d.get("unclear", "0")) + 1)  # a bad line / noise: never close without a read-back
         after_confirm = pending == "confirm" or d.get("last_intent") in ("confirm_close", "confirm_buy")
-        if u_ is not None and re.search(r"unclear|unrelated|garbled|nonsens|not clear|incomprehensible", u_.gist, re.I) \
-                and u_.intent in ("unknown", "clarify", "tell_more", "affirm", "small_talk") and not _BUY.search(text):
+        if u_ is not None and u_.garbled \
+                and u_.heard("unknown", "clarify", "tell_more", "affirm", "small_talk") and not _BUY.search(text):
             # a noisy line: don't build an answer (or a sale) on words the caller probably never said
             return TurnPlan(intent="clarify", llm_allowed=False, objective="Ask them to repeat",
                             fallback=_tpl("Sorry, the line isn't clear. Could you say that again?",
@@ -817,7 +820,7 @@ class ProductSalesDomain:
                     or (d.get("terms_confirmed") == "1" and (strong or asked_link)):
                 u0 = self._nlu(d)
                 # "हाँ हाँ" from someone who sounds unsure (the elderly persona got a link she never wanted)
-                if not strong and u0 is not None and u0.buying_signal < 0.6 and d.get("last_intent") != "confirm_buy":
+                if not strong and u0 is not None and u0.buying_interest < 0.6 and d.get("last_intent") != "confirm_buy":
                     d["pending"] = "confirm"
                     return TurnPlan(intent="confirm_buy", llm_allowed=False, objective="Make sure they really want to buy",
                                     fallback=_tpl("Just to be sure: would you like to buy it? It's completely fine to talk to your family first.",
@@ -859,7 +862,7 @@ class ProductSalesDomain:
                             fallback=_tpl("Sure, let's talk in English. " + (q or "Please go on."),
                                           "ज़रूर, हिंदी में बात करते हैं। " + (q or "बताइए।"),
                                           "Zaroor, Hinglish mein baat karte hain. " + (q or "Bataiye.")))
-        if intent == "human_agent" and ((u is not None and u.intent == "human_agent") or re.search(
+        if intent == "human_agent" and ((u is not None and u.heard("human_agent")) or re.search(
                 r"human|person|insaan|insan|इंसान|व्यक्ति|aadmi|आदमी|manager|मैनेजर|supervisor|real agent", text, re.I)):
             return TurnPlan(intent="human_agent", llm_allowed=False, decision="handoff_to_human", end_call=True,
                             objective="Say a team member will call them back",
@@ -951,7 +954,7 @@ class ProductSalesDomain:
         short_what = asks and len(text.split()) <= 6 and (u is None or u.question_topic in ("product", "none"))
         if not pitched and not quoted and pending in ("intro", None) and self._faq_match(text) is None \
                 and (plain_go_on or (intent in ("tell_more", "benefits") and (not asks or short_what))) \
-                and not (u is not None and u.intent in ("personal", "small_talk")) and p.pitch_hi and p.pitch_en:
+                and not (u is not None and u.heard("personal", "small_talk")) and p.pitch_hi and p.pitch_en:
             d["pending"] = "pitch"
             return TurnPlan(intent="pitch", llm_allowed=False, facts={"discount": self._offer()["discount"]},
                             objective="Operator-written pitch, then the discount and a short question", ask="shall I tell you the price?",
@@ -1063,7 +1066,7 @@ class ProductSalesDomain:
             lead = self._price_lead(text, lang)
             for k in ("offer", "validity", "rupees"):
                 facts.pop(k, None)
-        elif re.search(_ANNUAL, text, re.I) and self.p.annual_note.get(lang) and not (u is not None and u.intent == "personal"):
+        elif re.search(_ANNUAL, text, re.I) and self.p.annual_note.get(lang) and not (u is not None and u.heard("personal")):
             lead = self.p.annual_note[lang]
             for k in ("offer", "validity", "rupees"):
                 facts.pop(k, None)
@@ -1074,7 +1077,7 @@ class ProductSalesDomain:
         if node_note:
             knowledge.append(node_note[0])
             stage = node_note[1]
-        sad = u is not None and u.intent == "personal"
+        sad = u is not None and u.heard("personal")
         faq = self._faq_match(text)
         if faq is not None:
             d["_objection"] = (faq.keywords or ["question"])[0]

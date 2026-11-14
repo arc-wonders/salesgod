@@ -113,6 +113,12 @@ class NeedInput:
     decided: str = "undecided"                             # call context decision
     turn_index: int = 0
     prev_agent: str = ""
+    signals: object = None                                 # acie.signals.TurnSignals (learned providers' fused reading), or None
+
+    def heard(self, *labels: str) -> bool:
+        """A learned provider (any model) heard one of these intents; `nlu_intent` is the legacy single-label form."""
+        sg = self.signals
+        return self.nlu_intent in labels or (sg is not None and sg.heard(*labels))
 
 
 @dataclass
@@ -130,7 +136,7 @@ def signals(inp: NeedInput) -> dict[str, bool]:
         "crisis": bool(CRISIS.search(t)),
         "bye": bool(CLOSE.search(t)) or inp.intent == "goodbye",
         "thanks": bool(THANKS.search(t)),
-        "no": bool(NO.search(t)) or (0 < len(toks) <= 2 and all(w in BARE_NO for w in toks)) or inp.intent == "deny" or inp.nlu_intent == "deny",
+        "no": bool(NO.search(t)) or (0 < len(toks) <= 2 and all(w in BARE_NO for w in toks)) or inp.intent == "deny" or inp.heard("deny"),
         "negotiate": bool(NEGOTIATE.search(t)),
         "later": bool(LATER.search(t)) or inp.intent == "callback",
         "complaint": bool(COMPLAINT.search(t)),
@@ -139,7 +145,7 @@ def signals(inp: NeedInput) -> dict[str, bool]:
         "lang_trouble": bool(LANG_TROUBLE.search(t)),
         "asking": bool(ASKING.search(t)) or inp.question_topic not in ("none", ""),
         "busy": bool(BUSY.search(t)),
-        "personal": bool(PERSONAL.search(t)) or inp.nlu_intent in ("personal", "small_talk"),
+        "personal": bool(PERSONAL.search(t)) or inp.heard("personal", "small_talk"),
         "sale": bool(SALE.search(t)),
         "garbled": garbled(t),
         "go_on": bool(GO_ON.search(t)) or inp.intent in ("affirm", "tell_more", "benefits", "price"),

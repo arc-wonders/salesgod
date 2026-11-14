@@ -415,8 +415,13 @@ class HumanStateEstimator:
         self.alpha_up = alpha_up
         self.alpha_down = alpha_down
 
-    def estimate(self, turn: TurnInput, session: SessionState, nlu=None) -> HumanState:
-        raw, ev = self.scorer.score(turn, session)
+    def estimate(self, turn: TurnInput, session: SessionState, nlu=None, signals=None) -> HumanState:
+        if signals is not None:
+            # acie.signals.TurnSignals: the providers' state readings are already fused (acie/signals_fusion.py)
+            raw, ev = dict(signals.state), list(signals.evidence)
+            nlu = None
+        else:
+            raw, ev = self.scorer.score(turn, session)
         if nlu is not None:
             # neural reading of the turn in context (acie/understanding.py), fused half-half with the
             # lexicon: the lexicon is precise on words it knows, the model hears everything else

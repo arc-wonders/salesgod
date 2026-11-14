@@ -55,7 +55,7 @@ class ACIEPipeline:
                  store: ProfileStore | None = None, estimator: HumanStateEstimator | None = None,
                  policy: AdaptationPolicy | None = None, compiler: PromptCompiler | None = None,
                  feedback: FeedbackEngine | None = None, buffer_reply: bool = False, nlu=None,
-                 session_store=None):
+                 session_store=None, signal_providers: list | None = None):
         # buffer_reply: validate the whole reply before releasing any of it. On a phone call this
         # avoids speaking half an LLM reply and then the safe template (the customer would hear
         # the same facts twice). Replies are 1-2 sentences, so the extra wait is small.
@@ -76,6 +76,12 @@ class ACIEPipeline:
         # optional durable copy (acie.store.sessions): loaded at turn start if this process has not seen the
         # session yet (restart mid-call), saved at turn end. None = today's in-process behaviour.
         self.session_store = session_store
+        # acie.providers: None = built from ACIE_SIGNAL_PROVIDERS (default: rules, plus the LLM NLU when `nlu` is given)
+        self._signal_hub = None
+        self._hub_cache = None
+        if signal_providers is not None:
+            from .providers.hub import SignalHub
+            self._signal_hub = SignalHub(signal_providers)
 
     async def forget_session(self, session_id: str) -> SessionState | None:
         sess = self.sessions.pop(session_id, None)
@@ -88,24 +94,31 @@ class ACIEPipeline:
             self.sessions[turn.session_id] = SessionState(session_id=turn.session_id, customer_id=turn.customer_id)
         return self.sessions[turn.session_id]
 
+    def _hub(self):
+        """The signal providers for this pipeline (acie.providers), rebuilt when their configuration changes."""
+        if self._signal_hub is not None:
+            return self._signal_hub
+        key = (id(self.nlu), os.getenv("ACIE_SIGNAL_PROVIDERS", ""), os.getenv("ACIE_SIGNAL_HTTP_URL", ""),
+               os.getenv("ACIE_TURN_MODEL", ""))
+        if self._hub_cache is None or self._hub_cache[0] != key:
+            from .providers import build_hub
+            self._hub_cache = (key, build_hub(self))
+        return self._hub_cache[1]
+
     async def _stream_a(self, turn: TurnInput, session: SessionState) -> tuple[str, HumanState]:
-        rule_intent = self.decision.classify(turn, session)
-        nlu = None
+        """Layers 1-2: every provider reads the turn, the fusion (acie/signals_fusion.py) makes one TurnSignals, and
+        the decision layer sees only that. Rules keep the last word on priority intents; the other providers fill gaps."""
         dom = self.decision.domain
-        guide = getattr(dom, "intent_guide", None)
         session.dialog.pop("_nlu", None)
-        sure = rule_intent in getattr(dom, "confident_intents", ()) and len(turn.text.split()) <= 6
-        if self.nlu is not None and guide and turn.text.strip() and not sure:  # skip (~0.6 s) when the rules are sure
-            history = [(u.role, u.text) for u in session.history]
-            nlu = await self.nlu.understand(turn.text, history, guide, getattr(dom, "about", ""))
-        intent = rule_intent
-        if nlu is not None:
-            session.dialog["_nlu"] = nlu.model_dump_json()
-            session.dialog["_rule_intent"] = rule_intent
-            # the rules keep the last word on what they are sure about; the model fills the gaps
-            if nlu.intent != "unknown" and rule_intent in ("unknown", "tell_more", "benefits", "goodbye", "affirm", "deny"):
-                intent = nlu.intent
-        return intent, self.estimator.estimate(turn, session, nlu)
+        session.dialog.pop("_signals", None)
+        sig = await self._hub().run(turn, session, dom, getattr(dom, "classifier", None))
+        if sig.learned:
+            session.dialog["_nlu"] = sig.to_understanding().model_dump_json()  # console / logs compat
+            session.dialog["_rule_intent"] = sig.rule_intent
+        session.dialog["_signals"] = sig.model_dump_json()
+        if hasattr(self.estimator, "scorer") and sig.state:
+            return sig.intent, self.estimator.estimate(turn, session, signals=sig)
+        return sig.intent, self.estimator.estimate(turn, session, sig.to_understanding() if sig.learned else None)
 
     # ------------------------------------------------------------------ psyche (need -> move) and the repeat guard
 

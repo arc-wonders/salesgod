@@ -1,6 +1,6 @@
 """Hybrid intent classifier: trained model when it is confident, keyword rules otherwise.
 
-Turned on by ACIE_TURN_MODEL=<dir> (the ml lane's `TrainedTurnModel`, imported lazily). The keyword
+Turned on by ACIE_TURN_MODEL=<dir> (any model the loader registry in acie/providers/loaders.py can open). The keyword
 classifier keeps the last word where rules must not be second-guessed:
 
   * its hard-priority intents (clarify, human_agent, callback ...) always win,
@@ -20,23 +20,13 @@ from ..schemas import SessionState
 from .engine import KeywordIntentClassifier
 
 DEFAULT_THRESHOLD = 0.6
-_MODEL_CACHE: dict[str, object] = {}
 
 
 def load_turn_model(path: str | None = None):
-    """The model at ACIE_TURN_MODEL (cached), or None when unset or loading fails."""
-    path = path if path is not None else os.getenv("ACIE_TURN_MODEL", "")
-    if not path:
-        return None
-    if path in _MODEL_CACHE:
-        return _MODEL_CACHE[path]
-    try:
-        from training.state_classifier.predict import TrainedTurnModel  # lazy: torch is optional
-        model = TrainedTurnModel.load(path) if hasattr(TrainedTurnModel, "load") else TrainedTurnModel(path)
-    except Exception:
-        model = None
-    _MODEL_CACHE[path] = model
-    return model
+    """The model at ACIE_TURN_MODEL (cached), or None when unset or loading fails.
+    Which loader runs (XGBoost JSON dir, MuRIL dir, a custom one) is decided by acie.providers.loaders."""
+    from ..providers.loaders import load_model
+    return load_model(path)
 
 
 def _threshold() -> float:
@@ -65,16 +55,9 @@ class HybridIntentClassifier:
         return self.keyword.scores(text, session)
 
     def _predict(self, text: str, session: SessionState) -> tuple[str, float]:
-        m = self.model
-        if hasattr(m, "classify_with_confidence"):
-            label, p = m.classify_with_confidence(text, session)
-            return label, float(p)
-        if hasattr(m, "predict"):
-            from training.state_classifier.predict import _session_context, INTENTS  # lazy
-            probs = m.predict(text, _session_context(session, None))["intent_probs"]
-            k = max(range(len(probs)), key=probs.__getitem__)
-            return INTENTS[k], float(probs[k])
-        return m.classify(text, session), 1.0
+        from ..providers.loaders import predict_label
+        label, p, _ = predict_label(self.model, text, session)
+        return label, p
 
     def classify(self, text: str, session: SessionState) -> str:
         kw = self.keyword.classify(text, session)
