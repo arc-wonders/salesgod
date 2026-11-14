@@ -8,6 +8,7 @@ evidence tracking stay the same either way.
 
 from __future__ import annotations
 
+import logging
 import os
 
 import re
@@ -17,6 +18,10 @@ import numpy as np
 
 from ..schemas import HumanState, SessionState, TurnInput
 from ..text import jaccard, tokens
+from . import dims as _dims
+from .dims import state_dims  # noqa: F401  (re-exported)
+
+log = logging.getLogger("acie.state")
 
 # Lexicons: phrase -> weight. Phrases are matched on whole words over normalized
 # text (see acie.text.normalize); "x*" allows a suffix on the last word; "=x"
@@ -247,7 +252,10 @@ class RuleScorer:
             s["engagement"] -= 0.2
             ev.append("slow to respond")
 
-        return {k: max(0.0, min(1.0, v)) for k, v in s.items()}, ev
+        core = {k: max(0.0, min(1.0, v)) for k, v in s.items()}
+        minimal = bool(content) and all(t in LOW_ENGAGEMENT_REPLIES for t in content)
+        core.update(_dims.score_extended(turn, session, core, low, bare, toks, content, minimal, ev))
+        return core, ev
 
 
 # ----------------------------------------------------------------------------- prosody
@@ -314,26 +322,96 @@ def voice_arousal(turn: TurnInput, session: SessionState) -> tuple[float, list[s
 def apply_prosody(raw: dict[str, float], arousal: float, text_negative: bool) -> dict[str, float]:
     """Voice tells HOW activated someone is; words tell WHICH way. So high arousal amplifies
     frustration only when the words/behaviour already lean negative; otherwise it reads as
-    engagement (an excited 'haan haan batao!'). Low arousal (flat, quiet) lowers engagement."""
+    engagement (an excited 'haan haan batao!'). Low arousal (flat, quiet) lowers engagement.
+
+    Extended dims (only touched when present in `raw`):
+      high arousal + negative words -> anxiety up (more if the words already sounded worried), calmness down
+      high arousal + positive words -> excitement up, calmness down a little
+      low arousal (flat, quiet)     -> calmness up, excitement down
+    """
     out = dict(raw)
+    ext = "anxiety" in out
     if arousal > 0.25:
         if text_negative:
             out["frustration"] = min(1.0, out["frustration"] + 0.4 * arousal)
             out["urgency"] = min(1.0, out["urgency"] + 0.15 * arousal)
+            if ext:
+                worried = out["anxiety"] > 0 or out["trust"] < 0.5
+                out["anxiety"] = min(1.0, out["anxiety"] + (0.4 if worried else 0.2) * arousal)
+                out["calmness"] = max(0.0, out["calmness"] - 0.4 * arousal)
         else:
             out["engagement"] = min(1.0, out["engagement"] + 0.25 * arousal)
             out["frustration"] = min(1.0, out["frustration"] + 0.1 * arousal)
+            if ext:
+                out["excitement"] = min(1.0, out["excitement"] + 0.5 * arousal)
+                out["calmness"] = max(0.0, out["calmness"] - 0.2 * arousal)
     elif arousal < -0.25:
         out["engagement"] = max(0.0, out["engagement"] - 0.4 * abs(arousal))
+        if ext:
+            out["calmness"] = min(1.0, out["calmness"] + 0.4 * abs(arousal))
+            out["excitement"] = max(0.0, out["excitement"] - 0.3 * abs(arousal))
     return out
+
+
+class _FusedScorer:
+    """Rules + a trained turn model, 50/50 per dim the model returns (ACIE_TURN_MODEL)."""
+
+    def __init__(self, rules: RawScorer, model):
+        self.rules, self.model = rules, model
+
+    def score(self, turn: TurnInput, session: SessionState) -> tuple[dict[str, float], list[str]]:
+        raw, ev = self.rules.score(turn, session)
+        try:
+            m, mev = self.model.score(turn, session)
+        except Exception as e:  # a broken model must never break a live turn
+            log.warning("turn model failed (%s); rules only for this turn", type(e).__name__)
+            return raw, ev
+        for dim, v in m.items():
+            if dim in raw and v is not None:
+                raw[dim] = round(0.5 * raw[dim] + 0.5 * max(0.0, min(1.0, float(v))), 3)
+        return raw, ev + list(mev) + ["turn model"]
+
+
+_MODEL_FAILED = False
+
+
+def load_turn_model(path: str | None = None):
+    """TrainedTurnModel from ACIE_TURN_MODEL (lazy import), or None; logs the failure once."""
+    global _MODEL_FAILED
+    path = path or os.getenv("ACIE_TURN_MODEL")
+    if not path or _MODEL_FAILED:
+        return None
+    try:
+        from training.state_classifier.predict import TrainedTurnModel
+        return TrainedTurnModel.load(path)
+    except Exception as e:
+        _MODEL_FAILED = True
+        log.warning("ACIE_TURN_MODEL=%s could not be loaded (%s: %s); using the rules", path, type(e).__name__, e)
+        return None
+
+
+_BASELINE = {k: f.default for k, f in HumanState.model_fields.items() if k != "signals"}
 
 
 class HumanStateEstimator:
     """Asymmetric EMA: states rise fast (react to a problem now) and decay slowly
-    (don't forget the customer was annoyed one turn ago)."""
+    (don't forget the customer was annoyed one turn ago).
+
+    Smoothing math, per dim d with neutral baseline b_d (0 for frustration/anxiety/..., 0.5 for
+    engagement/trust/...; the HumanState default) and previous value p, raw reading r:
+        a = alpha_up if r > p else alpha_down
+        H = b + (a * (r - b) + (1 - a) * (p - b))
+    i.e. an EMA of the deviation from the baseline, added back to the baseline. With no signal the
+    raw reading equals b, so a neutral-default dim decays toward 0.5, not toward 0. For b = 0 this is
+    the plain EMA used before; for b = 0.5 it is algebraically the same as the plain EMA of r.
+    """
 
     def __init__(self, scorer: RawScorer | None = None, alpha_up: float = 0.7, alpha_down: float = 0.3):
-        self.scorer = scorer or RuleScorer()
+        if scorer is None:
+            scorer = RuleScorer()
+            if (model := load_turn_model()) is not None:
+                scorer = _FusedScorer(scorer, model)
+        self.scorer = scorer
         self.alpha_up = alpha_up
         self.alpha_down = alpha_down
 
@@ -342,7 +420,7 @@ class HumanStateEstimator:
         if nlu is not None:
             # neural reading of the turn in context (acie/understanding.py), fused half-half with the
             # lexicon: the lexicon is precise on words it knows, the model hears everything else
-            for dim in raw:
+            for dim in list(raw):
                 v = getattr(nlu, dim, None)
                 if v is not None:
                     raw[dim] = round(0.5 * raw[dim] + 0.5 * float(v), 3)
@@ -357,6 +435,7 @@ class HumanStateEstimator:
         out = {}
         for dim, r in raw.items():
             p = getattr(prev, dim)
+            b = _BASELINE.get(dim, 0.0)
             a = self.alpha_up if r > p else self.alpha_down
-            out[dim] = round(a * r + (1 - a) * p, 3)
+            out[dim] = round(b + (a * (r - b) + (1 - a) * (p - b)), 3)
         return HumanState(**out, signals=ev)
