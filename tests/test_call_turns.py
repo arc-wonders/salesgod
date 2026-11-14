@@ -163,19 +163,82 @@ async def test_two_speakers_never_interleave():
     assert len(set(first)) == 1 and len(set(second)) == 1 and first[0] != second[0]
 
 
-async def test_barge_in_needs_the_callers_voice_once_known():
-    cs, _ = session()
-    cs.play_until = time.monotonic() + 5  # agent is talking
+def _speaking(cs, seconds=5.0):
+    """The agent has `seconds` of audio queued at Plivo, in 200 ms parts."""
+    now = time.monotonic()
+    cs.play_until = now + seconds
+    cs.sent_parts = [(now - 0.4 + 0.2 * i, bytes([i % 256]) * 1600) for i in range(int(seconds / 0.2) + 2)]
+
+
+def _caller_speaking(cs, run_ms):
     d = cs.detector
-    d.in_speech, d.run_frames, d.run_start, d.run_energy = True, 20, 7, 0.2  # 640 ms of loud "speech"
-    d.frames = [np.zeros(512, np.float32)] * 30
-    voice(cs, 0.15)  # a background voice / noise
+    d.in_speech, d.run_frames, d.run_start, d.run_energy = True, run_ms // 32, 5, 0.2
+    d.frames = [np.zeros(512, np.float32)] * 40
+
+
+async def test_agent_pauses_within_about_250ms_of_caller_speech():
+    """Owner: "if the person is saying something, it does not cut it off" (old rule: 800 ms + a voice check)."""
+    cs, _ = session()
+    _speaking(cs)
+    _caller_speaking(cs, 160)
     await cs.check_barge_in()
-    assert not cs.barge_in_pending and ("barge_in_ignored", None) in kinds(cs)
-    d.run_start = 8  # a new run, this time the caller
+    assert cs.paused is None  # 160 ms: not yet
+    _caller_speaking(cs, 224)
+    await cs.check_barge_in()
+    assert cs.paused is not None and not cs.agent_speaking()
+    assert any(m["event"] == "clearAudio" for m in cs.ws.sent)
+    ev = [e for e in cs.call.events if e["type"] == "barge_pause"][0]
+    assert ev["after_speech_ms"] <= 256
+
+
+async def test_short_sound_resumes_the_paused_sentence():
+    cs, _ = session()
+    _speaking(cs)
+    _caller_speaking(cs, 224)
+    await cs.check_barge_in()
+    held = len(cs.paused["parts"])
+    assert held > 0
+    cs.detector.in_speech = False  # it was a "haan" / a cough: over at once
+    await cs.check_barge_in()
+    assert cs.paused is None and not cs.barge_in_pending
+    assert sum(m["event"] == "playAudio" for m in cs.ws.sent) == held  # the unplayed rest went out again
+    assert cs.agent_speaking()
+    assert [e for e in cs.call.events if e["type"] == "barge_resume"]
+
+
+async def test_sustained_caller_speech_is_a_real_interruption():
+    cs, _ = session()
     voice(cs, 0.7)
+    _speaking(cs)
+    _caller_speaking(cs, 224)
     await cs.check_barge_in()
-    assert cs.barge_in_pending  # stopped after 0.64 s, not 0.8 s
+    epoch = cs.speaking_epoch
+    cs.paused["at"] -= 0.4  # still talking 400 ms after the pause
+    await cs.check_barge_in()
+    assert cs.paused is None and cs.barge_in_pending and cs.speaking_epoch == epoch + 1
+    assert [e for e in cs.call.events if e["type"] == "barge_in"]
+
+
+async def test_another_voice_resumes_the_agent():
+    cs, _ = session()
+    voice(cs, 0.12)  # the caller is known; this is someone else
+    _speaking(cs)
+    _caller_speaking(cs, 224)
+    await cs.check_barge_in()
+    cs.paused["at"] -= 0.4
+    await cs.check_barge_in()
+    assert cs.paused is None and not cs.barge_in_pending
+    assert [e for e in cs.call.events if e["type"] == "barge_resume"]
+
+
+async def test_tts_arriving_while_paused_is_held_not_spoken():
+    cs, _ = session()
+    _speaking(cs)
+    _caller_speaking(cs, 224)
+    await cs.check_barge_in()
+    before = sum(m["event"] == "playAudio" for m in cs.ws.sent)
+    await cs.play_pcm(np.zeros(1600, dtype="<i2").tobytes(), cs.speaking_epoch)
+    assert sum(m["event"] == "playAudio" for m in cs.ws.sent) == before  # held while we decide
 
 
 async def test_noise_phrase_unlike_the_first_clean_turn_is_dropped_before_confirmation():
@@ -208,24 +271,6 @@ async def test_quiet_real_yes_is_kept_when_whisper_heard_speech():
     cs2.app.stt.next, cs2.app.stt.nsp = ("Okay.", ""), 0.59  # the same words from noise
     await cs2.handle_utterance(speech(amp=0.02), time.monotonic(), False, overlap=False)
     assert not [t for t in cs2.call.turns if t["role"] == "customer"]
-
-
-async def test_barge_in_gets_another_look_as_the_interruption_grows():
-    """A short clip scores lower: a caller at 0.30 on the first 0.5 s passes when 0.8 s scores 0.40."""
-    cs, _ = session()
-    cs.play_until = time.monotonic() + 5
-    d = cs.detector
-    d.in_speech, d.run_frames, d.run_start, d.run_energy = True, 16, 3, 0.2  # 512 ms
-    d.frames = [np.zeros(512, np.float32)] * 40
-    voice(cs, 0.30)
-    await cs.check_barge_in()
-    assert not cs.barge_in_pending
-    await cs.check_barge_in()  # same run, same length: no second look yet
-    assert [e["type"] for e in cs.call.events].count("barge_in_ignored") == 1
-    d.run_frames = 26  # 832 ms
-    voice(cs, 0.40)
-    await cs.check_barge_in()
-    assert cs.barge_in_pending
 
 
 async def test_degraded_caller_voice_is_not_dropped_as_background():

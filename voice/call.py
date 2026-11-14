@@ -75,6 +75,12 @@ STOCK_NOISE = {"कर दो", "कर दो कर दो", "हुआ है
                "thank you very much", "thanks for watching", "okay", "ok", "you", "bye", "we'll be on", "we're ready",
                "हां", "हाँ", "जी", "कि", "अ", "हम्म", "hmm", "yes", "yeah", "उनको लेकर", "कि उनको लेकर"}
 CLEAN_RMS = 0.03
+# Fast barge-in (owner: "if the person is saying something, it does not cut it off"): pause the agent after this much
+# confident caller speech, then confirm (keep listening) or resume the paused sentence if it was only a short noise
+FAST_BARGE_MS = 224          # 7 VAD frames: ~250 ms from the caller's first sound to clearAudio
+BARGE_CONFIRM_S = 0.35       # still speaking this long after the pause -> a real interruption
+BARGE_BACKCHANNEL_S = 0.6    # speech that ended within this of starting ("haan", a cough) -> resume the sentence
+BARGE_RESUME_BACKUP_S = 0.3  # resume a little before the cut so the listener hears a whole word
 BARGE_STAGES = [(500, 0.35), (800, 0.35), (1200, 0.32)]  # (ms of the caller's run, voice similarity needed)  # a turn loud enough (with the agent silent) to teach the caller's voice print
 MAX_CALL_S = 360.0
 
@@ -119,6 +125,7 @@ class CallSession:
         self.app, self.call, self.ws, self.stream_id = app, call, ws, stream_id
         self.detector = TurnDetector(end_silence_ms=app.cfg.vad_end_silence_ms, threshold=app.cfg.vad_threshold)
         self.pipeline, self.stt_prompt = app.make_pipeline(call)
+        self.stt_prompts = self.vocabulary_hint(app, call)
         # every ledger event goes to the console and the call record, live
         self.pipeline.context_sinks.append(lambda ev: self.event("context", ev.model_dump(exclude={"t"})))
         self.session_id = f"call-{call.call_id}"
@@ -145,6 +152,8 @@ class CallSession:
         self.speak_lock = asyncio.Lock()
         self.in_turn = False  # a turn ACCEPTED as the caller's is being answered
         self.barge_checked_run = -1  # VAD run already voice-checked for barge-in
+        self.paused: dict | None = None  # agent paused by a possible barge-in: {"at", "parts", "epoch", "speech_ms"}
+        self.sent_parts: list[tuple[float, bytes]] = []  # (scheduled start, mu-law part) of audio still queued at Plivo
         self.barge_stage = 0
         self.accepted_turns = 0
         self.last_dropped_speech = 0.0  # a caller utterance with words that we dropped or could not use
@@ -181,6 +190,9 @@ class CallSession:
             if epoch != self.speaking_epoch or self.closed.is_set():
                 return False
             part = ulaw[i:i + PLAY_CHUNK_BYTES]
+            if self.paused is not None and self.paused["epoch"] == epoch:
+                self.paused["parts"].append(part)  # paused for a possible barge-in: hold it, resume may play it
+                continue
             await self.send({"event": "playAudio", "media": {
                 "contentType": "audio/x-mulaw", "sampleRate": LINE_RATE,
                 "payload": base64.b64encode(part).decode()}})
@@ -189,7 +201,50 @@ class CallSession:
             if self.rec_t0 is not None:
                 self.rec_out.append((start - self.rec_t0, part, now - self.rec_t0))
             self.play_until = start + len(part) / LINE_RATE
+            self.sent_parts = [x for x in self.sent_parts if x[0] + len(x[1]) / LINE_RATE > now] + [(start, part)]
         return True
+
+    def _unplayed(self, now: float) -> list[bytes]:
+        """What Plivo still had queued at `now`, starting BARGE_RESUME_BACKUP_S before the cut."""
+        out = []
+        for start, part in self.sent_parts:
+            end = start + len(part) / LINE_RATE
+            if end <= now:
+                continue
+            off = int(max(0.0, now - start - BARGE_RESUME_BACKUP_S) * LINE_RATE)
+            out.append(part[off:])
+        return out
+
+    async def _pause_for_barge(self, now: float, speech_ms: int) -> None:
+        self.paused = {"at": now, "parts": self._unplayed(now), "epoch": self.speaking_epoch, "speech_ms": speech_ms,
+                       "checked": False}
+        self.sent_parts = []
+        self.play_until = now
+        await self.clear_audio()
+        self.event("barge_pause", {"after_speech_ms": speech_ms})
+
+    async def _resume_after_noise(self, why: str) -> None:
+        p, self.paused = self.paused, None
+        if p is None or p["epoch"] != self.speaking_epoch:
+            return
+        for part in p["parts"]:
+            await self.send({"event": "playAudio", "media": {
+                "contentType": "audio/x-mulaw", "sampleRate": LINE_RATE, "payload": base64.b64encode(part).decode()}})
+            now = time.monotonic()
+            start = max(self.play_until, now)
+            if self.rec_t0 is not None:
+                self.rec_out.append((start - self.rec_t0, part, now - self.rec_t0))
+            self.play_until = start + len(part) / LINE_RATE
+            self.sent_parts.append((start, part))
+        self.event("barge_resume", {"why": why, "paused_ms": round((time.monotonic() - p["at"]) * 1000)})
+
+    async def _confirm_barge(self, now: float) -> None:
+        p, self.paused = self.paused, None
+        self.speaking_epoch += 1  # drops the held parts and the rest of the reply
+        self.barge_in_pending = True
+        self.play_until = now
+        self.event("barge_in", {"after_speech_ms": p["speech_ms"] if p else None,
+                                "confirmed_after_ms": round((now - p["at"]) * 1000) if p else None})
 
     def agent_speaking(self) -> bool:
         return time.monotonic() < self.play_until
@@ -292,37 +347,38 @@ class CallSession:
         return 10 ** (float(np.median([x.loudness_db for x in self.primary])) / 20)
 
     async def check_barge_in(self) -> None:
+        """Pause fast, then decide. ~220 ms of confident, loud-enough speech over the agent pauses it at once (the
+        old rule waited 800 ms, plus a staged voice check once the caller was known). Then: still speaking after
+        BARGE_CONFIRM_S (and, once the caller's voice is known, it IS their voice) -> a real interruption, the rest
+        of the reply is dropped; speech that stopped almost at once (a "haan", a cough, a bump) or another voice
+        -> the paused sentence resumes from just before the cut."""
         d = self.detector
-        if not (self.agent_speaking() and not self.barge_in_pending and d.in_speech
-                and time.monotonic() >= self.protected_until):
+        now = time.monotonic()
+        if self.paused is not None:
+            p = self.paused
+            held = now - p["at"]
+            if d.in_speech and held >= BARGE_CONFIRM_S:
+                if self.speaker.confirmed and not p["checked"]:
+                    p["checked"] = True
+                    clip = np.concatenate(d.frames[-max(16, min(len(d.frames), 40)):]) if d.frames else None
+                    sim = None if clip is None else (await asyncio.to_thread(self.speaker.score, clip))[2]
+                    if sim is not None and sim < 0.3:  # someone else / noise: let the agent finish
+                        self.event("barge_in_ignored", {"voice_similarity": sim})
+                        await self._resume_after_noise("not the caller's voice")
+                        return
+                await self._confirm_barge(now)
+            elif not d.in_speech:
+                if held + p["speech_ms"] / 1000 < BARGE_BACKCHANNEL_S:
+                    await self._resume_after_noise("short sound")
+                else:
+                    await self._confirm_barge(now)  # a short real interruption ("ruko"): stay quiet, answer it
+            return
+        if not (self.agent_speaking() and not self.barge_in_pending and d.in_speech and now >= self.protected_until):
             return
         run_ms = d.run_frames * 32
-        if self.speaker.confirmed:
-            # we know the caller's voice: stop for THEIR voice, never for noise or a background voice. Checked in
-            # stages because a short clip scores lower (voice/diag_bargein.py on 122 real caller turns: the
-            # first 0.5 / 0.8 / 1.0 s pass >= 0.35 for 66% / 88% / 94% of callers, noise 0% / 0% / 7%)
-            stage = self.barge_stage if self.barge_checked_run == d.run_start else 0
-            if stage >= len(BARGE_STAGES) or run_ms < BARGE_STAGES[stage][0]:
-                return
-            self.barge_checked_run, self.barge_stage = d.run_start, stage + 1
-            clip = np.concatenate(d.frames[-max(16, min(d.run_frames, 40)):])
-            _, _, sim = await asyncio.to_thread(self.speaker.score, clip)
-            if sim is None or sim < BARGE_STAGES[stage][1]:
-                self.event("barge_in_ignored", {"voice_similarity": sim, "run_ms": run_ms})
-                return
-            if not (self.agent_speaking() and not self.barge_in_pending):
-                return
-        # before the caller's voice is known: continuous, confident (p>=0.7) and loud enough. Quiet echo of
-        # our own voice and line noise pass the VAD but sit far below real speech on the customer channel
-        elif not (run_ms >= self.app.cfg.barge_in_ms
-                  and d.run_energy >= max(self.app.cfg.barge_in_rms, 0.25 * (self.primary_rms() or 0),
-                                          4 * (self.calib.noise_level or 0))):  # noisy line: 12 dB over its floor
-            return
-        self.speaking_epoch += 1
-        self.barge_in_pending = True
-        self.play_until = time.monotonic()
-        await self.clear_audio()
-        self.event("barge_in", {})
+        if run_ms >= FAST_BARGE_MS and d.run_energy >= max(self.app.cfg.barge_in_rms, 0.25 * (self.primary_rms() or 0),
+                                                           4 * (self.calib.noise_level or 0)):
+            await self._pause_for_barge(now, run_ms)
 
     async def watchdog(self) -> None:
         t0 = time.monotonic()
@@ -606,10 +662,31 @@ class CallSession:
         except Exception:
             return False
 
+    @staticmethod
+    def vocabulary_hint(app, call) -> dict[str, str]:
+        """Words this call will likely contain, as Whisper's initial prompt, per language. The phone-line benchmark:
+        Hindi CER 7.3% -> 3.8% with it (English 0% -> 0.7%), and faster decoding. The server already built a hint per
+        campaign but it was never passed to Whisper."""
+        try:
+            p = app.products().get(call.campaign) if call.campaign != "bank_demo" else None
+        except Exception:
+            p = None
+        names = [x for x in ((p.product_name, p.seller_name) if p else ()) if x]
+        topics = [w for w in (getattr(p, "topic_words", None) or [])][:12] if p else []
+        hi = ", ".join(names + topics + ["ऑफर", "कीमत", "कितने का", "हाँ", "नहीं", "ठीक है", "लिंक भेज दो", "पेमेंट", "बताइए"])
+        en = ", ".join(names + topics + ["offer", "price", "how much", "yes", "no", "send the link", "payment"])
+        return {"hi": hi, "en": en}
+
     async def transcribe(self, audio: np.ndarray, hint: str | None, prefer: str | None):
         stt = self.app.stt
         if hasattr(stt, "transcribe_detail"):
-            out = await stt.transcribe_detail(audio, hint, prefer)
+            try:
+                # vocabulary hint OFF by default: on real calls it leaked into unclear audio ("ज़ुम्बा, लिंक भेज दो",
+                # "पेमेंट पेमेंट पेमेंट") even though it lowered CER on clean test speech. VOICE_STT_PROMPT=1 to try it.
+                hint_words = getattr(self, "stt_prompts", None) if os.getenv("VOICE_STT_PROMPT") == "1" else None
+                out = await stt.transcribe_detail(audio, hint, prefer, hint_words)
+            except TypeError:  # test doubles without the prompt argument
+                out = await stt.transcribe_detail(audio, hint, prefer)
             return out if len(out) == 5 else (*out, 0.5)
         text, lang, ms = await stt.transcribe(audio, hint, prefer)  # test doubles
         return text, lang, ms, "", 0.5
