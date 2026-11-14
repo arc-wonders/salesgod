@@ -19,7 +19,7 @@ from collections.abc import Awaitable, Callable
 
 from .compiler import PromptCompiler
 from .decision.engine import DecisionEngine
-from .expression import ExpressionBackend, TemplateBackend, render_fallback
+from .expression import SESSION_KEY, ExpressionBackend, TemplateBackend, render_fallback
 from .feedback import FeedbackEngine
 from .personalization.policy import AdaptationPolicy, detect_explicit_requests, make_default_policy
 from .personalization.profile_store import MemoryProfileStore, ProfileStore
@@ -106,6 +106,7 @@ class ACIEPipeline:
             t[name] = round((time.perf_counter() - t0) * 1000, 2)
 
         session = self.session(turn)
+        SESSION_KEY.set(session.session_id)  # sticky A/B variant per session (acie/expression.py)
         (intent, state), profile = await asyncio.gather(self._stream_a(turn, session), self.store.load(turn.customer_id))
         mark("understand")
 
@@ -179,7 +180,7 @@ class ACIEPipeline:
                 if validator.failed:
                     break
         except Exception as e:  # LLM down / timeout -> safe template, call continues
-            validator.issues.append(f"llm error: {type(e).__name__}: {e}")
+            validator.add_issue(f"llm error: {type(e).__name__}: {e}", "llm_error")
             validator.failed = True
             llm_down = True
         tail = validator.finish()
@@ -196,7 +197,7 @@ class ACIEPipeline:
                                                f"Your previous reply was rejected ({why}). Write it again: answer what the "
                                                "customer asked, in the reply language, and use the {slots} for the offer price.")
                 if again:
-                    validator.issues.append(f"regenerated after: {why}")
+                    validator.add_issue(f"regenerated after: {why}", "regenerated")
                     validator.used_fallback = False
                     reply = again
             if plan.llm_allowed and len(" ".join(reply).split()) > self.max_reply_words:
@@ -212,7 +213,7 @@ class ACIEPipeline:
                     n += len(s.split())
                 if ask:
                     kept.append(ask)
-                validator.issues.append(f"trimmed reply from {len(reply)} to {len(kept)} sentences")
+                validator.add_issue(f"trimmed reply from {len(reply)} to {len(kept)} sentences", "trimmed")
                 reply = kept
             if plan.llm_allowed and reply and not validator.used_fallback:
                 # "Aapke sawal ka jawab hai ki ..." on every turn sounded robotic (student persona)
@@ -226,7 +227,7 @@ class ACIEPipeline:
                 first = reply[0].strip(" ।.!?,")
                 bar = 0.88 if is_question(turn.text) else 0.75
                 if first and difflib.SequenceMatcher(None, first.lower(), turn.text.strip(" ।.!?,").lower()).ratio() > bar:
-                    validator.issues.append(f"dropped echo of the customer: {first!r}")
+                    validator.add_issue(f"dropped echo of the customer: {first!r}", "echo")
                     reply = reply[1:]
             if plan.lead and plan.llm_allowed and not validator.used_fallback:
                 # the model often restates the operator line it was told was already said: drop those sentences
@@ -239,7 +240,7 @@ class ACIEPipeline:
                     and difflib.SequenceMatcher(None, " ".join(reply), last_agent).ratio() > 0.7):
                 # live call 4: the LLM gave the same answer three times in a row. Ask once more for a
                 # different reply (persona reviews: the "say that again?" fallback felt like not listening)
-                validator.issues.append("llm repeated its previous reply; regenerated")
+                validator.add_issue("llm repeated its previous reply; regenerated", "repeat")
                 again = await self._regenerate(plan, expr, session, turn.text,
                                                f"You already said this last time: \"{last_agent}\". Do NOT repeat it; "
                                                "respond to what the customer just said in different words.")

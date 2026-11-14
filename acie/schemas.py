@@ -180,6 +180,8 @@ class TurnPlan(BaseModel):
     # garbled "{offer}" when it phrased prices itself). Per language, may use {slots}.
     lead: dict[str, str] | None = None
     persona: str | None = None  # tone of voice from the campaign config (Product.tone)
+    # validator rule packs for this product/plan (acie/rules): e.g. ["sales_compliance", "banking"]. Empty = none.
+    rule_packs: list[str] = Field(default_factory=list)
 
 
 # --------------------------------------------------------------------------- session
@@ -217,6 +219,8 @@ class ValidationReport(BaseModel):
     ok: bool
     used_fallback: bool = False
     issues: list[str] = Field(default_factory=list)
+    issue_codes: list[str] = Field(default_factory=list)  # machine-readable twin of `issues`
+    signals: dict[str, int] = Field(default_factory=dict)  # count per issue code (for the feedback lane)
 
 
 class TurnResult(BaseModel):

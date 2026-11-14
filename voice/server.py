@@ -23,7 +23,7 @@ from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, Res
 from acie.decision.domains.bank_demo import BankDemoDomain
 from acie.decision.domains.product_sales import Product, ProductSalesDomain
 from acie.decision.engine import DecisionEngine
-from acie.expression import OpenAICompatibleBackend, TemplateBackend
+from acie.expression import OpenAICompatibleBackend, TemplateBackend, make_backend_from_env
 from acie.personalization.profile_store import JsonProfileStore
 from acie.pipeline import ACIEPipeline
 
@@ -217,7 +217,7 @@ def build_app() -> tuple[FastAPI, App]:
         state.world = WorldKnowledge()
         from acie.understanding import LLMUnderstanding
         state.nlu = LLMUnderstanding()
-        state.backends = {"llm": OpenAICompatibleBackend(), "template": TemplateBackend()}
+        state.backends = {"llm": make_backend_from_env(), "template": TemplateBackend()}
         state.products()  # writes the default product on first start
         state.pipelines = {"llm": ACIEPipeline(DecisionEngine(BankDemoDomain()), backend=state.backends["llm"],
                                                store=state.store, buffer_reply=True)}
