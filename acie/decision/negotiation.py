@@ -391,7 +391,7 @@ def _lowest_offer(st: NegState, cur: float) -> float:
     return min(x for x in (st.price, cur) if x) if st.price else cur
 
 
-def _ladder_reply(p, kind: str, text: str, st: NegState, need_known: str, committed: bool = False, tone: str = "mid") -> NegReply | None:
+def _ladder_reply(p, kind: str, text: str, st: NegState, need_known: str, committed: bool = False, tone: str = "mid", force_kind: str | None = None) -> NegReply | None:
     """The Indian way, per product economics (list, floor = max(cost x (1+margin), floor_price), perk costs against the margin):
       1. first push: a warm, firm no plus concrete value, no cut (no number given -> ask the budget; a number -> say no to it, ask them to come up);
       2. every later push: ONE step down the shrinking ladder (fractions of list - floor, friendly ...49/...99 prices), framed personally,
@@ -501,10 +501,10 @@ def lang_bank_value(b: dict, need_known: str) -> dict:
     return {l: bank[l].format(b1=clean(b[l])) for l in LANGS}
 
 
-def step(p, text: str, st: NegState, need_known: str = "", faq_line=None, committed: bool = False, tone: str = "mid") -> NegReply | None:
+def step(p, text: str, st: NegState, need_known: str = "", faq_line=None, committed: bool = False, tone: str = "mid", force_kind: str | None = None) -> NegReply | None:
     """One negotiation turn. Returns the reply for all three languages and the new state, or None when this is not price talk.
     `faq_line(lang)` gives the operator's approved FAQ answer for the question, when there is one."""
-    kind = detect(text)
+    kind = force_kind or detect(text)
     if kind is None:
         return None
     st = NegState(**asdict(st))

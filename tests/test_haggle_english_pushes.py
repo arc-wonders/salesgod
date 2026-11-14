@@ -58,3 +58,15 @@ def test_cant_you_give_me_a_good_discount_enters_the_ladder_once_safety_passes_i
         st = r.state
         got.append(r)
     assert got[0].offer is None and "?" in got[0].text["en"] and got[1].offer == {"price": 2799.0}
+
+
+@pytest.mark.parametrize("tone", TONES)
+@pytest.mark.parametrize("line,lang", [("okay 2,600 then, send the link", "en"), ("okay 2,600 then, send the link", "hinglish"), ("chalo 2600 mein link bhej do", "hinglish"),
+                                       ("done, 2600, bhej do link", "hinglish")])
+def test_a_counter_with_consent_is_never_replaced_by_our_higher_price(tone, line, lang):
+    out, sess = talk(["go ahead" if lang == "en" else "haan batao", "how much", "too costly", "can you do better", line], tone, lang=lang)
+    intent, text = out[-1]
+    assert intent == "negotiation" and "₹2,600" in text or intent == "negotiation" and re.search(r"₹2,[67]\d\d", text), text   # accepted at 2,600 or met in the middle
+    assert "₹2,799 for 3 months" not in text and intent != "confirm_close" and intent != "link_sent"
+    assert "?" in text
+    assert float(sess.dialog.get("closed_price") or 0) == 0
