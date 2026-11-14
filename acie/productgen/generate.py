@@ -102,20 +102,39 @@ async def build_kb(spec: Spec, eff: Effective, llm: LLM, prof: dict, notes: list
     K.add_interests(kb, plan.get("interests", []))
     K.add_offerings(kb, plan.get("offerings", []), spec, eff, notes, limit=eff.criteria.max_offerings)
     tops = _top(kb)
-    per = max(2, int(os.getenv("PRODUCTGEN_TOPICS_PER_CALL", "3")))
-    groups = [tops[i:i + per] for i in range(0, len(tops), per)]
+    # one top-level topic per call and at most CHUNK entries per call: a whole KB (or even 3 topics x 3 languages) in one
+    # reply runs past the model's output limit and comes back cut off (live Gemini run: ~60 KB, invalid JSON)
+    per = max(1, int(os.getenv("PRODUCTGEN_TOPICS_PER_CALL", "1")))
+    chunk = max(3, int(os.getenv("PRODUCTGEN_ENTRIES_PER_CALL", "6")))
     need = max(6, -(-eff.criteria.min_entries // max(1, len(tops))) + 2)  # entries per top-level topic, with a margin
-    sem = asyncio.Semaphore(int(os.getenv("PRODUCTGEN_CONCURRENCY", "3")))
+    groups = []
+    for i in range(0, len(tops), per):
+        g = tops[i:i + per]
+        left, b = need * len(g), 0
+        while left > 0:
+            groups.append((g, min(chunk, left), b))
+            left -= chunk
+            b += 1
+    sem = asyncio.Semaphore(int(os.getenv("PRODUCTGEN_CONCURRENCY", "4")))
     done = 0
 
-    async def one(g: list[str]) -> dict:
+    async def one(item: tuple[list[str], int, int]) -> dict:
         nonlocal done
+        g, n, b = item
         async with sem:
-            r = await llm.json("kb_entries", {**base, "topics": [t for t in kb["topics"] if t["path"].split("/")[0] in g], "per_topic": need,
-                                              "offering_ids": [o["id"] for o in kb["offerings"]], "interest_ids": [i["id"] for i in kb["interests"]],
-                                              "existing_questions": []})
+            try:
+                r = await llm.json("kb_entries", {**base, "topics": [t for t in kb["topics"] if t["path"].split("/")[0] in g],
+                                                  "per_topic": n, "max_entries": n, "batch": b,
+                                                  "note": f"batch {b} of this topic: cover DIFFERENT questions than other batches "
+                                                          f"(angle {b + 1}); ids must be unique (suffix -b{b})",
+                                                  "offering_ids": [o["id"] for o in kb["offerings"]],
+                                                  "interest_ids": [i["id"] for i in kb["interests"]],
+                                                  "existing_questions": []})
+            except Exception as e:  # one bad batch must not sink the run: the repair loop tops up short topics
+                notes.append(f"entries batch for {g} failed: {str(e)[:120]}")
+                r = {}
             done += 1
-            progress("info_tree", "running", f"entries: {done}/{len(groups)} topic groups")
+            progress("info_tree", "running", f"entries: {done}/{len(groups)} batches")
             return r
 
     results = await asyncio.gather(*(one(g) for g in groups))  # gather keeps group order: deterministic merge

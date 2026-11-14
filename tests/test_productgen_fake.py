@@ -75,7 +75,7 @@ class FakeLLM:
         for t in p["topics"]:
             if isinstance(t, dict) and "/" not in t["path"] or isinstance(t, dict) and t["path"].count("/") == 0:
                 for k in range(per):
-                    out.append(self._entry(t["path"], k + (50 if p.get("errors") else 0), flaw=not p.get("errors")))
+                    out.append(self._entry(t["path"], k + 10 * p.get("batch", 0) + (50 if p.get("errors") else 0), flaw=not p.get("errors")))
         return {"entries": out}
 
     def _kb_fix(self, p):

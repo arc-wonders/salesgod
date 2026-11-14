@@ -9,6 +9,13 @@ from acie.productgen.generate import generate
 from acie.productgen.spec import Criteria, Spec, looks_like_real_brand, resolve, slugify
 from test_productgen_fake import FakeLLM
 
+
+@pytest.fixture(autouse=True)
+def _one_big_batch(monkeypatch):
+    # these tests were written for whole-topic batches; the default (1 topic, 6 entries per call) has its own test below
+    monkeypatch.setenv("PRODUCTGEN_TOPICS_PER_CALL", "3")
+    monkeypatch.setenv("PRODUCTGEN_ENTRIES_PER_CALL", "100")
+
 SPEC = dict(name="ZenBrew Coffee Subscription", category="coffee", notes="A monthly coffee box", price={"list_price": 1200, "offer_price": 999, "unit": "per month"},
             economics={"floor": 600})
 
@@ -222,6 +229,7 @@ async def test_publish_writes_files_and_keeps_console_edits(tmp_path):
     products[pid]["tone"] = "calm and slow (console edit)"
     products[pid]["one_liner"] = "console one liner"
     (tmp_path / "products.json").write_text(json.dumps(products))
+    v1_ids = {e["id"] for e in kb["entries"]}
     kb["entries"][0]["answer"]["en"] = "Console-edited answer."
     edited_id = kb["entries"][0]["id"]
     removed_id = kb["entries"][1]["id"]
@@ -244,7 +252,7 @@ async def test_publish_writes_files_and_keeps_console_edits(tmp_path):
     kb2 = {e["id"]: e for e in json.loads(kbf.read_text())["entries"]}
     assert kb2[edited_id]["answer"]["en"] == "Console-edited answer."
     assert removed_id not in kb2 and "console-added" in kb2
-    assert any(i.endswith("-q10") for i in kb2)  # new entries from v2 arrived
+    assert set(kb2) - v1_ids - {"console-added"}  # new entries from v2 arrived
     pb2 = json.loads(pbf.read_text())
     assert next(n for n in pb2["nodes"] if n["id"] == pb["nodes"][0]["id"])["ask"] == "console ask"
     assert S.state(tmp_path, "default", pid)["published"] == 2
@@ -257,3 +265,13 @@ async def test_publish_real_brand_never_writes_synthetic(tmp_path):
     S.publish(tmp_path, "default", pid, 1, tmp_path / "kb")
     kb = json.loads((tmp_path / "kb/default" / f"{pid}.json").read_text())
     assert kb["allow_synthetic"] is False and all(e["provenance"] == "public" for e in kb["entries"])
+
+
+async def test_default_batching_small_calls(tmp_path, monkeypatch):
+    """Live Gemini run: 3 topics x all entries in one reply came back cut off (~60 KB). Default = 1 topic, <= 6 entries per call."""
+    monkeypatch.delenv("PRODUCTGEN_TOPICS_PER_CALL", raising=False)
+    monkeypatch.delenv("PRODUCTGEN_ENTRIES_PER_CALL", raising=False)
+    llm = FakeLLM()
+    await _gen(tmp_path, llm=llm)
+    sizes = [c.get("max_entries") for st, c in getattr(llm, "calls", []) if st == "kb_entries" and "errors" not in c]
+    assert sizes and max(sizes) <= 6
