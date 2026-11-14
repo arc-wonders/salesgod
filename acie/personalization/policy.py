@@ -11,6 +11,7 @@ import re
 
 from ..schemas import CustomerProfile, ExpressionParams, HumanState, Language, SessionState
 from ..text import detect_language, padded
+from . import knobs as _knobs
 
 # Explicit customer requests -> preference overrides. Patterns run on normalized
 # ASR text padded with spaces (" tok tok "), so " x " is a whole-word match and
@@ -72,10 +73,17 @@ _EXPLICIT_BLOCK = [
          rf" {_DONT} (?:understand|speak|know) {_EN} "), "language", "en"),
 ]
 
+_EXPLICIT.extend(_knobs.EXPLICIT)
+_EXPLICIT_BLOCK.extend(_knobs.BLOCK)
+
+LEVELS = ("low", "med", "high")
+STYLES = ("direct", "example", "step_by_step")
 ENTER, EXIT = 0.5, 0.3  # hysteresis thresholds for state flags
 LANGUAGE_SWITCH_STREAK = 2  # implicit language switch needs N consecutive turns
 ACK_COOLDOWN_TURNS = 3  # don't say "I understand your frustration" every turn
 PREF_MIN_CONFIDENCE = 0.6
+HI_ENTER, HI_EXIT = 0.7, 0.5  # stricter band for dims whose neutral value is 0.5
+_KNOBS = {"formality", "verbosity", "complexity", "warmth", "proactivity", "info_density", "explanation_style"}
 
 
 def detect_explicit_requests(text: str) -> dict[str, str]:
@@ -108,10 +116,22 @@ def _flag(session: SessionState, name: str, value: float,
     return now
 
 
+def _valid(value: str, allowed: tuple[str, ...], default: str) -> str:
+    return value if value in allowed else default
+
+
 class AdaptationPolicy:
     def decide(self, text: str, state: HumanState, profile: CustomerProfile,
                session: SessionState, explicit: dict[str, str], intent: str | None = None) -> ExpressionParams:
+        return self.decide_traced(text, state, profile, session, explicit, intent)[0]
+
+    def decide_traced(self, text: str, state: HumanState, profile: CustomerProfile,
+                      session: SessionState, explicit: dict[str, str],
+                      intent: str | None = None) -> tuple[ExpressionParams, set[str]]:
+        """Rule decision plus the knobs that are *protected*: set by an explicit request or a
+        safety/state rule, so a learned policy must never override them."""
         prefs = profile.preferences
+        protected: set[str] = set()
 
         def pref(key: str, default: str) -> str:
             if key in explicit:
@@ -121,11 +141,15 @@ class AdaptationPolicy:
                 return p.value
             return default
 
+        variant = pref("regional_variant", "")
         a = ExpressionParams(
             language=self._language(text, profile, session, explicit),
             formality=pref("formality", "med"),  # type: ignore[arg-type]
             verbosity=pref("verbosity", "med"),  # type: ignore[arg-type]
             complexity=pref("complexity", "med"),  # type: ignore[arg-type]
+            regional_variant=None if variant in ("", "standard", "none") else variant,
+            explanation_style=_valid(pref("explanation_style", "direct"), STYLES, "direct"),  # type: ignore[arg-type]
+            info_density=_valid(pref("info_density", "med"), LEVELS, "med"),  # type: ignore[arg-type]
         )
 
         # A clarification request is direct evidence of confusion even when the
@@ -134,30 +158,55 @@ class AdaptationPolicy:
         frustrated = _flag(session, "frustrated", state.frustration)
         urgent = _flag(session, "urgent", state.urgency)
         disengaged = _flag(session, "disengaged", 1 - state.engagement, DISENGAGED_ENTER, DISENGAGED_EXIT)
+        # newer state dimensions (state lane): read defensively, neutral defaults keep every flag off
+        anxious = _flag(session, "anxious", getattr(state, "anxiety", 0.0))
+        distrustful = _flag(session, "distrustful", 1 - getattr(state, "trust", 0.5), HI_ENTER, HI_EXIT)
+        overloaded = _flag(session, "overloaded", getattr(state, "cognitive_load", 0.0))
+        certain = _flag(session, "certain", getattr(state, "certainty", 0.5), HI_ENTER, HI_EXIT)
+        engaged = _flag(session, "engaged", state.engagement, HI_ENTER, HI_EXIT)
 
         if confused:
             a.complexity = "low"
             a.verbosity = "med" if a.verbosity == "high" else a.verbosity  # simpler, not longer
             a.proactivity = "low"
+            protected |= {"complexity", "verbosity", "proactivity"}
         if frustrated:
             a.warmth = "high"
             a.verbosity = "low"
             a.proactivity = "low"
             a.formality = "high" if a.formality != "low" else "med"
+            protected |= {"warmth", "verbosity", "proactivity", "formality"}
             if session.turn_index - session.last_ack_turn >= ACK_COOLDOWN_TURNS:
                 a.acknowledge_emotion = True
                 session.last_ack_turn = session.turn_index
         if urgent:
             a.verbosity = "low"
             a.proactivity = "low"
+            protected |= {"verbosity", "proactivity"}
         if disengaged and not (confused or frustrated):
             a.verbosity = "low"
+            protected.add("verbosity")
+        if anxious or distrustful or explicit.get("reassurance") == "high":
+            a.reassurance = "high"
+            a.explanation_style = "step_by_step"
+            protected |= {"explanation_style"}
+        if overloaded:
+            a.info_density = "low"
+            a.complexity = "low"
+            protected |= {"info_density", "complexity"}
+        elif certain and engaged and "info_density" not in explicit:
+            a.info_density = "high"
 
         # explicit requests always win over state-driven changes
-        for key in ("verbosity", "complexity"):
-            if key in explicit:
+        for key in ("verbosity", "complexity", "info_density", "explanation_style", "reassurance"):
+            if key in explicit and explicit[key] in (LEVELS + STYLES):
                 setattr(a, key, explicit[key])
-        return a
+        if "regional_variant" in explicit:
+            a.regional_variant = None if explicit["regional_variant"] == "standard" else explicit["regional_variant"]
+        protected |= {k for k in explicit if k in _KNOBS}
+        if session.dialog.get("safety_flag"):
+            protected |= _KNOBS
+        return a, protected
 
     def _language(self, text: str, profile: CustomerProfile, session: SessionState,
                   explicit: dict[str, str]) -> Language:
@@ -190,3 +239,12 @@ class AdaptationPolicy:
         # language is a clear signal, so it switches immediately
         needed = 1 if len(text.split()) >= 4 else LANGUAGE_SWITCH_STREAK
         return detected if streak >= needed else current
+
+
+def make_default_policy():
+    """Rule policy unless ACIE_POLICY=bandit (learned policy with the rule policy as its prior)."""
+    import os
+    if os.environ.get("ACIE_POLICY", "").lower() == "bandit":
+        from .bandit import BanditPolicy
+        return BanditPolicy()
+    return AdaptationPolicy()
