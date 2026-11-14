@@ -29,7 +29,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from ..safety import is_distress
+from ..safety import enabled as safety_enabled, is_distress
 
 ROWS = ("crisis", "angry", "frustrated", "anxious", "sad", "confused", "overwhelmed", "suspicious", "busy", "excited", "calm")
 
@@ -80,7 +80,7 @@ def decide(state, text: str = "", voice=None, flagged: bool = False, nlu_intent:
         g = lambda k, d=0.0: float(state[k]) if k in state else _sg(signals, k, d)  # noqa: E731
     else:
         g = lambda k, d=0.0: float(getattr(state, k, _sg(signals, k, d)))  # noqa: E731
-    if flagged or is_distress(text):
+    if safety_enabled() and (flagged or is_distress(text)):
         return _TABLE["crisis"]
     arousal = _v(voice, "arousal")
     voice_ok = _v(voice, "confidence") >= 0.5 and bool(getattr(voice, "calibrated", True))

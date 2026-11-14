@@ -44,6 +44,12 @@ DIMS = ("frustration", "confusion", "urgency", "engagement", "satisfaction", "an
 # ---------------------------------------------------------------- lexicons (en / hinglish / Devanagari)
 _I = re.IGNORECASE
 CLOSE_INTEREST = 0.5  # buying interest at which the closing move is preferred (no open objection, no no)
+
+def _safety_on() -> bool:
+    from ..safety import enabled
+    return enabled()
+
+
 CRISIS = re.compile(r"मरने का (मन|दिल)|मर जाना चाहत|आत्महत्या|खुदकुशी|जीने का (मन|दिल) नहीं|\bsuicid|want to die|kill myself|"
                     r"marne ka (man|mann|dil)|jeene ka (man|dil) nahi", _I)
 CLOSE = re.compile(r"\b(bye|goodbye|good bye|that.?s all|that is all|nothing else|thank you,? bye|ok bye|okay bye)\b|बाय|रखता हूँ|रखती हूँ|"
@@ -207,7 +213,7 @@ def signals(inp: NeedInput) -> dict[str, bool]:
     t, toks = inp.text, _tokens(inp.text)
     sg = inp.signals
     f = {
-        "crisis": bool(CRISIS.search(t)),
+        "crisis": _safety_on() and bool(CRISIS.search(t)),
         "bye": bool(CLOSE.search(t)) or inp.intent == "goodbye" or inp.heard("goodbye"),
         "thanks": bool(THANKS.search(t)),
         "no": bool(NO.search(t)) or (0 < len(toks) <= 2 and all(w in BARE_NO for w in toks)) or inp.intent == "deny" or inp.heard("deny"),

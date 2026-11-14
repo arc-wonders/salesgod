@@ -10,7 +10,14 @@ India: Tele-MANAS 14416 (Government of India mental health helpline, free, 24x7)
 
 from __future__ import annotations
 
+import os
 import re
+
+
+def enabled() -> bool:
+    """Crisis/helpline guardrail switch. OFF by default (owner, 15 Nov 2026: no Tele-MANAS / mental-health handling
+    inside sales calls; a false trigger on "give me a good discount" stopped a live call). ACIE_SAFETY=1 turns it back on."""
+    return os.getenv("ACIE_SAFETY", "0") == "1"
 
 from .schemas import Fact, TurnPlan
 from .text import normalize, tokens
@@ -133,11 +140,24 @@ def _skel_word(w: str) -> str:
 
 
 def skeletons(text: str) -> list[str]:
-    return [_skel_word(t) for t in tokens(text)]
+    """Phonetic skeletons. A Latin-script word only gets one when it is a romanized Hindi/Hinglish word this module
+    knows (any concept word list): ordinary English words collide with Hindi skeletons ("good" = KUJ = kud/jump,
+    "for" = PUR = pul/bridge, owner's live call 15 Nov: "can't you just give me a good discount for me?" fired the
+    crisis helpline). English distress is caught by the exact English patterns (_EN, legacy phrases) instead."""
+    return [_skel_word(t) if (not t.isascii() or t in _ROMAN) else "~" + t for t in tokens(text)]
+
+
+_ROMAN: set[str] = set()  # every romanized word any concept below was built from (filled by _set / _roman)
+
+
+def _roman(words: str) -> list[str]:
+    ws = [normalize(w) for w in words.split()]
+    _ROMAN.update(w for w in ws if w.isascii())
+    return ws
 
 
 def _set(words: str) -> frozenset[str]:
-    return frozenset(_skel_word(normalize(w)) for w in words.split())
+    return frozenset(_skel_word(w) for w in _roman(words))
 
 
 # --- single-word concepts (written in Roman; the Devanagari spelling reaches the same skeleton) -----------
@@ -153,6 +173,7 @@ _PLACE = _set("chhat chhath terrace balcony balkani manzil mazil manjil pahad pa
 _PLACE_RAW = frozenset(normalize(w) for w in (
     "chat roof rooftop building bildin bilding bridge cliff tower river sea window terrace "
     "बिल्डिंग ब्रिज रूफ रूफटॉप टैरेस बालकनी टावर नदी").split())
+_roman("aage age kar kr kya kia jeekar jee ji jii jike jiye jiyo")  # used as literal skeletons in _evidence
 _TRAIN = _set("trein patri")
 _TRAIN_RAW = frozenset(normalize(w) for w in "train trains railway track metro ट्रेन रेलवे पटरी मेट्रो".split())
 _DIEV = _set("marna marne maarna maarne")
@@ -162,9 +183,9 @@ _WANT = _set("chahta chahti chahte chahiye chahun chahu chaahta chaahti man mann
              "sochte ichha irada iraada plan goal ")
 _ZINDAGI = _set("zindagi jindagi jindgi zindgi zindagee jeevan jivan life lyf lif")
 _HOPE_W = {  # defeat words near "life": skeleton -> weight
-    **{_skel_word(w): 0.78 for w in "haar haara hara hare haari tang pareshan pareshaan bezaar bekar nafrat".split()},
-    **{_skel_word(w): 0.55 for w in "thak thaka thaki thakk".split()},
-    **{_skel_word(w): 0.55 for w in "bojh bhoj tut toot tuta toota".split()},
+    **{_skel_word(w): 0.78 for w in _roman("haar haara hara hare haari tang pareshan pareshaan bezaar bekar nafrat")},
+    **{_skel_word(w): 0.55 for w in _roman("thak thaka thaki thakk")},
+    **{_skel_word(w): 0.55 for w in _roman("bojh bhoj tut toot tuta toota")},
 }
 _KHATAM = _set("khatam khatm khtm")
 _SAB = _set("sab sabkuch sabhi")
