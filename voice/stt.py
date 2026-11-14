@@ -90,7 +90,10 @@ class WhisperSTT:
 
     def _run_hi(self, audio: np.ndarray) -> list:
         segments, _ = self.hi_model.transcribe(
-            normalise(audio), language="hi", beam_size=5, vad_filter=False, condition_on_previous_text=False,
+            # beam 2: phone-line set CER 2.6% (beam 5: 1.7%, beam 1: 2.6%) but no slow tail (p90 424 ms vs 1.6 s with
+            # beam 5; Devanagari output is token-heavy). STT_HI_BEAM to change.
+            normalise(audio), language="hi", beam_size=int(os.getenv("STT_HI_BEAM", "2")), vad_filter=False,
+            condition_on_previous_text=False,
             without_timestamps=True, temperature=0.0)
         return list(segments)
 
