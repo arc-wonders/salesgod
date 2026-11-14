@@ -27,6 +27,7 @@ from .feedback import FeedbackEngine
 from .personalization.policy import AdaptationPolicy, detect_explicit_requests, make_default_policy
 from .personalization.profile_store import MemoryProfileStore, ProfileStore
 from .context import is_question
+from . import reply_length
 from .safety import CONCERN_T, DISTRESS_T, concern_plan, distress_followup_plan, distress_plan, distress_score
 from . import safety
 from . import psyche
@@ -592,6 +593,8 @@ class ACIEPipeline:
                 await release(validator.feed(delta))
                 if validator.failed:
                     break
+                if self.buffer_reply and plan.llm_allowed and held and reply_length.enough(held, plan, expr):
+                    break  # the reply is complete and at its length budget: stop generating, the caller is waiting
         except Exception as e:  # LLM down / timeout -> safe template, call continues
             validator.add_issue(f"llm error: {type(e).__name__}: {e}", "llm_error")
             validator.failed = True
@@ -613,6 +616,12 @@ class ACIEPipeline:
                     validator.add_issue(f"regenerated after: {why}", "regenerated")
                     validator.used_fallback = False
                     reply = again
+            if plan.llm_allowed and reply and not validator.used_fallback:
+                # the verbosity budget the eval scores (acie/reply_length): drop empty openers first, never a fact
+                fitted = reply_length.fit(reply, plan, expr)
+                if len(fitted) < len(reply_length.split(reply)):
+                    validator.add_issue(f"fitted reply to length budget ({len(reply_length.split(reply))} -> {len(fitted)} sentences)", "trimmed")
+                    reply = fitted
             if plan.llm_allowed and len(" ".join(reply).split()) > self.max_reply_words:
                 # the LLM ignores "one short sentence" (41-word answers on live call 8): keep the
                 # leading sentences that fit; the ask usually comes last and is re-asked next turn
