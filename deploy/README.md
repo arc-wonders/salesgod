@@ -54,3 +54,20 @@ This takes all 4 GPUs, so stop the live expression server first, or run the teac
 curl -s $ACIE_LLM_BASE_URL/models | python -m json.tool
 .venv/bin/python training/expression/eval_expression.py --models "$ACIE_LLM_MODEL" --limit 50
 ```
+
+## Optional infra: Redis sessions, Postgres profiles, pgvector memory, NATS events
+
+All off by default; with no `ACIE_*` store variable set the voice server behaves exactly as before
+(in-memory sessions, JSON profiles). Local test stack: `docker compose up -d` (redis 16379, postgres+pgvector 15432, nats 14222;
+user/password/db `acie`). Install the client libraries with `pip install -e '.[infra]'`.
+
+| feature | env | notes |
+|---|---|---|
+| Sessions in Redis (2 h TTL, a restart mid-call resumes from the last finished turn) | `ACIE_SESSION_STORE=redis`, `ACIE_REDIS_URL=redis://host:6379/0` | live call still uses an in-process cache; Redis is the durable copy |
+| Profiles in Postgres | `ACIE_PROFILE_STORE=postgres`, `ACIE_PG_DSN=postgresql://acie:acie@host:5432/acie` | table `customer_profiles` is created on first use. Import existing JSON once: `python deploy/migrate_profiles.py data/voice/profiles` (`--dry-run` to check) |
+| Semantic memory | `ACIE_MEMORY_STORE=pgvector`, `ACIE_PG_DSN`, `ACIE_MEMORY_DIM` (default 256) | needs the pgvector extension (the compose image has it); table `memories`, HNSW cosine index |
+| Context events | `ACIE_NATS_URL=nats://host:4222` | subject `acie.calls.<call_id>.context`; bounded queue, drops on overflow, never blocks a call |
+
+To enable on the VM (do this deliberately, not from a lane): start the services (compose or system packages), add the variables
+to the `salesgod-voice` unit environment, install the `[infra]` extra into its venv, run the migration, then restart the service
+in a quiet window. Roll back by removing the variables.

@@ -78,6 +78,9 @@ class App:
     world: object = None
     nlu: object = None
     sims: dict = field(default_factory=dict)
+    session_store: object = None  # acie.store (ACIE_SESSION_STORE); None = in-process sessions
+    memory: object = None
+    sinks: list = field(default_factory=list)
 
     # ------------------------------------------------------------------ products
 
@@ -104,7 +107,10 @@ class App:
                                         playbook=pbm.load(DATA, product.tenant, product.id))
             prompt = f"{product.product_name}, {product.seller_name}, subscription, offer, हाँ, नहीं, ठीक है, बताइए"
         pipe = ACIEPipeline(DecisionEngine(domain), backend=self.backends[call.backend], store=self.store,
-                            buffer_reply=call.backend == "llm", nlu=self.nlu if call.backend == "llm" else None)
+                            buffer_reply=call.backend == "llm", nlu=self.nlu if call.backend == "llm" else None,
+                            session_store=getattr(self, "session_store", None))
+        for sink in getattr(self, "sinks", ()):
+            pipe.context_sinks.append(sink.for_call(call.call_id) if hasattr(sink, "for_call") else sink)
         return pipe, prompt
 
     # ------------------------------------------------------------------ do-not-call list
@@ -184,7 +190,7 @@ class App:
         if any(t.get("intent") == "opt_out" for t in call.turns if t["role"] == "agent"):
             self.add_dnc(call.to)
             call.events.append({"type": "dnc_added", "t": time.time(), "after_turn": len(call.turns)})
-        sess = pipeline.sessions.pop(session_id, None)
+        sess = await pipeline.forget_session(session_id)
         if sess is not None:
             call.context = sess.context.model_dump(exclude={"events"})
         if sess is not None:  # end of call -> long-term memory update
@@ -214,6 +220,9 @@ def build_app() -> tuple[FastAPI, App]:
         await asyncio.to_thread(embed, np.zeros(16000, dtype=np.float32))  # load the voice model now, not mid-call
         state.tts = FishTTS()
         state.store = JsonProfileStore(DATA / "profiles")
+        if any(os.getenv(k) for k in ("ACIE_SESSION_STORE", "ACIE_PROFILE_STORE", "ACIE_MEMORY_STORE", "ACIE_NATS_URL")):
+            from acie.store import build_stores_from_env  # flags unset = exactly the stores above
+            state.session_store, state.store, state.memory, state.sinks = build_stores_from_env(profile_dir=DATA / "profiles")
         from acie.world import WorldKnowledge
         state.world = WorldKnowledge()
         from acie.understanding import LLMUnderstanding
