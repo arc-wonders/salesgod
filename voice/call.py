@@ -463,10 +463,15 @@ class CallSession:
             prosody.words_per_s = round(len(text.split()) / dur_s, 2) if dur_s > 0 else None
         rms = float(np.sqrt(np.mean(audio * audio))) if len(audio) else 0.0
         confirmed = self.speaker.confirmed
-        caller_voice = voice_sim is not None and voice_sim >= 0.5
-        if is_caller and self.stock_noise(text) and not caller_voice and (confirmed or overlap or rms < 0.035):
+        caller_voice = voice_sim is not None and voice_sim >= (0.5 if overlap else 0.4)
+        psim = None if confirmed else self.speaker.provisional_sim(emb)
+        # not confirmed yet, but one clean turn is known: noise scored 0.07-0.2 against it, the caller 0.49+
+        unlike_first = psim is not None and psim < 0.35
+        if is_caller and self.stock_noise(text) and not caller_voice and (confirmed or overlap or rms < 0.035
+                                                                          or unlike_first):
             self.event("noise", {"duration_s": round(dur_s, 2), "why": "noise phrase, not the caller's voice",
-                                 "text": text, "voice_similarity": voice_sim, "rms": round(rms, 3), "overlap": overlap})
+                                 "text": text, "voice_similarity": voice_sim if confirmed else psim,
+                                 "rms": round(rms, 3), "overlap": overlap})
             return
         if is_caller and self.hangup_after_speaking and not (caller_voice or (not confirmed and not overlap
                                                                                and not self.stock_noise(text))):

@@ -169,3 +169,21 @@ async def test_barge_in_needs_the_callers_voice_once_known():
     voice(cs, 0.7)
     await cs.check_barge_in()
     assert cs.barge_in_pending  # stopped after 0.64 s, not 0.8 s
+
+
+async def test_noise_phrase_unlike_the_first_clean_turn_is_dropped_before_confirmation():
+    cs, _ = session()
+    voice(cs, None, confirmed=False)
+    cs.speaker.embs = [np.ones(256) / 16]
+    cs.speaker.provisional_sim = lambda e: 0.12
+    cs.app.stt.next = ("करते हैं", "")
+    await cs.handle_utterance(speech(amp=0.05), time.monotonic(), False, overlap=False)  # loud, agent silent
+    assert not [t for t in cs.call.turns if t["role"] == "customer"]
+
+
+async def test_short_okay_from_the_confirmed_caller_is_kept_when_the_agent_is_silent():
+    cs, _ = session()
+    voice(cs, 0.42)
+    cs.app.stt.next = ("Okay.", "")
+    await cs.handle_utterance(speech(), time.monotonic(), False, overlap=False)
+    assert [t["text"] for t in cs.call.turns if t["role"] == "customer"] == ["Okay."]
