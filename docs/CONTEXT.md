@@ -1,4 +1,4 @@
-# Project Context: Adaptive Voice AI Engine
+# Project Context: SalesGod (Adaptive Voice AI Engine)
 
 ## 1. Overall objective
 
