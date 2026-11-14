@@ -580,6 +580,10 @@ class CallSession:
             self.event("noise", {"duration_s": round(dur_s, 2), "why": "background voice", "text": text,
                                  "loudness_db": prosody.loudness_db, "f0_hz": prosody.f0_median_hz})
             return
+        if not getattr(self, "hindi_requested", False):
+            from acie.personalization.policy import detect_explicit_requests
+            if detect_explicit_requests(text).get("language") in ("hi", "hinglish"):
+                self.hindi_requested = True  # "can you speak in Hindi?": the Hindi phone model may take over
         # accepted as the caller. Only CLEAN turns teach the voice print (agent silent, loud enough, real
         # words): the old lock learned from everything, so noise heard as words could become "the caller"
         self.accepted_turns += 1
@@ -662,6 +666,13 @@ class CallSession:
         except Exception:
             return False
 
+    def hindi_model_ok(self) -> bool:
+        """The Hindi phone model only in calls that are Hindi/Hinglish, or after the caller ASKED for Hindi. A call that
+        opened in English stays on large-v3: an Indian-accented English line is often detected as Hindi, and the Hindi
+        model then writes it in Devanagari ("Currently, I am going towards building a lean..." became "करते हैं, मैं
+        बिल्डर लीन कर रहा" in a replay of 2c4ec7a4ff)."""
+        return self.call.language in ("hi", "hinglish") or getattr(self, "hindi_requested", False)
+
     @staticmethod
     def vocabulary_hint(app, call) -> dict[str, str]:
         """Words this call will likely contain, as Whisper's initial prompt, per language. The phone-line benchmark:
@@ -684,7 +695,7 @@ class CallSession:
                 # vocabulary hint OFF by default: on real calls it leaked into unclear audio ("ज़ुम्बा, लिंक भेज दो",
                 # "पेमेंट पेमेंट पेमेंट") even though it lowered CER on clean test speech. VOICE_STT_PROMPT=1 to try it.
                 hint_words = getattr(self, "stt_prompts", None) if os.getenv("VOICE_STT_PROMPT") == "1" else None
-                out = await stt.transcribe_detail(audio, hint, prefer, hint_words)
+                out = await stt.transcribe_detail(audio, hint, prefer, hint_words, allow_hi_model=self.hindi_model_ok())
             except TypeError:  # test doubles without the prompt argument
                 out = await stt.transcribe_detail(audio, hint, prefer)
             return out if len(out) == 5 else (*out, 0.5)
