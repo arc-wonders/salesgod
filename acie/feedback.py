@@ -11,18 +11,26 @@ Sales outcomes (end_session, once per call)
 
 Per-turn reward in [-1, 1]  (needs turn t+1, so (state, expr) of turn t stays pending until the next turn / call end)
   reward = clip( - w_frustration * d_frustration  - w_confusion * d_confusion
-                 + w_positive * mean(d_engagement, d_satisfaction, d_receptiveness)
+                 + w_positive * mean(d_engagement, d_satisfaction, d_receptiveness, d_trust)
                  - w_validator * penalty - w_barge * barge_in , -1, 1 )
-  d_x = x(next turn) - x(this turn); engagement/satisfaction/receptiveness missing on HumanState (state lane
+  d_x = x(next turn) - x(this turn); engagement/satisfaction/receptiveness/trust missing on HumanState (state lane
   adds them) are read with getattr default 0.5. penalty = 1.0 if the reply used the safe fallback, else 0.4 if
   it carried real validation issues (issue_codes if the report has them, else issues; trimming/echo/regenerate
   notes are benign). barge_in = the customer interrupted that reply (next turn's timing.barge_in).
   Default weights: frustration 0.8, confusion 0.6, positive 0.5, validator 0.5, barge 0.3 (WEIGHTS; override per
   engine via FeedbackEngine(weights={...}) or env ACIE_REWARD_WEIGHTS="frustration=0.9,barge=0.2").
 
-Delayed call-level reward credited to every turn of the call at end_session (discounted 0.9 per turn back from the
-last one, sent as a second policy.observe): accepted +1, later +0.2, declined -0.3, opt_out -0.6; safety and
-no outcome are excluded from learning (no observe, and per-turn learning stops once the safety flag is set).
+Delayed call-level credit (customer-centred; sale outcomes carry WEIGHT 0, they are only recorded)
+  call credit, summed then clipped to [-1, 1]:
+    +0.5  calm end with every customer question answered (last frustration and confusion < 0.3)
+    +0.5  the caller said no / later / stop and the agent respected it at once (no pushing reply after it)
+    -1.0  opt-out after the agent kept pushing (pitch/price/reoffer/recover/confirm_close/price_floor after the no)
+    -1.0  the caller hung up (the agent did not end the call) during or right after a repeated reply
+  per-turn extras on the turn that caused them:
+    -0.5  repeated reply: difflib.SequenceMatcher ratio > 0.6 vs ANY earlier agent reply in the call
+    -0.5  unanswered customer question: a question whose reply was the safe fallback (or intent "unknown")
+  Each turn gets one second policy.observe with clip(call_credit * 0.9^(turns back from the last) + extras).
+  Safety calls are excluded from learning. No order- or randomness-dependent arithmetic anywhere.
 
 Learning hooks (called when present, never break a turn)
   acie.personalization.learner.learn_from_turn(profile, text, state, expr, explicit)   (persona lane; lazy import)
@@ -41,16 +49,23 @@ start for the compiler.
 
 from __future__ import annotations
 
+import difflib
 import json
 import os
 
+from .context import is_question
 from .memory.base import MemoryStore, make_store, memory_enabled
 from .personalization.profile_store import update_preference
 from .schemas import CustomerProfile, ExpressionParams, HumanState, SessionState, TurnPlan
 from .text import detect_language
 
 WEIGHTS = {"frustration": 0.8, "confusion": 0.6, "positive": 0.5, "validator": 0.5, "barge": 0.3}
-CALL_REWARD = {"accepted": 1.0, "later": 0.2, "declined": -0.3, "opt_out": -0.6}
+# call-level credit terms (see docstring). Sale outcomes are recorded in profile.outcomes but are NOT in here: weight 0.
+CALL_CREDIT = {"calm_answered": 0.5, "respected_refusal": 0.5, "opt_out_after_push": -1.0, "hangup_after_repeat": -1.0}
+TURN_EXTRA = {"repeat": -0.5, "unanswered": -0.5}
+SALE_OUTCOME_WEIGHT = 0.0
+REPEAT_RATIO = 0.6
+PUSH_INTENTS = frozenset({"pitch", "price", "reoffer", "recover", "confirm_close", "price_floor"})
 _BENIGN = ("trimmed", "dropped echo", "regenerated", "llm repeated")
 CREDIT_DISCOUNT = 0.9
 
@@ -106,12 +121,13 @@ class FeedbackEngine:
         self.policy = policy  # pipeline sets this to its policy when None
         self.memory = memory if memory is not None else (make_store() if memory_enabled() else None)
         self._pending: dict[str, dict] = {}  # session_id -> {"state","expr","penalty"}
-        self._turns: dict[str, list[tuple[HumanState, ExpressionParams, float]]] = {}
+        self._turns: dict[str, list[dict]] = {}
+        self._call: dict[str, dict] = {}  # per-session facts for the call-level credit
 
     # ------------------------------------------------------------------ reward
     def turn_reward(self, prev: HumanState, nxt: HumanState, penalty: float = 0.0, barge_in: bool = False) -> float:
         w = self.weights
-        pos = sum(_g(nxt, n) - _g(prev, n) for n in ("engagement", "satisfaction", "receptiveness")) / 3
+        pos = sum(_g(nxt, n) - _g(prev, n) for n in ("engagement", "satisfaction", "receptiveness", "trust")) / 4
         r = (-w["frustration"] * (nxt.frustration - prev.frustration) - w["confusion"] * (nxt.confusion - prev.confusion)
              + w["positive"] * pos - w["validator"] * penalty - w["barge"] * (1.0 if barge_in else 0.0))
         return max(-1.0, min(1.0, r))
@@ -129,7 +145,8 @@ class FeedbackEngine:
         if p is None:
             return
         r = self.turn_reward(p["state"], nxt if nxt is not None else p["state"], p["penalty"], barge_in)
-        self._turns.setdefault(sid, []).append((p["state"], p["expr"], r))
+        self._turns.setdefault(sid, []).append({"state": p["state"], "expr": p["expr"], "reward": r,
+                                                "extra": p["extra"]})
         self._observe(p["state"], p["expr"], r, profile)
 
     # ------------------------------------------------------------------ per turn
@@ -167,7 +184,8 @@ class FeedbackEngine:
             self._learn_hook(profile, text, state, cur, explicit)
             sid = session.session_id if session is not None else profile.customer_id
             self._resolve(sid, profile, state, barge_in)  # reward of the PREVIOUS reply: how the caller reacted
-            self._pending[sid] = {"state": state, "expr": cur, "penalty": validation_penalty(validation)}
+            extra = self._track_call(sid, session, text, plan, state, validation)
+            self._pending[sid] = {"state": state, "expr": cur, "penalty": validation_penalty(validation), "extra": extra}
 
     def _learn_hook(self, profile, text, state, expr, explicit) -> None:
         try:
@@ -208,18 +226,64 @@ class FeedbackEngine:
             self._delayed_credit(session, profile, outcome)
         profile.outcomes = profile.outcomes[-50:]
 
+    def _track_call(self, sid: str, session: SessionState | None, text: str, plan: TurnPlan, state: HumanState,
+                    validation) -> float:
+        """Record per-call facts for the end-of-call credit; returns this turn's extra (repeat / unanswered)."""
+        c = self._call.setdefault(sid, {"refused": False, "pushes": 0, "ended_by_agent": False,
+                                        "last_repeat": False, "unanswered": 0, "state": state})
+        c["state"] = state
+        extra = 0.0
+        if session is not None:
+            replies = [u.text for u in session.history if u.role == "agent"]
+            last = replies[-1] if replies else ""
+            c["last_repeat"] = bool(last) and any(
+                difflib.SequenceMatcher(None, last, prev).ratio() > REPEAT_RATIO for prev in replies[:-1])
+            if c["last_repeat"]:
+                extra += TURN_EXTRA["repeat"]
+            ctx = session.context
+            if ctx.decision in ("declined", "later") or "number_removed_no_more_calls" in ctx.promised:
+                c["refused"] = True
+        if c["refused"] and plan.intent in PUSH_INTENTS:
+            c["pushes"] += 1
+        if is_question(text) and (getattr(validation, "used_fallback", False) or plan.intent == "unknown"):
+            c["unanswered"] += 1
+            extra += TURN_EXTRA["unanswered"]
+        if plan.end_call:
+            c["ended_by_agent"] = True
+        return extra
+
+    def call_credit(self, session: SessionState) -> float:
+        c = self._call.get(session.session_id)
+        if c is None:
+            return 0.0
+        opted_out = "number_removed_no_more_calls" in session.context.promised
+        credit = 0.0
+        if c["refused"] and c["pushes"] == 0:
+            credit += CALL_CREDIT["respected_refusal"]
+        if opted_out and c["pushes"] > 0:
+            credit += CALL_CREDIT["opt_out_after_push"]
+        if not c["ended_by_agent"] and c["last_repeat"]:
+            credit += CALL_CREDIT["hangup_after_repeat"]
+        st = c["state"]
+        if c["unanswered"] == 0 and c["pushes"] == 0 and st.frustration < 0.3 and st.confusion < 0.3:
+            credit += CALL_CREDIT["calm_answered"]
+        return max(-1.0, min(1.0, credit))
+
     def _delayed_credit(self, session: SessionState, profile, outcome: str | None) -> None:
         sid = session.session_id
         if outcome != "safety":
             self._resolve(sid, profile, None, False)  # last turn has no next state
         self._pending.pop(sid, None)
         turns = self._turns.pop(sid, [])
-        reward = CALL_REWARD.get(outcome or "")
-        if reward is None:
+        credit = self.call_credit(session)
+        self._call.pop(sid, None)
+        if outcome == "safety":
             return
         n = len(turns)
-        for i, (st, ex, _) in enumerate(turns):
-            self._observe(st, ex, reward * CREDIT_DISCOUNT ** (n - 1 - i), profile)
+        for i, t in enumerate(turns):
+            r = max(-1.0, min(1.0, credit * CREDIT_DISCOUNT ** (n - 1 - i) + t["extra"]))
+            if r:
+                self._observe(t["state"], t["expr"], r, profile)
 
     # ------------------------------------------------------------------ semantic memory
     @staticmethod
