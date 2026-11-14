@@ -139,7 +139,8 @@ def check(bundle: dict, spec: Spec, eff: Effective) -> dict:
     checks: list[dict] = []
     top = [t for t in topics if "/" not in t.get("path", "")]
 
-    checks.append(_check("topics", f"Topics: {c.min_topics}-{c.max_topics} top-level", c.min_topics <= len(top) <= c.max_topics,
+    checks.append(_check("topics", f"Topics: {c.min_topics}-{c.max_topics} top-level, {c.min_total_topics}-{c.max_total_topics} in all",
+                         c.min_topics <= len(top) <= c.max_topics and c.min_total_topics <= len(topics) <= c.max_total_topics,
                          f"{len(top)} top-level, {len(topics)} in all", blocking=False))
     checks.append(_check("entries", f"Q&A entries: at least {c.min_entries}", len(entries) >= c.min_entries, f"{len(entries)} entries", blocking=False))
     checks.append(_check("offerings", f"Offerings: {c.min_offerings}-{c.max_offerings}", c.min_offerings <= len(offs) <= c.max_offerings,
@@ -153,6 +154,7 @@ def check(bundle: dict, spec: Spec, eff: Effective) -> dict:
     # languages
     miss: list[str] = []
     wrong: list[str] = []
+    problems: dict[str, list[str]] = {}
     for lang_req in [x for x in spec.languages if c.require_all_languages or x == "en"]:
         for e in entries:
             a = (e.get("answer") or {}).get(lang_req, "")
@@ -175,9 +177,14 @@ def check(bundle: dict, spec: Spec, eff: Effective) -> dict:
     for where, lang, t in texts(bundle):
         if lang in spec.languages and not _lang_ok(lang, t):
             wrong.append(where)
-    checks.append(_check("languages", "Every entry in " + " / ".join(spec.languages), not miss and not wrong,
-                         (f"missing: {len(set(miss))}" if miss else "") + ("; wrong script in: " + str(len(set(wrong))) if wrong else "") or "all present",
-                         miss + wrong))
+            problems.setdefault(where, []).append(f"the {lang} text has the wrong script: {t[:70]!r}. Rule: en and hinglish use Roman letters only, hi is Devanagari")
+    for m_ in set(miss):
+        problems.setdefault(m_, []).append("a required language is missing or empty")
+    chk = _check("languages", "Every entry in " + " / ".join(spec.languages), not miss and not wrong,
+                 (f"missing: {len(set(miss))}" if miss else "") + ("; wrong script in: " + str(len(set(wrong))) if wrong else "") or "all present",
+                 miss + wrong)
+    chk["problems"] = problems
+    checks.append(chk)
 
     # provenance
     bad_prov: list[str] = []

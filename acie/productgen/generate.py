@@ -6,6 +6,7 @@ Everything the model returns is cleaned by kbops (invalid pieces dropped and rep
 from __future__ import annotations
 
 import asyncio
+import copy
 import json
 import os
 from pathlib import Path
@@ -266,17 +267,57 @@ def _items(report: dict, *check_ids: str) -> set[str]:
     return out
 
 
+def _problems(report: dict) -> dict[str, list[str]]:
+    out: dict[str, list[str]] = {}
+    for c in report["checks"]:
+        if not c["passed"]:
+            for k, v in (c.get("problems") or {}).items():
+                out.setdefault(k, []).extend(v)
+            for k in c["items"]:
+                out.setdefault(k, []).append(c["label"])
+    return {k: list(dict.fromkeys(v))[:4] for k, v in out.items()}
+
+
+def _tag(item: str) -> str:
+    return item.split(":", 1)[0] if ":" in item else "entry"
+
+
+async def _add_subtopics(bundle: dict, spec: Spec, eff: Effective, llm: LLM, notes: list[str], errs: dict, base: dict) -> str:
+    """Topic shortfall: more subtopics under the EXISTING top-level topics, and entries for them. Never invents new top-level topics."""
+    kb, c = bundle["kb"], eff.criteria
+    room = max(0, c.max_total_topics - len(kb["topics"]))
+    want = min(room, max(0, c.min_total_topics - len(kb["topics"])) + 2)
+    if want <= 0:
+        return ""
+    r = await llm.json("kb_plan", {**base, "errors": errs, "only": "subtopics", "need": want, "top_level": _top(kb),
+                                   "topics": [t["path"] for t in kb["topics"]], "interests": [{"id": i["id"]} for i in kb["interests"]],
+                                   "instruction": "add subtopics (path 'parent/child') under the EXISTING top-level topics only; do not add top-level topics"})
+    raws = [t for t in (r.get("topics") or []) if isinstance(t, dict) and "/" in K.path_clean(t.get("path"))][:want]
+    added = K.add_topics(kb, raws, notes)
+    if not added:
+        return ""
+    tset = set(added)
+    r = await llm.json("kb_entries", {**base, "errors": errs, "topics": [t for t in kb["topics"] if t["path"] in tset], "per_topic": 4, "max_entries": 4 * len(added),
+                                      "offering_ids": [o["id"] for o in kb["offerings"]], "interest_ids": [i["id"] for i in kb["interests"]],
+                                      "existing_questions": [(e["question_variants"].get("en") or [""])[0] for e in kb["entries"]][:400]})
+    n = len(K.add_entries(kb, r.get("entries", []), eff, notes))
+    return f"added {len(added)} subtopics and {n} entries for them"
+
+
 async def repair(bundle: dict, report: dict, spec: Spec, eff: Effective, llm: LLM, notes: list[str]) -> list[str]:
-    """One repair round. The failing checks' errors go back to the model; only what it returns for those items is applied."""
+    """One repair round. Every failing location goes to a targeted regeneration of just that item (entry -> kb_fix, topic / offering ->
+    kb_plan fix_text, node -> playbook fix_nodes, ladder rung -> ladder fix_text, profile field / FAQ -> profile), with the problem named."""
     kb, tree = bundle["kb"], bundle["tree"]
     base = spec_payload(spec, eff)
     log: list[str] = []
     errs = {c["id"]: c["detail"] for c in report["checks"] if not c["passed"]}
     bad_items = _items(report, "languages", "banned", "provenance", "numeric", "duplicates")
+    prob = _problems(report)
     ids = {e["id"] for e in kb["entries"]}
     fix_entries = sorted(i for i in bad_items if i in ids)
     if fix_entries:
-        r = await llm.json("kb_fix", {**base, "errors": errs, "fix": [e for e in kb["entries"] if e["id"] in set(fix_entries)],
+        r = await llm.json("kb_fix", {**base, "errors": errs, "problems": {i: prob.get(i, []) for i in fix_entries},
+                                      "fix": [e for e in kb["entries"] if e["id"] in set(fix_entries)],
                                       "topics": [t["path"] for t in kb["topics"]], "offering_ids": [o["id"] for o in kb["offerings"]],
                                       "interest_ids": [i["id"] for i in kb["interests"]]})
         done = K.replace_entries(kb, r.get("entries", []), eff, notes)
@@ -286,21 +327,44 @@ async def repair(bundle: dict, report: dict, spec: Spec, eff: Effective, llm: LL
             if still:
                 kb["entries"] = [e for e in kb["entries"] if e["id"] not in still]
                 log.append(f"removed {len(still)} entries that stayed non-compliant")
-    bad_nodes = {i[5:] for i in bad_items if i.startswith("node:")}
-    if bad_nodes or ("situations" in errs and len(tree["nodes"]) < eff.criteria.min_situations):
-        need = max(0, eff.criteria.min_situations - (len(tree["nodes"]) - len(bad_nodes)))
-        keep = [n for n in tree["nodes"] if n["id"] not in bad_nodes]
-        r = await llm.json("playbook", {**base, "errors": errs, "have": [n["id"] for n in keep], "need": need, "fix": [n for n in tree["nodes"] if n["id"] in bad_nodes],
+    # playbook nodes (any depth): rewrite just the failing ones, in place
+    nids = K.all_node_ids(tree["nodes"])
+    bad_nodes = sorted(i[5:] for i in bad_items if i.startswith("node:") and i[5:] in nids)
+    if bad_nodes:
+        r = await llm.json("playbook", {**base, "errors": errs, "only": "fix_nodes", "problems": {n: prob.get("node:" + n, []) for n in bad_nodes},
+                                        "fix": [K.find_node(tree["nodes"], n) for n in bad_nodes],
+                                        "instruction": "return each node in `fix` again with the same id and the problem corrected: points / ask in English (Roman letters), "
+                                                       "points_hi / ask_hi in Devanagari Hindi; a node about switching language still has its English fields in English",
                                         "kb": {"topics": [t["path"] for t in kb["topics"]]}})
-        tree["nodes"] = keep
-        K.add_nodes(tree["nodes"], r.get("nodes", []), notes, limit=eff.criteria.max_situations)
-        log.append("regenerated playbook situations")
-    if "ladder" in errs or any(i.startswith("ladder:") for i in bad_items):
+        k = sum(1 for raw in r.get("nodes", []) or [] if isinstance(raw, dict) and K.replace_node(tree["nodes"], raw, notes))
+        log.append(f"rewrote {k} playbook situations")
+    if "situations" in errs and len(tree["nodes"]) < eff.criteria.min_situations:
+        need = eff.criteria.min_situations - len(tree["nodes"])
+        r = await llm.json("playbook", {**base, "errors": errs, "have": sorted(K.all_node_ids(tree["nodes"])), "need": need,
+                                        "kb": {"topics": [t["path"] for t in kb["topics"]]}})
+        added = K.add_nodes(tree["nodes"], r.get("nodes", []), notes, limit=eff.criteria.max_situations)
+        log.append(f"added {len(added)} playbook situations")
+    # discovery ladder
+    bad_rungs = sorted(i[7:] for i in bad_items if i.startswith("ladder:"))
+    if "ladder" in errs:
         r = await llm.json("ladder", {**base, "errors": errs, "previous": tree["ladder"], "kb": {"interests": [i["id"] for i in kb["interests"]]}})
         lad = K.clean_ladder(r.get("ladder", []))
         if len(lad) >= len(tree["ladder"]):
             tree["ladder"] = lad
         log.append("regenerated the discovery ladder")
+    elif bad_rungs:
+        r = await llm.json("ladder", {**base, "errors": errs, "only": "fix_text", "problems": {n: prob.get("ladder:" + n, []) for n in bad_rungs},
+                                      "fix": [x for x in tree["ladder"] if x["id"] in bad_rungs], "kb": {"interests": [i["id"] for i in kb["interests"]]}})
+        fixed = {x["id"]: x for x in K.clean_ladder(r.get("ladder", []))}
+        tags = {i["id"] for i in kb["interests"]}
+        k = 0
+        for i, x in enumerate(tree["ladder"]):
+            nx = fixed.get(x["id"])
+            if nx and x["id"] in bad_rungs:
+                nx["interests"] = [t for t in nx["interests"] if t in tags]
+                tree["ladder"][i] = nx
+                k += 1
+        log.append(f"rewrote {k} ladder rungs")
     n_have = len(kb["entries"])
     if n_have < eff.criteria.min_entries or _items(report, "coverage"):
         counts = {t: 0 for t in _top(kb)}
@@ -315,6 +379,10 @@ async def repair(bundle: dict, report: dict, spec: Spec, eff: Effective, llm: LL
                                               "existing_questions": [(e["question_variants"].get("en") or [""])[0] for e in kb["entries"]][:400]})
             added = K.add_entries(kb, r.get("entries", []), eff, notes)
             log.append(f"added {len(added)} entries")
+    if "topics" in errs and len(kb["topics"]) < eff.criteria.min_total_topics:
+        msg = await _add_subtopics(bundle, spec, eff, llm, notes, errs, base)
+        if msg:
+            log.append(msg)
     if len(kb["offerings"]) < eff.criteria.min_offerings:
         r = await llm.json("kb_plan", {**base, "errors": errs, "only": "offerings", "have_offerings": [o["id"] for o in kb["offerings"]],
                                        "interests": [{"id": i["id"]} for i in kb["interests"]], "topics": [t["path"] for t in kb["topics"]]})
@@ -324,7 +392,8 @@ async def repair(bundle: dict, report: dict, spec: Spec, eff: Effective, llm: LL
     o_bad = {i[9:] for i in bad_items if i.startswith("offering:")}
     if t_bad or o_bad:
         r = await llm.json("kb_plan", {**base, "errors": errs, "only": "fix_text", "topics": [t for t in kb["topics"] if t["path"] in t_bad],
-                                       "offerings": [o for o in kb["offerings"] if o["id"] in o_bad]})
+                                       "offerings": [o for o in kb["offerings"] if o["id"] in o_bad],
+                                       "problems": {k: v for k, v in prob.items() if k.startswith(("topic:", "offering:"))}})
         tm = {path: t for t in (r.get("topics") or []) if isinstance(t, dict) and (path := K.path_clean(t.get("path")))}
         for t in kb["topics"]:
             nt = tm.get(t["path"])
@@ -341,21 +410,75 @@ async def repair(bundle: dict, report: dict, spec: Spec, eff: Effective, llm: LL
                 if v.get("en"):
                     o["name"] = {**o["name"], **v}
         log.append("rewrote topic / offering text")
-    prod_bad = {i for i in bad_items if i.startswith("product:")}
+    prod_bad = {i for i in bad_items if i.startswith(("product:", "faq:"))}
     if prod_bad:
-        r = await llm.json("profile", {**base, "errors": errs})
+        r = await llm.json("profile", {**base, "errors": errs, "problems": {k: v for k, v in prob.items() if k in prod_bad}})
         np_ = build_product(spec, eff, r)
         for k in ("pitch_en", "pitch_hi", "pitch_hinglish", "one_liner", "knowledge", "benefits", "benefits_hi", "benefits_hinglish"):
             if np_.get(k):
                 bundle["product"][k] = np_[k]
+        faqs = bundle["product"].get("faqs", [])
+        for i in sorted(int(x[4:]) for x in prod_bad if x.startswith("faq:") and x[4:].isdigit()):
+            if i < len(faqs) and i < len(np_["faqs"]):
+                faqs[i] = np_["faqs"][i]
         log.append("rewrote product text")
     return log
+
+
+def _bad_script_en(text: str) -> bool:
+    return bool(text) and not C._lang_ok("hinglish", text)
+
+
+def drop_unfixable(bundle: dict, report: dict) -> list[str]:
+    """Last resort, after the repair rounds: a still-failing OPTIONAL item (entry, playbook situation, ladder rung, FAQ) is removed so that
+    one bad item never blocks a publish. A wrong-script Roman-language text on a topic / offering falls back to the English text.
+    Returns what was removed (also put in the report)."""
+    kb, tree, prod = bundle["kb"], bundle["tree"], bundle["product"]
+    bad = _items({"checks": [c for c in report["checks"] if c["blocking"]]}, *[c["id"] for c in report["checks"] if c["blocking"] and not c["passed"]])
+    out: list[str] = []
+    eids = {e["id"] for e in kb["entries"]}
+    gone = sorted(i for i in bad if i in eids)
+    if len(gone) > max(3, len(eids) // 10):  # that many failing is a systemic problem, not one bad item: keep it blocking
+        gone = []
+    if gone:
+        kb["entries"] = [e for e in kb["entries"] if e["id"] not in set(gone)]
+        out += [f"entry {i}" for i in gone]
+    bad_n = sorted(x[5:] for x in bad if x.startswith("node:"))
+    if len(bad_n) > max(2, len(K.all_node_ids(tree["nodes"])) // 5):
+        bad_n = []
+    for i in bad_n:
+        if K.drop_node(tree["nodes"], i):
+            out.append(f"playbook situation {i}")
+    rungs = {x[7:] for x in bad if x.startswith("ladder:")}
+    if rungs:
+        tree["ladder"] = [r for r in tree["ladder"] if r["id"] not in rungs]
+        out += [f"ladder rung {i}" for i in sorted(rungs)]
+    for i in sorted((int(x[4:]) for x in bad if x.startswith("faq:") and x[4:].isdigit()), reverse=True):
+        if i < len(prod.get("faqs", [])):
+            del prod["faqs"][i]
+            out.append(f"FAQ {i}")
+    for t in kb["topics"]:  # Roman-script languages fall back to the English text when that is plain English
+        if "topic:" + t["path"] in bad:
+            for key in ("title", "overview"):
+                en = (t[key] or {}).get("en", "")
+                if "hinglish" in t[key] and not C._lang_ok("hinglish", t[key]["hinglish"]) and en and not C._DEV.search(en):
+                    t[key]["hinglish"] = en
+                    out.append(f"topic {t['path']}: hinglish {key} replaced by English")
+    for o in kb["offerings"]:
+        if "offering:" + o["id"] in bad and "hinglish" in o["name"] and not C._lang_ok("hinglish", o["name"]["hinglish"]) and not C._DEV.search(o["name"].get("en", "")):
+            o["name"]["hinglish"] = o["name"]["en"]
+            out.append(f"offering {o['id']}: hinglish name replaced by English")
+    return out
 
 
 def finish_bundle(bundle: dict, spec: Spec, eff: Effective) -> dict:
     bundle["tree"]["clusters"] = K.clusters(bundle["kb"])
     bundle["review"] = sorted(e["id"] for e in bundle["kb"]["entries"] if "review" in str(e.get("source", ""))) if eff.real_brand else []
     return C.check(bundle, spec, eff)
+
+
+def _signature(report: dict) -> list:
+    return [(c["id"], c["detail"], tuple(c["items"])) for c in report["checks"] if not c["passed"]]
 
 
 async def validate_and_repair(bundle: dict, spec: Spec, eff: Effective, llm: LLM, notes: list[str], progress: Progress = _noop) -> tuple[dict, list[dict]]:
@@ -367,10 +490,23 @@ async def validate_and_repair(bundle: dict, spec: Spec, eff: Effective, llm: LLM
         if report["passed"]:
             break
         progress("validate", "running", f"repair round {rnd}: " + ", ".join(history[-1]["failed"]))
+        before = _signature(report)
         log = await repair(bundle, report, spec, eff, llm, notes)
         log += deterministic_fixes(bundle, spec, eff)
         report = finish_bundle(bundle, spec, eff)
         history.append({"round": rnd, "failed": [c["id"] for c in report["checks"] if not c["passed"]], "fixes": log})
+        if _signature(report) == before:  # the round changed nothing about the failures: more rounds would repeat it
+            history[-1]["stopped"] = "no progress"
+            break
+    dropped: list[str] = []
+    if not report["publishable"]:
+        dropped = drop_unfixable(bundle, report)
+        if dropped:
+            dropped += [f"(then) {x}" for x in deterministic_fixes(bundle, spec, eff)]
+            report = finish_bundle(bundle, spec, eff)
+            history.append({"round": "final", "failed": [c["id"] for c in report["checks"] if not c["passed"]], "fixes": ["removed after the repair rounds: " + ", ".join(dropped)]})
+            notes.append("removed after the repair rounds (still failing): " + ", ".join(dropped)[:400])
+    report["dropped"] = dropped
     return report, history
 
 
@@ -409,5 +545,31 @@ async def generate(spec: Spec, llm: LLM, data: Path, progress: Progress = _noop)
     doc = {"kind": "generate", "status": "draft" if report["publishable"] else "needs_review", "model": getattr(llm, "model", ""), "spec": spec.model_dump(),
            "effective": eff.model_dump(), "bundle": bundle, "report": report, "repair_history": history, "notes": notes[:200]}
     S.save_version(data, spec.tenant, eff.product_id, doc)
+    progress("save", "done", f"version v{doc['version']}")
+    return doc
+
+
+async def repair_version(data: Path, tenant: str, pid: str, n: int, llm: LLM, progress: Progress = _noop) -> dict:
+    """Run ONLY the repair loop on saved version `n` (no regeneration) and save the result as the next version."""
+    old = S.load_version(data, tenant, pid, n)
+    if not old or not old.get("bundle"):
+        raise KeyError(f"no full version v{n} for {tenant}/{pid}")
+    sd = copy.deepcopy(old["spec"])
+    crit = sd.get("criteria") or {}
+    if "min_total_topics" not in crit and (crit.get("min_topics"), crit.get("max_topics")) == (15, 30):
+        crit["min_topics"], crit["max_topics"] = 5, 20  # versions saved before the topic criterion changed carry the old default
+        sd["criteria"] = crit
+    spec = Spec.model_validate(sd)
+    eff = resolve(spec)
+    bundle = copy.deepcopy(old["bundle"])
+    notes: list[str] = list(old.get("notes") or [])
+    progress("validate", "running", f"repairing v{n}")
+    report, history = await validate_and_repair(bundle, spec, eff, llm, notes, progress)
+    failed = [c["label"] for c in report["checks"] if not c["passed"]]
+    progress("validate", "done" if report["passed"] else "failed", "all criteria pass" if report["passed"] else f"{len(failed)} criteria still fail")
+    doc = {"kind": "generate", "status": "draft" if report["publishable"] else "needs_review", "model": getattr(llm, "model", ""), "spec": spec.model_dump(),
+           "effective": eff.model_dump(), "bundle": bundle, "report": report, "repair_history": history, "notes": notes[:200], "base_version": n,
+           "note": f"repair pass on v{n}"}
+    S.save_version(data, tenant, pid, doc)
     progress("save", "done", f"version v{doc['version']}")
     return doc

@@ -58,7 +58,7 @@ SHAPES: dict[str, str] = {
                '"faqs": [{"keywords": [any-script words a caller would say], "answer": {en,hi,hinglish}}] (8-12), "knowledge": "a factual background paragraph", '
                '"topic_words": [words in en/hi/hinglish that mean the caller talks about this product], "discovery_question": {en,hi,hinglish}, '
                '"pronunciations": {"Word": "spoken Devanagari respelling"}, "tone": str, "info_source": {en,hi,hinglish}, "call_to_action": str}',
-    "kb_plan": '{"topics": [{"path": "a" or "a/b", "title": {en,hi,hinglish}, "overview": {en,hi,hinglish}, "interests": [tag ids]}] (15-30 top-level topics plus subtopics), '
+    "kb_plan": '{"topics": [{"path": "a" or "a/b", "title": {en,hi,hinglish}, "overview": {en,hi,hinglish}, "interests": [tag ids]}] (5-20 top-level topics, 15-40 topics in all with subtopics; for a focused product fewer top-level topics with subtopics under them is right), '
                '"interests": [{"id", "label": {en,hi,hinglish}, "keywords": [what callers say, any script], "related": [ids], "discovery": {"en": [q], "hi": [q], "hinglish": [q]}}] (8-15), '
                '"offerings": [{"id", "name": {en,hi,hinglish}, "who_suits": [tag ids], "price_inr": int or null, "price_label": {en,hi,hinglish} or null, '
                '"pitch": {"en": [..], "hi": [..], "hinglish": [..]}, "upsell_from": [topic paths], "min_fit": 1.0}] (5-10)}',
