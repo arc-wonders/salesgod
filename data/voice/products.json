@@ -464,12 +464,7 @@
      "branch",
      "ब्रांच",
      "location",
-     "kahan",
-     "कहाँ",
-     "कहां",
      "address",
-     "पता",
-     "near",
      "gurgaon",
      "gurugram",
      "गुरुग्राम",
@@ -480,8 +475,11 @@
      "साकेत",
      "sector",
      "सेक्टर",
+     "re:(gym|jim|जिम|centre|center|branch|ब्रांच|jagah|जगह).{0,25}(kahan|kahaan|kidhar|कहाँ|कहां)|(kahan|kahaan|कहाँ|कहां).{0,20}(hai|है|located|pe hai|par hai)\\b(?!.{0,30}(number|नंबर))",
+     "re:\\bnear(est)?\\b.{0,12}(me|my|home|ghar|branch|us|here)|(mere|मेरे) (ghar|घर|paas|पास)",
      "nearest",
-     "पास"
+     "आपका पता",
+     "aapka pata"
     ],
     "answer": "We have three branches in Delhi NCR: Saket in Delhi, Sector 29 in Gurugram and Sector 62 in Noida; there is no branch in Sector 49 Gurugram, the nearest is Sector 29",
     "answer_hi": "दिल्ली NCR में हमारी तीन ब्रांच हैं: दिल्ली में साकेत, गुरुग्राम में सेक्टर 29 और नोएडा में सेक्टर 62; गुरुग्राम के सेक्टर 49 में ब्रांच नहीं है, सबसे पास सेक्टर 29 है",
@@ -699,6 +697,44 @@
    "hi": "आपका fitness goal क्या है: weight कम करना, muscle बनाना, या बस fit रहना?",
    "hinglish": "Aapka fitness goal kya hai: weight kam karna, muscle banana, ya bas fit rehna?"
   },
+  "discovery_ladder": [
+   {
+    "id": "goal",
+    "question": {
+     "en": "What's your fitness goal: losing weight, building muscle, or just staying fit?",
+     "hi": "आपका fitness goal क्या है: weight कम करना, muscle बनाना, या बस fit रहना?",
+     "hinglish": "Aapka fitness goal kya hai: weight kam karna, muscle banana, ya bas fit rehna?"
+    },
+    "answers_regex": "muscle|bulk|मसल|बॉडी|body ?build|weight ?(loss|lose|gain)|lose weight|fat ?loss|वज़न|वजन|stay fit|fitness|fit rehna|फिट रहना|toning|strength|power ?lift|stamina"
+   },
+   {
+    "id": "subgoal",
+    "question": {
+     "en": "Is that for the aesthetic look, or for strength and powerlifting?",
+     "hi": "वो दिखने के लिए है, या strength और powerlifting के लिए?",
+     "hinglish": "Wo look ke liye hai, ya strength aur powerlifting ke liye?"
+    },
+    "answers_regex": "aesthetic|\\blook\\b|physique|\\bshape\\b|दिखने|लुक|power ?lift|strength|competition|stamina|toning|flexib"
+   },
+   {
+    "id": "experience",
+    "question": {
+     "en": "Are you just starting out, or have you trained before?",
+     "hi": "आप अभी शुरुआत कर रहे हैं, या पहले ट्रेनिंग की है?",
+     "hinglish": "Aap abhi shuru kar rahe hain, ya pehle training ki hai?"
+    },
+    "answers_regex": "beginner|first time|pehli baar|पहली बार|new to|never (done|tried|trained)|trained before|lifted before|already (go|train|lift)|\\d+\\s*(years?|saal|साल|months?|mahine)|experience|pehle se|पहले से|just start"
+   },
+   {
+    "id": "schedule",
+    "question": {
+     "en": "How many days a week can you come, and is morning or evening better?",
+     "hi": "आप हफ़्ते में कितने दिन आ सकते हैं, और सुबह या शाम कब ठीक रहेगा?",
+     "hinglish": "Aap hafte mein kitne din aa sakte hain, aur subah ya shaam kab theek rahega?"
+    },
+    "answers_regex": "\\b(\\d+|one|two|three|four|five|six|ek|do|teen|char|chaar|paanch|panch)\\s*(to|-|se)?\\s*(\\d+|four|five|six|char|paanch)?\\s*(days?|din)\\b|morning|evening|weekend|subah|shaam|सुबह|शाम|रोज़|daily"
+   }
+  ],
   "tenant": "default",
   "use_playbook": true,
   "benefits_hi": [
@@ -716,8 +752,8 @@
   "cancel_any_time": null,
   "info_source": {
    "en": "the gym team at the nearest branch can tell you",
-   "hi": "नज़दीकी ब्रांच पर जिम की टीम आपको बता सकती है",
-   "hinglish": "nazdeeki branch par gym ki team aapko bata sakti hai"
+   "hi": "नज़दीकी ब्रांच पर जिम की टीम से पूछ लीजिए",
+   "hinglish": "nazdeeki branch par gym ki team se pooch lijiye"
   },
   "description": "operator demo facts: FitZone is the operator's own demo gym, not a real company. Every fact in this sheet (plans, branches, policies, rates) is authored demo data; the operator confirms or replaces it (see docs/PRODUCT_FACTS_TODO.md).",
   "negotiation": {
@@ -768,7 +804,8 @@
       "en": "plus one extra week free",
       "hi": "और एक हफ़्ता फ्री",
       "hinglish": "aur ek hafta free"
-     }
+     },
+     "cost": 150
     },
     {
      "kind": "perk",
@@ -782,7 +819,8 @@
       "en": "plus two extra free trainer sessions",
       "hi": "और दो एक्स्ट्रा फ्री ट्रेनर सेशन",
       "hinglish": "aur do extra free trainer session"
-     }
+     },
+     "cost": 300
     },
     {
      "kind": "price",

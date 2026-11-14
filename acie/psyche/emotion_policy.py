@@ -65,9 +65,21 @@ def _v(voice, name, default=0.0):
     return float(getattr(voice, name, default) or default) if voice is not None else default
 
 
+def _sg(signals, k: str, default: float) -> float:
+    """A dim from the fused TurnSignals when the state does not carry it."""
+    if signals is None:
+        return default
+    return float(signals.state.get(k, signals.learned_state.get(k, default)))
+
+
 def decide(state, text: str = "", voice=None, flagged: bool = False, nlu_intent: str = "", signals=None) -> Strategy:
     """state: HumanState or dict of dims. First matching row wins (see the module table)."""
-    g = (lambda k, d=0.0: float(state.get(k, d))) if isinstance(state, dict) else (lambda k, d=0.0: float(getattr(state, k, d)))
+    from .needs import resolve_signals
+    signals = resolve_signals(signals)  # TurnSignals, or the stored session.dialog / legacy NLU; None = raw state only
+    if isinstance(state, dict):
+        g = lambda k, d=0.0: float(state[k]) if k in state else _sg(signals, k, d)  # noqa: E731
+    else:
+        g = lambda k, d=0.0: float(getattr(state, k, _sg(signals, k, d)))  # noqa: E731
     if flagged or is_distress(text):
         return _TABLE["crisis"]
     arousal = _v(voice, "arousal")
@@ -86,7 +98,7 @@ def decide(state, text: str = "", voice=None, flagged: bool = False, nlu_intent:
         return _TABLE["confused"]
     if g("cognitive_load") >= 0.70:
         return _TABLE["overwhelmed"]
-    if g("trust", 0.5) <= 0.30:
+    if g("trust", 0.5) <= 0.30 or (signals is not None and signals.objection == "trust"):
         return _TABLE["suspicious"]
     if g("urgency") >= 0.60 and g("engagement", 0.5) <= 0.40:
         return _TABLE["busy"]

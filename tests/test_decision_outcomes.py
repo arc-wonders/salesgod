@@ -14,7 +14,7 @@ async def test_accepted():
 
 
 async def test_declined_after_reoffer():
-    _, _, pipe, _, _ = await run(["yes tell me", "no not interested", "nahi chahiye"])
+    _, _, pipe, _, _ = await run(["yes tell me", "no not interested", "nahi chahiye", "nahi chahiye"])
     c = led(pipe)
     assert (c.decision, c.outcome) == ("declined", "declined") and not c.has("payment_link")
 

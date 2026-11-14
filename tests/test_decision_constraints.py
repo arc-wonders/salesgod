@@ -63,7 +63,7 @@ async def test_max_reoffers_zero_respects_the_first_no():
     out, last, pipe, _, _ = await run(["yes tell me", "no not interested"], P({"type": "max_reoffers", "value": 0}))
     assert out[-1] == "declined" and last.plan.end_call
     out, _, _, _, _ = await run(["yes tell me", "no not interested"])
-    assert out[-1] == "reoffer"
+    assert out[-1] == "reason_ask"  # the first soft no is asked about, not re-offered (OWNER UPDATE 2)
 
 
 def test_unknown_constraint_type_is_ignored():

@@ -18,6 +18,7 @@ import argparse
 import asyncio
 import json
 import os
+import re
 import sys
 from collections import defaultdict
 from pathlib import Path
@@ -104,21 +105,29 @@ def evaluate(fx: dict, recs: list[dict], prods_raw: dict) -> list[dict]:
     camp = fx["campaign"]
     prod = prods_raw[camp]
     allowed = C.numbers_in_product(prod)
+    kbf = ROOT / "data" / "voice" / "knowledge" / "default" / f"{camp}.json"
+    if os.environ.get("ACIE_KB") == "1" and kbf.exists():  # facts the knowledge base carries are product facts too
+        allowed |= set(re.findall(r"\d+", C.flat(kbf.read_text())))
     others = [v["product_name"] for k, v in prods_raw.items() if k != camp and v["product_name"] != prod["product_name"]]
     fails: list[dict] = []
     prior_replies = [recs[0]["reply"]]
     prior_tags: list[set] = []
     turns = fx["turns"]
+    said_numbers: set[str] = set()  # a price the caller named earlier (and we agreed to) is legitimate later in the call
     for i, rec in enumerate(recs[1:]):
         turn = turns[i]
+        said_numbers |= set(re.findall(r"\d+", C.flat(turn["say"])))
         tags = set(turn.get("tags", []))
         ctx = C.Ctx(reply=rec["reply"], intent=rec["intent"], end_call=rec["end_call"], ask=rec["ask"], say=rec["say"],
                     tags=tags, lang=turn.get("lang", fx.get("lang", "hinglish")), prior_replies=list(prior_replies),
-                    prior_tags=list(prior_tags), allowed_numbers=allowed, product_name=prod["product_name"],
+                    prior_tags=list(prior_tags), prior_intents=[r_["intent"] for r_ in recs[1:i + 1]], allowed_numbers=allowed | said_numbers, product_name=prod["product_name"],
                     other_products=others, expect_lang=turn.get("expect_lang"))
         skip = set(turn.get("skip", []))
         # an explicit end-of-call expectation implies the agent may end here
-        if turn.get("must", {}).get("end_call") is True:
+        mu = turn.get("must", {})
+        while isinstance(mu.get("must"), dict):
+            mu = {**{k: v for k, v in mu.items() if k != "must"}, **mu["must"]}
+        if mu.get("end_call") is True:
             ctx.tags.add("end_ok")
         for name, fn in C.DEFAULT_CHECKS.items():
             if name in skip:

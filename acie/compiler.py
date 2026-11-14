@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 
+from .psyche.ledger import CustomerFacts, SaidLedger
 from .schemas import CompiledPrompt, ExpressionParams, SessionState, TurnPlan
 
 LANGUAGE_RULES = {
@@ -192,6 +193,8 @@ class PromptCompiler:
         ctx = session.context.summary() if getattr(session, "context", None) else ""
         ctx_block = f"CALL SO FAR (true for the whole call, never contradict it):\n{ctx}\n\n" if ctx else ""
         ctx_block += _profile_block(profile) + _memory_block(memories)
+        dialog = getattr(session, "dialog", None) or {}
+        ctx_block += CustomerFacts.load(dialog).prompt_block(SaidLedger.load(dialog))  # already known / already said: do not restate
         messages.append({"role": "user", "content": f"{ctx_block}CUSTOMER SAID: {customer_text}\n\nPLAN:\n{plan_json}\n\n{reminder} "
                                                     "Use the {placeholders} for every fact, never the values."})
         return CompiledPrompt(system=system, messages=messages)

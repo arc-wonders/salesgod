@@ -30,15 +30,19 @@ from .context import is_question
 from .safety import CONCERN_T, DISTRESS_T, concern_plan, distress_followup_plan, distress_plan, distress_score
 from . import psyche
 from .psyche import emotion_policy
-from .psyche.ledger import SaidLedger
+from .psyche.ledger import (CustomerFacts, SaidLedger, clear_input, explicit_bye, firm_no, invented_memory, is_repeat_ask, next_unsaid,
+                            norm as _lnorm, one_word_fragment, pure_farewell, sentences as _lsentences, unsourced_claims, _FORWARD)
 from .psyche.moves import Move, MoveContext, choose_move, repeat_move
 from .psyche.needs import NeedInput, estimate_need
-from .schemas import HumanState, SessionState, TurnInput, TurnResult, Utterance
+from .schemas import ExpressionParams, HumanState, SessionState, TurnInput, TurnPlan, TurnResult, Utterance
 from .state.estimator import HumanStateEstimator
+from .tree import enrich_plan
 from .validator import StreamingValidator
 
 _FILLER_OPEN = re.compile(r"^(aapke sawal ka jawab (yeh |ye )?(hai )?(ki |hai ki )?|आपके सवाल का जवाब (यह |ये )?(है )?(कि )?|"
                           r"आपके सवाल का जवाब देते हुए,? |to answer your question,? |the answer to your question is,? )", re.I)
+_ASKS_HINDI = re.compile(r"(hindi|हिंदी|हिन्दी)\s*(mein|me|में|मे)\b|(hindi|हिंदी)\s+(bol|baat|बोल|बात)|speak (in )?hindi|talk (in )?hindi", re.I)
+_ASKS_ENGLISH = re.compile(r"(english|इंग्लिश|अंग्रेज़ी|अंग्रेजी)\s*(mein|me|में|मे)\s*(baat|bol|बात|बोल|samjha|समझा)|(speak|talk|reply|continue) (in )?english|in english please", re.I)
 _ABOUT_IT = re.compile(r"(karta|karti|kar sakta|kar sakti|sakta|sakti|samajhta|samjhta) (hai|h)\b|करता है|करती है|कर सकता|"
                        r"सकता है|समझता है|\b(does|can|will) (it|claude)\b|support|\b(usse|isse|usme|isme|use|ise)\b|उससे|इससे|इसमें|उसमें", re.IGNORECASE)
 
@@ -58,6 +62,18 @@ _FILLER = {"haan", "han", "ha", "ji", "ok", "okay", "yes", "yeah", "hmm", "hm", 
            "जी", "ओके", "ठीक", "है", "हम्म", "अच्छा", "हेलो", "bolo", "बोलो", "bataiye", "बताइए", "please", "sure", "nahi", "नहीं", "no"}
 
 SentenceSink = Callable[[str], Awaitable[None] | None]
+
+# deterministic "no repeating context" guard (see _facts_guard). Plans that are compliance wording or a safety reply never change.
+_GUARD_KEEP = frozenset({"opening", "language_switch", "opt_out", "opt_out_confirmed", "declined", "callback", "callback_time", "human_agent", "identify",
+                         "are_you_ai", "number_source", "sensitive_stop", "slow_down", "link_cancelled", "confirm_buy", "constraint_stop"})
+_FIRM_END = frozenset({"declined", "opt_out", "opt_out_confirmed", "callback", "human_agent"})  # intents that may end the call by themselves
+_DIDNT = re.compile(r"didn.?t (quite )?(get|catch)|say (that )?(it )?(once more|again)|दोबारा|phir se bol|samajh nahi paya|सुन नहीं पाया|समझ नहीं पाया|"
+                    r"dobara bol|ek baar phir|एक बार फिर|सुनाई नहीं|sunai nahi|ठीक से सुन|theek se sun", re.I)
+_UNKNOWN = re.compile(r"don.?t have (that|any)|won.?t guess|not sure about that|can.?t answer for sure|can.?t say anything sure|that is all i have|"
+                      r"nothing more on that|that is really all|rather not guess|jaankari mere paas nahi|pakka nahi|nahi bata sakta|bas itna hi|"
+                      r"जानकारी मेरे पास नहीं|पक्का नहीं|नहीं बता सकता|बस इतना ही|अंदाज़ा नहीं", re.I)
+_FAREWELL = re.compile(r"धन्यवाद|शुक्रिया|दिन शुभ|thank you|thanks for|have a (nice|good|great) day|take care|goodbye|bye\b|dhanyavaad|din accha|din achha|alvida", re.I)
+_NO_SELL_ROWS = ("sad", "anxious", "angry", "crisis")
 
 
 class ACIEPipeline:
@@ -138,7 +154,7 @@ class ACIEPipeline:
                            turn_index=session.turn_index, frustration=state.frustration, engagement=state.engagement,
                            decided=session.context.decision, has_link=session.context.has("payment_link"),
                            refused=session.context.decision in ("declined", "later"),
-                           hold=session.dialog.get("sad_hold") == "1")
+                           hold=session.dialog.get("sad_hold") == "1", signals=session.dialog)
 
     def _psyche_move(self, turn: TurnInput, session: SessionState, state: HumanState, intent: str, strat,
                      ledger: SaidLedger, lang: str):
@@ -146,7 +162,7 @@ class ACIEPipeline:
         ctx = session.context
         need = estimate_need(NeedInput(text=turn.text, state=state_dims(state), intent=intent,
                                        has_link=ctx.has("payment_link"), decided=ctx.decision,
-                                       turn_index=session.turn_index,
+                                       turn_index=session.turn_index, dialog=session.dialog,
                                        prev_agent=next((u.text for u in reversed(session.history) if u.role == "agent"), "")))
         if need.need == "information" and not strat.continue_business:  # the emotion row outranks plain curiosity
             need.need = {"suspicious": "reassurance", "anxious": "reassurance", "sad": "connection", "busy": "space"}.get(strat.row, "be_heard")
@@ -190,6 +206,161 @@ class ACIEPipeline:
                                        "decision": "psyche_move", "fallback": dict(mv.text), "lead": None, "facts": {},
                                        "objective": mv.note or "Say something new"})
 
+    # ------------------------------------------------------------------ no repeating context (CustomerFacts, deterministic)
+
+    @staticmethod
+    def _plan_text(plan, lang: str) -> str:
+        probe = StreamingValidator(plan, ExpressionParams(language=lang), trusted=True, customer_text="")
+        parts = []
+        if plan.lead:
+            parts.append(plan.lead.get(lang) or plan.lead.get("en") or "")
+        parts.append(plan.fallback.get(lang) or plan.fallback.get("en") or "")
+        return " ".join(probe.fill(x) for x in parts if x)
+
+    @staticmethod
+    def _claim_sources(plan, customer_text: str) -> str:
+        bits = [customer_text, plan.context or "", plan.reference or "", plan.objective or ""]
+        bits += [f.value + " " + (f.description or "") for f in plan.facts.values()]
+        bits += list((plan.lead or {}).values()) + list(plan.fallback.values())
+        return " ".join(bits)
+
+    def reply_issues(self, text: str, ledger: SaidLedger, facts: CustomerFacts, customer_text: str = "", plan=None) -> list[tuple[str, str]]:
+        """What is wrong with a reply, as (code, detail): invented memory, a repeated sentence, a restated caller fact, a re-asked
+        question, an unsourced claim. Empty for a caller who asked us to repeat ('repeat_ask')."""
+        out: list[tuple[str, str]] = []
+        m = invented_memory(text)
+        if m:
+            out.append(("invented_memory", m))
+        if is_repeat_ask(customer_text):
+            return out
+        thr = 0.9 if is_question(customer_text) else 0.6  # a direct question may get the same fact again, reworded
+        for s in _lsentences(text):
+            if len(_lnorm(s).split()) >= 3 and ledger.similar_to(s, thr):
+                out.append(("repeated_sentence", s))
+        if ledger.replies and ledger.reply_repeats(text, 0.85 if is_question(customer_text) else 0.6) and not any(c == "repeated_sentence" for c, _ in out):
+            out.append(("repeated_sentence", text[:80]))
+        out += [("restated_fact", s) for s in facts.restates(text)]
+        out += [("reasked_question", t) for t in facts.reasks(text)]
+        if plan is not None:
+            out += [("unsourced_claim", c) for c in unsourced_claims(text, self._claim_sources(plan, customer_text))]
+        return out
+
+    def _new_point(self, session: SessionState, ledger: SaidLedger, facts: CustomerFacts, lang_text: str, intent: str,
+                   hold: bool) -> tuple[dict[str, str], str | None]:
+        """The next thing not yet said, in all three languages: (text per lang, slot in the call's language)."""
+        p = getattr(self.decision.domain, "p", None)
+        sell_ok = intent in ("confirm_close", "price", "reoffer", "pitch", "price_floor") and not (ledger.refused or hold)
+        link_ok = intent == "confirm_close" and sell_ok
+        text, slot = {}, None
+        cur = session.dialog.get("_lang") or "en"
+        for lang in ("en", "hi", "hinglish"):
+            sl, line = next_unsaid(None if (hold or ledger.refused or link_ok) else p, lang, ledger, facts, lang_text, allow_sell=sell_ok, allow_link=link_ok)
+            if not (hold or ledger.refused or link_ok):
+                q = facts.next_discovery(p, lang)  # the NEXT unanswered level of the discovery ladder, never one already answered
+                if q and not ledger.repeats(q) and not ledger.reply_repeats(q):
+                    if sl is None:
+                        line = q
+                    elif facts.just_answered:  # they just answered a level: a new point, then the next level down
+                        line = f"{line} {q}"
+            text[lang] = line
+            if lang == cur:
+                slot = sl
+        return text, slot
+
+    def _facts_guard(self, plan, expr, session: SessionState, ledger: SaidLedger, facts: CustomerFacts, state, text: str):
+        """_facts_guard_core, then the same filler is never used twice: a used leading filler becomes the next unused synonym."""
+        plan = self._facts_guard_core(plan, expr, session, ledger, facts, state, text)
+        if os.getenv("ACIE_FACTS_GUARD", "1") == "0" or getattr(self.decision.domain, "name", "") != "product_sales" or plan.intent in _GUARD_KEEP \
+                or plan.intent.startswith(("safety", "distress", "concern")) or explicit_bye(text) or not (not plan.llm_allowed or isinstance(self.backend, TemplateBackend)):
+            return plan
+        lang = expr.language
+        cand = self._plan_text(plan, lang)
+        new = facts.rotate_opener(cand, lang) if cand else cand
+        if new and new != cand:
+            return plan.model_copy(update={"lead": None, "facts": {}, "llm_allowed": False, "fallback": {**plan.fallback, lang: new}})
+        return plan
+
+    def _facts_guard_core(self, plan, expr, session: SessionState, ledger: SaidLedger, facts: CustomerFacts, state, text: str):
+        """Final deterministic gate on a plan whose words are fixed (no LLM, or the offline template backend): never repeat a sentence we
+        said, never say the caller's own facts back, never re-ask what was answered, never "I didn't catch that" for clear words, never
+        invented CRM memory. Repeated/restated parts are dropped; if nothing new is left, the next unsaid benefit/fact (or a short new
+        forward step) is said instead. 'repeat_ask' (the caller asked us to repeat) is exempt. ACIE_FACTS_GUARD=0 turns it off."""
+        dom = self.decision.domain
+        if os.getenv("ACIE_FACTS_GUARD", "1") == "0" or getattr(dom, "name", "") != "product_sales":
+            return plan
+        if plan.intent in _GUARD_KEEP or plan.intent.startswith(("safety", "distress", "concern")) or plan.reference \
+                or (plan.decision or "").startswith(("garbled input", "audio check", "negotiation")) \
+                or plan.intent in ("confirm_close", "price_floor"):  # the negotiation, floor and confirmation lines carry the price on purpose
+            return plan  # (a garbled-line "say it again" and the audio answer are the point of the turn, never rewritten)
+        if not (not plan.llm_allowed or isinstance(self.backend, TemplateBackend)):
+            return plan
+        if explicit_bye(text):
+            return plan  # their goodbye / opt-out: the closing words are required, never rewritten
+        lang = expr.language
+        cand = self._plan_text(plan, lang)
+        if not cand.strip():
+            return plan
+        hold = session.dialog.get("sad_hold") == "1" or session.dialog.get("_row") in _NO_SELL_ROWS
+        issues = self.reply_issues(cand, ledger, facts, text, plan)
+        codes = {c for c, _ in issues}
+        clear = clear_input(text)
+        generic_didnt = bool(_DIDNT.search(cand)) and clear and not is_repeat_ask(text)
+        unknown = bool(_UNKNOWN.search(cand))
+        asks_more = bool(re.search(r"what (will|do|can) i get|what.?s (in|inside|included)|what does it (do|include|give)|kya milega|kya milta|क्या मिलेगा|क्या मिलता|"
+                                   r"benefits?|features?|\baur\b|और (कुछ|क्या)|anything else|what else|kuch aur|कुछ और|\bmore\b|kya kya|क्या क्या|tell me about", text, re.I))
+        unknown_swap = unknown and not is_repeat_ask(text) and (asks_more or (clear and not is_question(text)))
+        if not (codes or generic_didnt or unknown_swap):
+            return plan
+        keep: list[str] = []
+        if codes and not (generic_didnt or unknown_swap) and codes <= {"repeated_sentence", "restated_fact", "reasked_question"} and plan.intent not in ("link_sent",):
+            bad = {s for c, s in issues if c in ("repeated_sentence", "restated_fact")}
+            keep = [s for s in _lsentences(cand) if s not in bad and not (s.rstrip().endswith("?") and "reasked_question" in codes and facts.reasks(s))]
+            if any(not s.rstrip().endswith("?") for s in keep):
+                session.dialog["_facts_guard"] = str(int(session.dialog.get("_facts_guard", "0")) + 1)
+                facts.guards["trimmed"] = facts.guards.get("trimmed", 0) + 1
+                return plan.model_copy(update={"decision": "facts_guard:trim", "llm_allowed": False, "lead": None, "facts": {},
+                                               "fallback": {l: " ".join(keep) for l in ("en", "hi", "hinglish")}})
+        why = "didnt_catch" if generic_didnt else ("unknown" if unknown_swap else "+".join(sorted(codes)))
+        texts, slot = self._new_point(session, ledger, facts, text, plan.intent, hold)
+        facts.guards["forward"] = facts.guards.get("forward", 0) + (1 if slot is None else 0)
+        session.dialog["_facts_guard"] = str(int(session.dialog.get("_facts_guard", "0")) + 1)
+        session.dialog["_cf_slot"] = slot or ""
+        keep_end = plan.end_call and plan.intent in _FIRM_END
+        return plan.model_copy(update={"intent": "answer" if plan.intent in ("not_understood", "clarify", "small_talk", "off_topic", "answer") else plan.intent,
+                                       "llm_allowed": False, "end_call": keep_end, "decision": f"facts_guard:{why}", "fallback": texts,
+                                       "lead": None, "facts": {}, "objective": "Say the next thing not said yet"})
+
+    def _fragment_plan(self, session: SessionState, expr, ledger: SaidLedger) -> TurnPlan:
+        """A one-word fragment ("मुझे", "mujhe", "main"): the caller is about to say it. A short 'ji, bataiye', no answer, no price."""
+        n = ledger.count_move("fragment")
+        ledger.add_move("fragment")
+        lines = {"en": ("Yes, please go on.", "Go ahead, I'm listening."), "hi": ("जी, बताइए।", "जी, बोलिए।"),
+                 "hinglish": ("Ji, bataiye.", "Ji, boliye.")}
+        return TurnPlan(intent="acknowledge", objective="Invite the caller to finish", llm_allowed=False, decision="fragment",
+                        fallback={l: v[n % 2] for l, v in lines.items()})
+
+    def _keep_call_open(self, plan, expr, session: SessionState, ledger: SaidLedger, facts: CustomerFacts, text: str):
+        """The call ends only on an explicit bye / opt-out / firm no (and the crisis and handoff plans). A link that was just sent, or a
+        caller still mid-explanation, never ends it; the farewell text is replaced by something that continues the conversation."""
+        if not plan.end_call and plan.intent == "link_sent" and pure_farewell(text) and os.getenv("ACIE_KEEP_OPEN", "1") != "0":
+            return plan.model_copy(update={"end_call": True})  # "thanks, bye" right after the link: they are done
+        if not plan.end_call or os.getenv("ACIE_KEEP_OPEN", "1") == "0" or getattr(self.decision.domain, "name", "") != "product_sales":
+            return plan
+        if plan.intent in ("opt_out", "opt_out_confirmed", "human_agent", "constraint_stop") or plan.intent.startswith(("safety", "distress")) or explicit_bye(text) \
+                or (plan.intent in _FIRM_END and plan.decision != "psyche_move" and (plan.intent != "declined" or firm_no(text))) \
+                or (plan.intent in _FIRM_END and (firm_no(text) or re.search(r"call|कॉल|फ़ोन|फोन|phone|बाद|later|कल|शाम|evening|tomorrow|baad|kal|subah|सुबह|morning", text, re.I))):
+            return plan
+        lang = expr.language
+        cur = self._plan_text(plan, lang)
+        upd: dict = {"end_call": False}
+        if _FAREWELL.search(cur) or plan.intent in ("goodbye", "link_sent"):
+            hold = session.dialog.get("sad_hold") == "1" or plan.intent == "declined" or ledger.refused
+            texts = self._new_point(session, ledger, facts, text, "answer", hold)[0]
+            upd.update({"intent": "answer" if plan.intent == "goodbye" else plan.intent, "llm_allowed": False, "lead": None, "facts": {},
+                        "fallback": texts, "decision": "keep_call_open"})
+        session.dialog["_kept_open"] = str(int(session.dialog.get("_kept_open", "0")) + 1)
+        return plan.model_copy(update=upd)
+
     # ------------------------------------------------------------------ what the caller already told us (never re-ask it)
 
     @staticmethod
@@ -225,7 +396,7 @@ class ACIEPipeline:
             keep.append(sent)
         return keep or reply
 
-    def _learn_said(self, ledger: SaidLedger, session: SessionState, plan, move, text: str) -> None:
+    def _learn_said(self, ledger: SaidLedger, session: SessionState, plan, move, text: str, facts: CustomerFacts | None = None) -> None:
         self._note_asked(session, text)
         ledger.add_text(text)
         ledger.add_intent(plan.intent)
@@ -240,13 +411,19 @@ class ACIEPipeline:
                     ledger.offers += 1
         if plan.intent in ("declined", "callback"):
             ledger.refused = True
+        if facts is not None:
+            slots = [x for x in (session.dialog.pop("_cf_slot", ""),) + tuple(i for i in ledger.slots[-3:] if i.startswith(("benefit_", "offer", "faq_", "what"))) if x]
+            facts.learn_agent(text, slots)
+            facts.save(session.dialog)
         ledger.save(session.dialog)
 
     async def _regenerate(self, plan, expr, session, text: str, note: str) -> list[str] | None:
         """One more generation with a correction note; None if it also fails validation."""
         retry = self.compiler.compile(plan, expr, session, text)
         retry.messages[-1]["content"] += "\n\n" + note
-        v2 = StreamingValidator(plan, expr, trusted=False, customer_text=text)
+        led = SaidLedger.load(session.dialog)
+        v2 = StreamingValidator(plan, expr, trusted=False, customer_text=text,
+                                known=(led, CustomerFacts.load(session.dialog)) if led.replies and not is_repeat_ask(text) else None)
         out: list[str] = []
         try:
             async for delta in self.backend.stream(retry, plan, expr):
@@ -280,6 +457,8 @@ class ACIEPipeline:
         if "language" in explicit and _ABOUT_IT.search(turn.text):
             # "Hindi mein bhi baat karta hai kya?" asks what the PRODUCT can do, not to switch language
             explicit.pop("language")
+        if explicit.get("language") == "en" and _ASKS_HINDI.search(turn.text) and not _ASKS_ENGLISH.search(turn.text):
+            explicit["language"] = "hi"  # "Hindi mein baat karo please, English mushkil lagti hai": the request is Hindi
         prev_expr = session.expression if session.turn_index > 0 else None
         expr = self.policy.decide(turn.text, state, profile, session, explicit, intent)
         # the emotion table (acie/psyche/emotion_policy.py): one deterministic row per turn from the 14 state dims.
@@ -291,12 +470,15 @@ class ACIEPipeline:
         flagged = bool(session.dialog.get("safety_flag")) or bool(nlu_crisis) or d_score >= DISTRESS_T
         if d_ev or nlu_crisis:
             session.dialog["_distress"] = json.dumps({"score": round(d_score, 2), "evidence": d_ev[:4], "nlu": nlu_crisis})
-        strat = emotion_policy.decide(state, turn.text, turn.voice, flagged=flagged)
+        strat = emotion_policy.decide(state, turn.text, turn.voice, flagged=flagged, signals=session.dialog)
         session.dialog["_row"] = strat.row  # the domain reads it (a sad caller pauses the selling in both configs)
         if psyche.enabled() and strat.row != "crisis":
             expr = emotion_policy.apply_to_expression(expr, strat)
         mark("adapt")
         ledger = SaidLedger.load(session.dialog)
+        facts = CustomerFacts.load(session.dialog)
+        facts.use_ladder(getattr(self.decision.domain, "p", None))
+        facts.learn_caller(turn.text, asked_goal=session.dialog.get("need_asked") == "1")
         self._track_need(session, turn.text)
         move = None
 
@@ -331,8 +513,15 @@ class ACIEPipeline:
                         if inspect.isawaitable(r):
                             await r
                 dom.interim = interim
-            plan = await self.decision.decide(intent, turn, session)
-            plan = self._no_repeat(plan, expr, session, ledger, state, intent)
+            if os.getenv("ACIE_FRAGMENT_GUARD", "1") != "0" and one_word_fragment(turn.text) and getattr(dom, "name", "") == "product_sales" \
+                    and session.turn_index > 0:
+                plan = self._fragment_plan(session, expr, ledger)  # "मुझे" / "mujhe": they are about to say it; no answer, no price
+            else:
+                plan = await self.decision.decide(intent, turn, session)
+                plan = enrich_plan(plan, session, None, turn.text, getattr(self.decision.domain, "p", None))  # knowledge base + tree (ACIE_KB=1), else a no-op
+                plan = self._no_repeat(plan, expr, session, ledger, state, intent)
+                plan = self._facts_guard(plan, expr, session, ledger, facts, state, turn.text)
+                plan = self._keep_call_open(plan, expr, session, ledger, facts, turn.text)
         mark("decide")
         # whole-call memory: what was promised / quoted / asked survives beyond the prompt window
         session.context.record_turn(session.turn_index, turn.text, plan.intent, is_question(turn.text),
@@ -342,7 +531,9 @@ class ACIEPipeline:
         if os.getenv("ACIE_MEMORY") == "1":  # semantic memory + profile reach the prompt only when memory is on
             extra = {"profile": profile, "memories": json.loads(session.dialog.get("_memories", "[]"))}
         prompt = self.compiler.compile(plan, expr, session, turn.text, **extra)
-        validator = StreamingValidator(plan, expr, trusted=not plan.llm_allowed, customer_text=turn.text)
+        known = (ledger, facts) if (plan.llm_allowed and not is_repeat_ask(turn.text) and ledger.replies
+                                    and os.getenv("ACIE_FACTS_GUARD", "1") != "0") else None
+        validator = StreamingValidator(plan, expr, trusted=not plan.llm_allowed, customer_text=turn.text, known=known)
         sentences: list[str] = []
 
         spoken_parts: list[str] = []  # every sentence already spoken this turn (lead, interim, reply)
@@ -469,8 +660,32 @@ class ACIEPipeline:
                 if kept != reply:
                     validator.add_issue("dropped a question the call already asked or answered", "question_repeated")
                     reply = kept
+            if plan.llm_allowed and reply and os.getenv("ACIE_FACTS_GUARD", "1") != "0" and getattr(self.decision.domain, "name", "") == "product_sales":
+                # the model's reply, or the safe template that replaces it, still repeats / restates / re-asks: regenerate once with the
+                # known-block note, then the next unsaid point as a deterministic template (never the same words twice)
+                spoken = validator.fill(render_fallback(plan, expr)) if validator.used_fallback else " ".join(reply)
+                bad = self.reply_issues(spoken, ledger, facts, turn.text, None if validator.used_fallback else plan)
+                if bad and not validator.used_fallback:
+                    kinds = ", ".join(sorted({c for c, _ in bad}))
+                    again = await self._regenerate(plan, expr, session, turn.text,
+                                                   f"Your reply was rejected ({kinds}). It repeated something already said, said back what the caller told you, "
+                                                   "or asked what they already answered. Say something NEW and relevant, in different words.")
+                    if again and not self.reply_issues(" ".join(again), ledger, facts, turn.text, plan):
+                        validator.add_issue(f"regenerated after: {kinds}", "regenerated")
+                        reply, bad = again, []
+                if bad:
+                    validator.add_issue("replaced a repeating reply with the next new point", "repeat_replaced")
+                    hold = session.dialog.get("sad_hold") == "1" or session.dialog.get("_row") in _NO_SELL_ROWS
+                    texts, slot = self._new_point(session, ledger, facts, turn.text, plan.intent, hold)
+                    session.dialog["_cf_slot"] = slot or ""
+                    reply = [texts.get(expr.language) or texts["en"]]
+                    validator.used_fallback = False
+                    plan = plan.model_copy(update={"fallback": texts, "lead": None, "facts": {}})
             # any problem anywhere in the reply -> speak only the safe template
-            await emit([validator.fill(render_fallback(plan, expr))] if validator.used_fallback else reply)
+            out_reply = [validator.fill(render_fallback(plan, expr))] if validator.used_fallback else reply
+            if out_reply and plan.llm_allowed and getattr(self.decision.domain, "name", "") == "product_sales" and not explicit_bye(turn.text):
+                out_reply = [facts.rotate_opener(out_reply[0], expr.language)] + out_reply[1:]
+            await emit(out_reply)
         else:
             await emit(tail)
         mark("total")
@@ -479,7 +694,7 @@ class ACIEPipeline:
         if plan.llm_allowed and (plan.intent == "answer" and plan.lead or "offer" in plan.facts and plan.facts["offer"].value in text) \
                 and "offer_price" not in session.context.quoted:
             session.context.quoted.append("offer_price")  # the price was told inside an answer: don't offer it again
-        self._learn_said(ledger, session, plan, move, text)
+        self._learn_said(ledger, session, plan, move, text, facts)
         session.history += [Utterance(role="customer", text=turn.text), Utterance(role="agent", text=text)]
         session.state, session.expression = state, expr
         if turn.prosody is not None:  # this turn becomes part of the caller's voice baseline

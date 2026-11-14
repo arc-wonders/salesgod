@@ -44,13 +44,16 @@ _TRIAL = re.compile(r"free trial|trial|ट्रायल|demo|try (it )?(first|
 _COUNTER = re.compile(r"(?:₹|rs\.?|rupees?)\s*\d[\d,]{2,}|\b\d[\d,]{2,}\s*(?:pe|par|tak|mein|me|में)\s*(?:ho|chalega|done|final|kar|de)|\b\d[\d,]{2,}\s*(?:rupe\w*|rs)\b|\d[\d,]*\s*(rupe\w*|rs\.?|₹|dollars?|\$|bucks)?\s*(kam|कम|off|less|discount)\b|"
                       r"(₹|rs\.?|\$)\s*\d[\d,]*\s*(mein|me|में|for|tak|तक)?\s*(do|de|dedo|दो|दे|chahiye|चाहिए)?|\d[\d,]*\s*(rupe\w*|rs|₹|dollars?)?\s*(mein|me|में|for|tak|तक)\s*(do|de|dedo|दो|दे|chahiye|चाहिए|milega|मिलेगा|ho jayega|हो जाएगा)|"
                       r"(give|do|de|दो|दे)\s*(it|me)?\s*(for|at|in)?\s*(₹|rs\.?|\$)?\s*\d[\d,]*", _I)
+_COUNTER_MORE = re.compile(r"\b(?:for|at|around|about|to|in)\s*(?:₹|rs\.?|rupees?|\$)?\s*\d[\d,]{2,}\b|\b(?:want|need|make|give|take|do)\b.{0,18}\b\d[\d,]{2,}\b|"
+                          r"\b\d[\d,]{2,}\s*(?:max|only|hi|bas|tak|se zyada nahi)\b", _I)
 _COMP_NAME = re.compile(r"cult|gold.?s|anytime fitness|competitor|chatgpt|gpt|gemini|copilot|other (gym|app|plan)|dusr[ae] (gym|app|jagah)|doosre|दूसरे|कहीं और|kahin aur|elsewhere|वहाँ|wahan", _I)
 _COMP_PRICE = re.compile(r"cheap|sasta|सस्ता|सस्ती|price|dollar|\$|₹|rupe|रुपये|\b\d{3,5}\b|kitna|कितना|cost|monthly|मंथली|महंगा|mehenga|expensive|same|20|free hai|फ्री है", _I)
 _BUDGET = re.compile(r"budget|afford|bajet|बजट|tight|tangi|तंगी|paise (kam|nahi|nhi)|पैसे (कम|नहीं)|expensive for me|mere liye (mehenga|महंगा)|मेरे लिए (महंगा|ज़्यादा|ज्यादा)", _I)
 _VALUE = re.compile(r"worth|value for money|paisa vasool|पैसा वसूल|itna (paisa|mehenga|महंगा)|इतना (पैसा|महंगा)|mehenga|mehnga|महंगा|expensive|too much|"
                     r"zyada hai|jyada hai|ज़्यादा है|ज्यादा है|costly|pricey|over ?priced", _I)
-_HAGGLE = re.compile(honest.NEGOTIATE.pattern + "|" + NEGOTIATE_MORE + r"|still (too )?(high|much|expensive)|(ab|abhi|phir|fir) bhi (mehenga|zyada|jyada|kam)|aur kam|और कम|bargain|negotiat|best price|final price|last price|aakhri (rate|price)|आखिरी (रेट|प्राइस)|thoda (aur )?(kam|sasta)", _I)
+_HAGGLE = re.compile(honest.NEGOTIATE.pattern + "|" + NEGOTIATE_MORE + r"|still (too )?(high|much|expensive)|(ab|abhi|phir|fir) bhi (mehenga|zyada|jyada|kam)|aur kam|और कम|bargain|negotiat|how much (lower|less|cheaper)|(price|rate|keemat|कीमत) (lower|kam|कम)|more lower|\\blower\\b.{0,12}\\b(price|rate)\\b|(any|more|further|extra|koi|aur) (more |further |extra )?(discount|छूट|डिस्काउंट)|(give|do|de|dedo) (me )?(a |the |some )?(discount|छूट|डिस्काउंट)|best price|final price|last price|aakhri (rate|price)|आखिरी (रेट|प्राइस)|thoda (aur )?(kam|sasta)", _I)
 _NUM = re.compile(r"\d[\d,]*")
+_NOT_A_PRICE = re.compile(r"\b(?:days?|din|months?|mahine|weeks?|hafte|sessions?|minutes?|baje|bje|o.?clock|am|pm)\b", _I)
 
 
 def detect(text: str) -> str | None:
@@ -59,6 +62,8 @@ def detect(text: str) -> str | None:
     for name, rx in (("discount_group", _GROUP), ("free_trial", _TRIAL), ("counter_offer", _COUNTER)):
         if rx.search(t):
             return name
+    if _COUNTER_MORE.search(t) and not _NOT_A_PRICE.search(t):
+        return "counter_offer"
     if _COMP_NAME.search(t) and _COMP_PRICE.search(t):
         return "competitor"
     for name, rx in (("budget", _BUDGET), ("value_doubt", _VALUE), ("haggle", _HAGGLE)):
@@ -68,8 +73,10 @@ def detect(text: str) -> str | None:
 
 
 def counter_number(text: str) -> int | None:
-    m = _NUM.search(text.replace(",", ""))
-    return int(m.group(0)) if m else None
+    """The amount the caller names: the last number of 3+ digits ("not sold at 2,999, I want 2,500" -> 2500), else the last number."""
+    nums = [int(x) for x in re.findall(r"\d+", text.replace(",", ""))]
+    big = [x for x in nums if x >= 100]
+    return (big or nums or [None])[-1]
 
 
 @dataclass
@@ -85,6 +92,10 @@ class NegState:
     ladder_i: int = 0                                 # next economics.ladder step to offer
     price: float = 0.0                                # the price currently on the table (0 = list)
     final_said: bool = False                          # the final price was stated (once)
+    used: list[str] = field(default_factory=list)     # phrase variants already said ("bank:index"): no sentence repeats
+    perks: list[str] = field(default_factory=list)    # ladder perks already offered
+    ask_i: int = -1                                   # the closing-ask form used last (never the same twice in a row)
+    sweet: bool = False                               # the last perk-only sweetener at the floor was given
 
     @classmethod
     def load(cls, dialog: dict) -> "NegState":
@@ -140,6 +151,18 @@ CLOSE_WARM = [
        "ठीक है, आप आराम से सोचिए; कोई सवाल हो तो मैं यहीं हूँ।",
        "Theek hai, aap aaram se sochiye; koi sawal ho to main yahin hoon."),
 ]
+CLOSED_AGAIN = [  # after the warm goodbye was said, a caller who keeps pushing hears something new each time, never a push
+    CLOSE_WARM[1],
+    _t("I hear you. The price stays where we agreed, and the link is ready whenever you want it.",
+       "मैं समझता हूँ। कीमत वही रहेगी जो तय हुई, और लिंक जब चाहें तब तैयार है।",
+       "Main samajhta hoon. Keemat wahi rahegi jo tay hui, aur link jab chahein tab ready hai."),
+    _t("No hurry at all; if you like, I can also call you back at a time that suits you.",
+       "कोई जल्दी नहीं है; चाहें तो मैं आपके सुविधा वाले समय पर वापस कॉल कर सकता हूँ।",
+       "Koi jaldi nahi hai; chahein to main aapke suvidha wale time par wapas call kar sakta hoon."),
+    _t("Thank you for hearing me out; whatever you decide, it was good talking to you.",
+       "मेरी बात सुनने के लिए शुक्रिया; आप जो भी तय करें, आपसे बात करके अच्छा लगा।",
+       "Meri baat sunne ke liye shukriya; aap jo bhi tay karein, aapse baat karke achha laga."),
+]
 NO_GROUP = _t("There is no student, friend or group discount in this offer, and I can't make one up.",
               "इस ऑफर में स्टूडेंट, दोस्त या ग्रुप डिस्काउंट नहीं है, और मैं अपनी तरफ़ से कोई बना नहीं सकता।",
               "Is offer mein student, friend ya group discount nahi hai, aur main apni taraf se koi bana nahi sakta.")
@@ -188,64 +211,156 @@ def _fmt(p, n: float) -> str:
     return f"{cur}{int(round(n)):,}"
 
 
-def _ladder_reply(p, kind: str, text: str, st: NegState, need_known: str) -> NegReply | None:
-    """Close-in-profit bargaining (economics in the product config): anchor at list, reframe value on the first push, then concede
-    one ladder step per push (value perks before cash, shrinking price steps), accept a counter at or above the profit floor at once,
-    meet a counter below the floor with a perk or the next step, state the final price once, then walk away warmly. Every price
-    on the table is at or above the profit floor; every concession is followed by one closing ask and tied to a commitment."""
+# ---------------------------------------------------------------- close-in-profit bargaining banks (fixed text, three languages)
+# Every bank is a list of variants; NegState.used remembers which were said, so no round repeats a line.
+OPENERS = [
+    _t("Fair enough.", "ठीक है।", "Theek hai."),
+    _t("I understand.", "मैं समझता हूँ।", "Main samajhta hoon."),
+    _t("Okay, let me see what I can do.", "अच्छा, देखता हूँ मैं क्या कर सकता हूँ।", "Achha, dekhta hoon main kya kar sakta hoon."),
+    _t("Alright.", "चलिए।", "Chaliye."),
+]
+FIRST_NUMBER = _t("What number did you have in mind?", "आप बताइए, आपके मन में कितना है?", "Aap batao, aapke mann mein kitna hai?")
+PERK_LEADS = [
+    _t("Let me add something instead of cutting the price: one thing free.", "कीमत घटाने की जगह एक चीज़ फ्री कर देता हूँ।", "Keemat ghatane ki jagah ek cheez free kar deta hoon."),
+    _t("How about this: a bit more value rather than a lower number.", "एक काम करता हूँ: कम कीमत की जगह थोड़ा और वैल्यू जोड़ देता हूँ।", "Ek kaam karta hoon: kam keemat ki jagah thoda aur value jod deta hoon."),
+    _t("Here's one more thing from my side.", "लीजिए, एक चीज़ और मेरी तरफ़ से।", "Ye lijiye, ek cheez aur meri taraf se."),
+]
+PRICE_LINES = [  # a price concession, each tied to a commitment (never a deadline or scarcity); {p} = the price
+    ("I can do {p} for you, if we finalise it now.", "मैं आपके लिए {p} कर सकता हूँ, अगर अभी तय हो जाए।", "Aapke liye main {p} kar sakta hoon, agar abhi tay ho jaye."),
+    ("It has been nice talking to you, so I'll come down to {p} if you're ready to join now.", "आपसे बात करके अच्छा लगा, इसलिए अगर आप अभी जुड़ने को तैयार हैं तो {p} कर देता हूँ।",
+     "Aapse baat karke achha laga, isliye agar aap abhi judne ko taiyaar hain to {p} kar deta hoon."),
+    ("Let me stretch a little more: {p}, if you'll go ahead today.", "थोड़ा और खींचता हूँ: {p}, अगर आप आज आगे बढ़ें।", "Thoda aur kheenchta hoon: {p}, agar aap aaj aage badhein."),
+    ("One more small step down to {p}, on the promise that we close it now.", "एक छोटा क़दम और, {p}, इस वादे पर कि अभी बात पक्की करें।", "Ek chhota kadam aur, {p}, is vaade par ki abhi baat pakki karein."),
+]
+MIDDLE_LINE = ("Let's meet in the middle: {p}, if you'll join now.", "चलिए बीच का करते हैं: {p}, अगर आप अभी जुड़ें।", "Chaliye beech ka karte hain: {p}, agar aap abhi judein.")
+FINAL_LINE = ("{p} is my final price, I can't go below it; it is a fair one and I'd be glad to have you.",
+              "{p} मेरी आख़िरी कीमत है, इससे नीचे नहीं जा सकता; ये ठीक कीमत है और आपका स्वागत है।",
+              "{p} meri aakhri keemat hai, isse neeche nahi ja sakta; ye theek keemat hai aur aapka swagat hai.")
+ACCEPT_LINES = [
+    ("Done, {p} it is, that works for me.", "ठीक है, {p} पक्का, ये मेरे लिए चलेगा।", "Done, {p} pakka, ye mere liye chalega."),
+    ("Deal, {p} works for me.", "चलिए, {p} में बात पक्की।", "Chaliye, {p} mein baat pakki."),
+    ("Alright, {p} it is.", "ठीक है, {p} कर देता हूँ।", "Theek hai, {p} kar deta hoon."),
+]
+ASKS = [  # closing-ask forms; never the same twice in a row
+    ("Shall I lock {p} and send the link?", "क्या मैं {p} पक्का कर दूँ और लिंक भेज दूँ?", "Kya main {p} pakka kar doon aur link bhej doon?"),
+    ("Should I send you the joining link at {p}?", "तो {p} पर जॉइनिंग लिंक भेज दूँ?", "To {p} par joining link bhej doon?"),
+    ("Is {p} a deal, then?", "तो {p} में बात पक्की?", "To {p} mein baat pakki?"),
+    ("Want me to SMS the link for {p} now?", "{p} का लिंक अभी SMS कर दूँ?", "{p} ka link abhi SMS kar doon?"),
+]
+LOWEST_LINE = ("{p} is already the lowest I can go.", "{p} मेरी सबसे कम कीमत है।", "{p} meri sabse kam keemat hai.")
+SWEET_LEAD = _t("The price can't move any further, but here is something that may help.", "कीमत इससे आगे नहीं हिल सकती, पर एक चीज़ शायद काम आए।",
+                "Keemat isse aage nahi hil sakti, par ek cheez shayad kaam aaye.")
+SWEET_ORDER = ("referral", "cheaper_plan", "trial_pass", "annual_saving")
+
+
+def _fill(row, p, price: float) -> dict[str, str]:
+    return {l: row[i].format(p=_fmt(p, price)) for i, l in enumerate(LANGS)}
+
+
+def _pick(st: NegState, key: str, n: int) -> int:
+    """The first variant of this bank not yet said on the call; once all were, the least repeated (round robin)."""
+    seen = [u for u in st.used if u.startswith(key + ":")]
+    for i in range(n):
+        if f"{key}:{i}" not in seen:
+            st.used.append(f"{key}:{i}")
+            return i
+    i = len(seen) % n
+    st.used.append(f"{key}:{i}")
+    return i
+
+
+def _ask(p, st: NegState, price: float) -> dict[str, str]:
+    st.ask_i = (st.ask_i + 1) % len(ASKS)
+    return _fill(ASKS[st.ask_i], p, price)
+
+
+def _round50(x: float) -> int:
+    return int(round(x / 50.0)) * 50
+
+
+def _perk_cost(eco, ids) -> float:
+    return sum(x.cost for x in eco.ladder if x.kind == "perk" and x.id in ids)
+
+
+def effective_floor(eco, st: NegState) -> float:
+    """The profit floor plus what the perks already promised cost us: a sale with a perk must still clear the margin."""
+    return eco.profit_floor + _perk_cost(eco, st.perks)
+
+
+def _remaining(eco, st: NegState, cur: float, floor: float):
+    # at most ONE perk per sale (a second perk would be stacking); cost counts against the margin through effective_floor()
+    perks = [x for x in eco.ladder if x.kind == "perk" and len(st.perks) < eco.max_perks and x.id not in st.perks and all(x.text.get(l) for l in LANGS)
+             and cur >= eco.profit_floor + x.cost]
+    prices = sorted((x for x in eco.ladder if x.kind == "price" and floor <= x.price < cur), key=lambda x: -x.price)
+    return perks, prices
+
+
+def _ladder_reply(p, kind: str, text: str, st: NegState, need_known: str, committed: bool = False) -> NegReply | None:
+    """Close-in-profit bargaining (economics in the product config): anchor at list, reframe value on the first push and let them name
+    their number, then concede one ladder step per push (value perks before cash, shrinking price steps, friendly rounding), accept a
+    counter at or above the profit floor at once, meet a counter below the current price halfway (never below the floor), tie every price
+    to a commitment (no deadline, no scarcity), state the final price once, give one last honest sweetener, then walk away warmly.
+    Every price on the table is at or above the profit floor; every line is picked so no sentence repeats on the call."""
     eco = p.economics
-    floor = eco.profit_floor
     st = NegState(**asdict(st))
+    floor = effective_floor(eco, st)
     cur = st.price or eco.list_price
-    steps = [x for x in eco.ladder if not (x.kind == "price" and (x.price < floor or x.price >= cur))]
-    ask = lambda price: _t(f"Shall I lock {_fmt(p, price)} for you and send the link?", f"क्या मैं {_fmt(p, price)} पक्का कर दूँ और लिंक भेज दूँ?",
-                           f"Kya main {_fmt(p, price)} pakka kar doon aur link bhej doon?")
     st.pushes += 1
-    parts = {l: ACK.get(kind, ACK["haggle"])[l] for l in LANGS}
-    def say(*banks):
-        return {l: _join(*(b[l] for b in banks)) for l in LANGS}
-    # a counter-offer at or above the floor: accepted at once
+    say = lambda *banks: {l: _join(*(b[l] for b in banks)) for l in LANGS}
+    lead = ACK.get(kind, ACK["haggle"]) if st.pushes == 1 else OPENERS[_pick(st, "open", len(OPENERS))]
+    n = None
     target = None
     if kind == "counter_offer":
         n = counter_number(text)
         if n is not None:
             target = float(max(0, cur - n)) if re.search(r"kam|कम|off|less", text, _I) and n < cur else float(n)
-    if target is not None and target >= floor:
+    if target is not None and target >= floor:  # at or above the floor: accepted at once, even on the very first push
         price = min(target, cur)
         st.price, st.final_said = price, True
-        return NegReply("negotiation", say(_t(f"Done, {_fmt(p, price)} it is, that works for me.", f"ठीक है, {_fmt(p, price)} पक्का, ये मेरे लिए चलेगा।",
-                                              f"Done, {_fmt(p, price)} pakka, ye mere liye chalega."), ask(price)), st, offer={"price": price}, note="Accepted at once; one closing ask.")
+        a = _fill(ACCEPT_LINES[_pick(st, "accept", len(ACCEPT_LINES))], p, price)
+        return NegReply("negotiation", say(a, _ask(p, st, price)), st, offer={"price": price}, note="Accepted at once; one closing ask.")
     if st.closed:
-        return NegReply("negotiation", CLOSE_WARM[1], st)
-    if st.pushes == 1 and target is None:  # anchor at list: value first, no concession yet
-        b = {l: _benefit(p, l) for l in LANGS}
-        bank = lang_bank_value(b, need_known)
-        return NegReply("negotiation", say(ACK.get(kind, ACK["haggle"]), bank, _t(f"Would {_fmt(p, cur)} work for you if I add that, or what number do you have in mind?",
-                        f"अगर मैं ये जोड़ दूँ तो क्या {_fmt(p, cur)} ठीक रहेगा, या आपके मन में कितना है?", f"Agar main ye jod doon to kya {_fmt(p, cur)} theek rahega, ya aapke mann mein kitna hai?")), st,
-                        note="Anchor at list; let them name a number; no concession yet.")
-    if st.ladder_i < len(steps):
-        stp = steps[st.ladder_i]
-        st.ladder_i += 1
-        if stp.kind == "perk":
-            line = {l: stp.text.get(l, "") for l in LANGS}
-            if all(line.values()):
-                return NegReply("negotiation", say(_t("Let me add something instead of cutting the price.", "कीमत घटाने की जगह मैं कुछ जोड़ देता हूँ।", "Keemat ghatane ki jagah main kuch jod deta hoon."),
-                                                  line, ask(cur)), st, offer={"price": cur, "perk": stp.id}, note="A perk instead of a price cut, then a closing ask.")
-        else:
-            st.price = stp.price
-            last = st.ladder_i >= len(steps)
-            lines = _t(f"For you I can do {_fmt(p, stp.price)}, if we finalise it now.", f"आपके लिए मैं {_fmt(p, stp.price)} कर सकता हूँ, अगर अभी तय हो जाए।",
-                       f"Aapke liye main {_fmt(p, stp.price)} kar sakta hoon, agar abhi tay ho jaye.")
-            if last:
-                st.final_said = True
-                lines = _t(f"This is my final price, {_fmt(p, stp.price)}, I can't go below it; but it is a fair one and I'd be glad to have you.",
-                           f"ये मेरी आख़िरी कीमत है, {_fmt(p, stp.price)}, इससे नीचे नहीं जा सकता; पर ये ठीक कीमत है और आपका स्वागत है।",
-                           f"Ye meri aakhri keemat hai, {_fmt(p, stp.price)}, isse neeche nahi ja sakta; par ye theek keemat hai aur aapka swagat hai.")
-            return NegReply("price_floor" if last else "negotiation", say(lines, ask(stp.price)), st, offer={"price": stp.price}, note="One concession, one closing ask.")
+        return NegReply("negotiation", CLOSED_AGAIN[_pick(st, "closed", len(CLOSED_AGAIN))], st)
+    if st.pushes == 1 and target is None:  # first vague push: anchor at list, value, and let them name their number first
+        if committed:
+            return NegReply("negotiation", say(lead, FIRST_NUMBER), st, note="Already keen: let them name their number first.")
+        bank = lang_bank_value({l: _benefit(p, l) for l in LANGS}, need_known)
+        keep = _t(f"Would {_fmt(p, cur)} work for you with that, or what number do you have in mind?", f"इसके साथ क्या {_fmt(p, cur)} ठीक रहेगा, या आपके मन में कितना है?",
+                  f"Iske saath kya {_fmt(p, cur)} theek rahega, ya aapke mann mein kitna hai?")
+        return NegReply("negotiation", say(lead, bank, keep), st, note="Anchor at list; let them name a number; no concession yet.")
+    perks, prices = _remaining(eco, st, cur, floor)
+    if perks:  # value before cash
+        stp = perks[0]
+        st.perks.append(stp.id)
+        floor = effective_floor(eco, st)
+        line = {l: stp.text[l] for l in LANGS}
+        return NegReply("negotiation", say(PERK_LEADS[_pick(st, "perk", len(PERK_LEADS))], line, _ask(p, st, cur)), st,
+                        offer={"price": cur, "perk": stp.id}, note="A perk instead of a price cut, then a closing ask.")
+    if prices:
+        price = float(prices[0].price)
+        row = PRICE_LINES[_pick(st, "price", len(PRICE_LINES))]
+        mid_used = False
+        if n is not None and kind == "counter_offer":  # below the floor or not yet reachable: meet them part of the way, never under the floor
+            mid = float(_round50((cur + n) / 2.0))
+            if floor <= mid <= cur - 50 and mid != price:
+                price, row, mid_used = mid, MIDDLE_LINE, True
+        st.price = price
+        _, after = _remaining(eco, st, price, floor)
+        if not after:
+            st.final_said = True
+            return NegReply("price_floor", say(_fill(MIDDLE_LINE, p, price) if mid_used else {l: '' for l in LANGS}, _fill(FINAL_LINE, p, price), _ask(p, st, price)), st, offer={"price": price}, note="Final price, said once, warmly.")
+        return NegReply("negotiation", say(lead, _fill(row, p, price), _ask(p, st, price)), st, offer={"price": price}, note="One concession tied to a commitment, one closing ask.")
     if not st.final_said:
         st.final_said = True
-        return NegReply("price_floor", say(_t(f"{_fmt(p, cur)} is already the lowest I can go.", f"{_fmt(p, cur)} मेरी सबसे कम कीमत है।", f"{_fmt(p, cur)} meri sabse kam keemat hai."), ask(cur)),
-                        st, offer={"price": cur}, note="Floor stated once, warmly.")
+        return NegReply("price_floor", say(_fill(LOWEST_LINE, p, cur), _ask(p, st, cur)), st, offer={"price": cur}, note="Floor stated once, warmly.")
+    if not st.sweet:  # one last NEW honest offer before the goodbye: a configured lever, never an invented one
+        st.sweet = True
+        cfg = getattr(p, "negotiation", None)
+        for name in SWEET_ORDER:
+            if cfg is not None and name in cfg.levers and name not in st.levers and _lever_text(p, name, "en") and all(_lever_text(p, name, l) for l in LANGS):
+                st.levers.append(name)
+                return NegReply("negotiation", say(SWEET_LEAD, {l: _lever_text(p, name, l) for l in LANGS}, _ask(p, st, cur)), st,
+                                offer={"price": cur}, note="Last honest sweetener from the config, then a warm goodbye.")
     st.closed = True
     return NegReply("negotiation", CLOSE_WARM[0], st, note="Final no: warm goodbye, callback offered.")
 
@@ -258,7 +373,7 @@ def lang_bank_value(b: dict, need_known: str) -> dict:
     return {l: bank[l].format(b1=clean(b[l])) for l in LANGS}
 
 
-def step(p, text: str, st: NegState, need_known: str = "", faq_line=None) -> NegReply | None:
+def step(p, text: str, st: NegState, need_known: str = "", faq_line=None, committed: bool = False) -> NegReply | None:
     """One negotiation turn. Returns the reply for all three languages and the new state, or None when this is not price talk.
     `faq_line(lang)` gives the operator's approved FAQ answer for the question, when there is one."""
     kind = detect(text)
@@ -268,7 +383,7 @@ def step(p, text: str, st: NegState, need_known: str = "", faq_line=None) -> Neg
     st.rounds += 1
     if getattr(p, "economics", None) is not None and p.economics.list_price > 0 and p.economics.ladder \
             and kind in ("haggle", "value_doubt", "budget", "counter_offer", "competitor"):
-        return _ladder_reply(p, kind, text, st, need_known)
+        return _ladder_reply(p, kind, text, st, need_known, committed)
     if st.closed and kind in ("competitor", "discount_group", "free_trial"):
         return None  # a question again after walking away: the conversation answers it (never pushed)
     if st.closed:  # they already walked away once: never push, just stay kind

@@ -43,6 +43,7 @@ DIMS = ("frustration", "confusion", "urgency", "engagement", "satisfaction", "an
 
 # ---------------------------------------------------------------- lexicons (en / hinglish / Devanagari)
 _I = re.IGNORECASE
+CLOSE_INTEREST = 0.5  # buying interest at which the closing move is preferred (no open objection, no no)
 CRISIS = re.compile(r"मरने का (मन|दिल)|मर जाना चाहत|आत्महत्या|खुदकुशी|जीने का (मन|दिल) नहीं|\bsuicid|want to die|kill myself|"
                     r"marne ka (man|mann|dil)|jeene ka (man|dil) nahi", _I)
 CLOSE = re.compile(r"\b(bye|goodbye|good bye|that.?s all|that is all|nothing else|thank you,? bye|ok bye|okay bye)\b|बाय|रखता हूँ|रखती हूँ|"
@@ -59,7 +60,11 @@ from ..signals import NEGOTIATE_MORE  # noqa: E402
 NEGOTIATE = re.compile(NEGOTIATE.pattern + "|" + NEGOTIATE_MORE, _I)
 BARE_NO = {"no", "nope", "nahi", "nahin", "nai", "na", "नहीं", "नही", "ना", "ने", "नो"}
 LATER = re.compile(r"\b(later|call me back|call back|call me later|some other time|another time|not now|abhi nahi|baad mein|baad me)\b|"
-                   r"बाद में|बाद मे|अभी नहीं|अभी मत|कल कॉल|कल फोन|फिर कभी|बाद में कॉल", _I)
+                   r"बाद में|बाद मे|अभी नहीं|अभी मत|कल कॉल|कल फोन|फिर कभी|बाद में कॉल|"
+                   r"(शाम|सुबह|कल|परसों|रात|दोपहर|shaam|subah|kal|parso|evening|morning|tomorrow|tonight|afternoon)\W+(\w+\W+){0,3}(फ़ोन|फोन|कॉल|phone|call|baat)", _I)
+# "call me in the evening / tomorrow": a callback with a time, so the reply confirms it instead of only saying goodbye
+CALLBACK_TIME = re.compile(r"(शाम|सुबह|कल|परसों|रात|दोपहर|shaam|subah|kal|parso|evening|morning|tomorrow|tonight|afternoon)\W+(\w+\W+){0,3}(फ़ोन|फोन|कॉल|phone|call|baat)|"
+                           r"(call|phone|फोन|फ़ोन|कॉल)\W+(\w+\W+){0,3}(शाम|सुबह|कल|परसों|रात|दोपहर|shaam|subah|kal|parso|evening|morning|tomorrow|tonight|afternoon)", _I)
 COMPLAINT = re.compile(r"बार बार|bar bar|repeat (क्यों|kyun|kyu|why)|रिपेट|रिपीट|same (thing|cheez)|same बात|तू (चार|बार)|आवाज.{0,12}(बदल|change)|"
                        r"voice.{0,12}(change|chang)|you (keep|are) repeat|stop repeat|not listening|सुन नहीं|जल्दी जा रहा|too fast|rushing|"
                        r"fix this|पागल|बेवकूफ|stupid|idiot|\bshit\b|\bfuck|bakwas|बकवास|harass|परेशान मत|annoy|irritat|तंग|चिढ़|"
@@ -98,6 +103,25 @@ FIRM_NO = re.compile(r"not interested|don.?t call|do not call|stop calling|never
                      r"कभी नहीं|मत करो|मत करना|bakwas|बकवास|harass|नंबर हटा|फोन मत|फ़ोन मत", re.I)
 
 
+_NEW_FLAGS = {"callback_time", "objection", "interest", "mid_explanation", "closing"}
+
+
+# a caller who is still explaining: the sentence is unfinished (trailing "...", "and", "because"), or a long run with no stop
+_TRAILING = re.compile(r"(\.\.\.|…|,|\b(and|but|because|so|then|also|like|actually|basically|if|that|which)|और|लेकिन|क्योंकि|तो|कि|मतलब|"
+                       r"\b(aur|lekin|kyunki|kyuki|toh|matlab|ki))\s*$", re.I)
+
+
+def mid_explanation(text: str) -> bool:
+    """True when the caller has not finished: never end the call or cut in on them. Unfinished sentence, or long speech
+    that carries no goodbye / no word."""
+    t = (text or "").strip()
+    if not t:
+        return False
+    if _TRAILING.search(t):
+        return True
+    return len(_tokens(t)) >= 14 and not t.endswith(("?", "।", ".", "!")) and not CLOSE.search(t)
+
+
 def _tokens(text: str) -> list[str]:
     return re.findall(r"[\wऀ-ॿ]+", text.lower())
 
@@ -112,6 +136,24 @@ def garbled(text: str) -> bool:
     return False
 
 
+def resolve_signals(obj):
+    """A TurnSignals from a TurnSignals, a session.dialog dict (its stored "_signals" / "_nlu"), a legacy NLU object/dict
+    or a JSON string. None = the rules spoke alone (callers then fall back to the raw words)."""
+    from ..signals import TurnSignals, as_signals, signals_from_dialog
+    if obj is None or isinstance(obj, TurnSignals):
+        return obj
+    try:
+        if isinstance(obj, str):
+            return signals_from_dialog({"_signals": obj}) if obj.lstrip().startswith("{") and "learned_state" in obj else None
+        if isinstance(obj, dict):
+            if "_signals" in obj or "_nlu" in obj:
+                return signals_from_dialog(obj)
+            return as_signals(type("NLU", (), obj)()) if obj else None  # a bare legacy NLU dict
+        return as_signals(obj)
+    except Exception:
+        return None
+
+
 @dataclass
 class NeedInput:
     text: str
@@ -124,6 +166,27 @@ class NeedInput:
     turn_index: int = 0
     prev_agent: str = ""
     signals: object = None                                 # acie.signals.TurnSignals (learned providers' fused reading), or None
+    dialog: dict | None = None                             # session.dialog: when `signals` is None the stored "_signals" / "_nlu" is read
+
+    def __post_init__(self):
+        self.signals = resolve_signals(self.signals if self.signals is not None else self.dialog)
+        sg = self.signals
+        if sg is not None:
+            if self.question_topic in ("none", "") and sg.question_topic not in ("none", ""):
+                self.question_topic = sg.question_topic
+            if not self.nlu_intent and sg.votes:
+                self.nlu_intent = next(iter(sorted(sg.votes.values())), "")
+            for k, v in sorted(sg.state.items()):  # the 14 dims the pipeline already fused: fill the ones the caller did not give
+                self.state.setdefault(k, float(v))
+
+    @property
+    def interest(self) -> float:
+        """Buying interest 0..1 from the fused signals (0 when the rules spoke alone)."""
+        return float(self.signals.buying_interest) if self.signals is not None else 0.0
+
+    @property
+    def objection(self) -> str:
+        return (self.signals.objection if self.signals is not None else "none") or "none"
 
     def heard(self, *labels: str) -> bool:
         """A learned provider (any model) heard one of these intents; `nlu_intent` is the legacy single-label form."""
@@ -142,27 +205,33 @@ class NeedResult:
 
 def signals(inp: NeedInput) -> dict[str, bool]:
     t, toks = inp.text, _tokens(inp.text)
+    sg = inp.signals
     f = {
         "crisis": bool(CRISIS.search(t)),
-        "bye": bool(CLOSE.search(t)) or inp.intent == "goodbye",
+        "bye": bool(CLOSE.search(t)) or inp.intent == "goodbye" or inp.heard("goodbye"),
         "thanks": bool(THANKS.search(t)),
         "no": bool(NO.search(t)) or (0 < len(toks) <= 2 and all(w in BARE_NO for w in toks)) or inp.intent == "deny" or inp.heard("deny"),
         "negotiate": bool(NEGOTIATE.search(t)),
-        "later": bool(LATER.search(t)) or inp.intent == "callback",
+        "callback_time": bool(CALLBACK_TIME.search(t)),
+        "later": bool(LATER.search(t)) or inp.intent == "callback" or inp.heard("callback"),
         "complaint": bool(COMPLAINT.search(t)),
-        "distrust": bool(DISTRUST.search(t)),
-        "confused": bool(CONFUSED.search(t)),
-        "lang_trouble": bool(LANG_TROUBLE.search(t)),
+        "distrust": bool(DISTRUST.search(t)) or inp.objection == "trust",
+        "confused": bool(CONFUSED.search(t)) or inp.heard("clarify", "not_understood"),
+        "lang_trouble": bool(LANG_TROUBLE.search(t)) or inp.objection == "language",
         "asking": bool(ASKING.search(t)) or inp.question_topic not in ("none", ""),
         "busy": bool(BUSY.search(t)),
         "personal": bool(PERSONAL.search(t)) or inp.heard("personal", "small_talk"),
         "sad": bool(SAD.search(t)),
         "soft_no": bool(SOFT_NO.search(t)) and not FIRM_NO.search(t),
         "sale": bool(SALE.search(t)),
-        "garbled": garbled(t),
-        "go_on": bool(GO_ON.search(t)) or inp.intent in ("affirm", "tell_more", "benefits", "price"),
+        "garbled": garbled(t) or bool(sg is not None and sg.garbled and len(toks) <= 6),
+        "go_on": bool(GO_ON.search(t)) or inp.intent in ("affirm", "tell_more", "benefits", "price")
+                 or inp.heard("affirm", "tell_more", "benefits", "price"),
         "weak_yes": 0 < len(toks) <= 2 and all(w in WEAK_YES for w in toks),
         "short": len(toks) <= 3,
+        "objection": inp.objection not in ("none", ""),
+        "interest": inp.interest >= CLOSE_INTEREST,
+        "mid_explanation": mid_explanation(t),
     }
     f["asking"] = f["asking"] or f["negotiate"]
     if f["negotiate"] and not re.search(r"नहीं चाहिए|not interested|don.?t want|stop calling", t, _I):
@@ -173,10 +242,28 @@ def signals(inp: NeedInput) -> dict[str, bool]:
     return f
 
 
+def closing_ready(inp: NeedInput, f: dict[str, bool]) -> bool:
+    """The caller is interested (buying interest >= 0.5 from the fused signals; without signals: they agreed / asked for
+    the plan or price while engaged) AND nothing is open: no objection, no no / later, no hardship, no complaint, no
+    stop-sign. The closing ask is preferred only then; the move policy re-checks the call-level holds."""
+    s = inp.state
+    if (f["no"] or f["later"] or f["bye"] or f["sad"] or f["crisis"] or f["complaint"] or f["distrust"] or f["confused"] or f["lang_trouble"]
+            or f["objection"] or f["busy"] or f["garbled"] or FIRM_NO.search(inp.text)):
+        return False
+    if float(s.get("frustration", 0.0)) >= 0.40 or float(s.get("anxiety", 0.0)) >= 0.60:
+        return False
+    if inp.signals is not None:
+        return inp.interest >= CLOSE_INTEREST
+    asked = inp.prev_agent.rstrip().endswith("?")  # a bare "ok / achha" counts as interest only when it answers a question
+    wants = inp.intent in ("tell_more", "benefits", "price") or (inp.intent == "affirm" and (asked or f["sale"])) or (f["go_on"] and f["sale"])
+    return wants and float(s.get("engagement", 0.5)) >= CLOSE_INTEREST
+
+
 def table_need(inp: NeedInput) -> NeedResult:
     """The deterministic decision table (see module docstring). First matching row wins."""
     s, f = inp.state, signals(inp)
     g = lambda k, d=0.0: float(s.get(k, d))
+    f["closing"] = closing_ready(inp, f)
     if f["crisis"]:
         return NeedResult("be_heard", "0:crisis", flags=f)
     if f["bye"] and not (f["asking"] and not CLOSE.search(inp.text)) or (inp.has_link and f["short"] and not f["asking"] and (f["thanks"] or f["weak_yes"] or f["bye"])):
@@ -195,11 +282,13 @@ def table_need(inp: NeedInput) -> NeedResult:
                         and inp.intent in ("unknown", "clarify", "") and not f["sale"]):
         return NeedResult("clarity", "5:garbled", flags=f)
     if f["asking"]:
-        return NeedResult("answer", "6:answer", flags=f)
+        return NeedResult("answer", "6:answer", flags=f)  # (flags["closing"] tells the move policy a close may follow the answer)
     if f["busy"] or g("frustration") >= 0.40 or g("cognitive_load") >= 0.70:
         return NeedResult("space", "7:space", flags=f)
     if f["personal"] and not f["sale"]:
         return NeedResult("connection", "8:connection", flags=f)
+    if f["closing"]:
+        return NeedResult("information", "9:close", flags=f)  # interested, nothing open: the move policy prefers the closing ask
     return NeedResult("information", "9:information", flags=f)
 
 
@@ -213,7 +302,7 @@ def features(inp: NeedInput) -> list[float]:
     f = signals(inp)
     extra = [float(inp.state.get(k, 0.5 if k in ("engagement", "satisfaction", "calmness", "trust", "certainty", "attention",
                                                   "participation", "receptiveness") else 0.0)) for k in DIMS]
-    extra += [float(f[k]) for k in sorted(f)]
+    extra += [float(f[k]) for k in sorted(f) if k not in _NEW_FLAGS]  # (new flags stay out: the trained vector has a fixed width)
     extra += [float(len(toks)), float(inp.turn_index), float(inp.has_link), 0.0]  # (intent is deliberately not a feature: it differs between labelling and runtime)
     return vec + extra
 

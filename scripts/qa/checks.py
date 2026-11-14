@@ -109,6 +109,7 @@ class Ctx:
     allowed_numbers: set[str]
     product_name: str
     other_products: list[str] = field(default_factory=list)
+    prior_intents: list[str] = field(default_factory=list)  # intents of earlier agent replies
     expect_lang: str | None = None  # language the reply must be in (language-switch fixtures)
 
     @property
@@ -117,7 +118,14 @@ class Ctx:
 
     @property
     def refused(self) -> bool:
-        return any("refuse" in t for t in self.prior_tags + [self.tags])
+        """The caller's latest stance is a no: a later accept / ask_link (flip-flop) lifts it."""
+        state = False
+        for t in self.prior_tags + [self.tags]:
+            if "refuse" in t:
+                state = True
+            elif t & {"accept", "ask_link"}:
+                state = False
+        return state
 
     @property
     def hardship_open(self) -> bool:
@@ -160,6 +168,9 @@ def c_link_unasked(c: Ctx):
 
 def c_push_after_no(c: Ctx):
     if c.refused and (c.intent in SELL_INTENTS) and not (c.tags & {"asks_price"}):
+        # OWNER UPDATE 2: after the first soft no the agent asks why (reason_ask); ONE value-based re-offer is then allowed
+        if c.intent == "reoffer" and "reason_ask" in c.prior_intents and "reoffer" not in c.prior_intents and not (c.tags & {"firm_no"}):
+            return None
         return f"sales intent {c.intent!r} after a no"
 
 
@@ -272,6 +283,8 @@ DEFAULT_CHECKS = {
 # ---------------------------------------------------------------- positive expectations (must)
 
 def check_must(c: Ctx, must: dict) -> list[tuple[str, str]]:
+    while isinstance(must.get("must"), dict):  # fixtures wrote {"must": {"must": {...}}}: unwrap, or the expectations never ran
+        must = {**{k: v for k, v in must.items() if k != "must"}, **must["must"]}
     out = []
     fr = flat(c.reply)
     if "contains_any" in must and not any(flat(x) in fr for x in must["contains_any"]):

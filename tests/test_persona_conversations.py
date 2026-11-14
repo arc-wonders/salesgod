@@ -451,7 +451,7 @@ def test_economics_floor_and_ladder_live_in_the_gym_config_and_stay_above_the_fl
     assert eco.list_price == 2999 and eco.profit_floor == 2400.0
     prices = [s.price for s in eco.ladder if s.kind == "price"]
     assert prices == sorted(prices, reverse=True) and min(prices) >= eco.profit_floor
-    assert [s.kind for s in eco.ladder][:2] == ["perk", "perk"]          # value before cash
+    assert [s.kind for s in eco.ladder][:2] == ["perk", "perk"] and eco.max_perks == 1  # value before cash, at most one perk per sale
     assert not CLAUDE.economics.ladder and CLAUDE.economics.list_price == 0  # no concessions for another company's price
 
 
@@ -459,10 +459,10 @@ def test_haggle_walks_the_ladder_in_order_and_a_yes_locks_the_price_above_the_fl
     out, _, sess = talk(["haan bolo", "kitne ka hai", "thoda kam karo", "kam karo na", "aur kam", "ab bhi mehenga hai"], GYM)
     texts = [t for _, t, _ in out[2:]]
     assert "₹2,999" in texts[0] and "₹2,800" not in texts[0]          # first push: value, anchor at list
-    assert "hafte ki membership" in texts[1] and "personal trainer" in texts[2] and "₹2,800" in texts[3]
+    assert "hafte ki membership" in texts[1] and "₹2,800" in texts[2] and "personal trainer" not in texts[2]  # one perk per sale, then prices
     assert len(set(texts)) == len(texts) and all("₹2,000" not in t for t in texts)
     out, _, sess = talk(["haan bolo", "kitne ka hai", "thoda kam karo", "kam karo na", "aur kam", "ab bhi mehenga hai", "haan theek hai, kar do"], GYM)
-    assert out[-1][0] == "confirm_close" and "₹2,800" in out[-1][1]
+    assert out[-1][0] == "confirm_close" and "₹2,700" in out[-1][1]
     assert float(sess.dialog["closed_price"]) >= float(sess.dialog["profit_floor"]) == 2400.0
 
 

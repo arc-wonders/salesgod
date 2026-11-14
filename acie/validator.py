@@ -19,6 +19,7 @@ from .expression import render_fallback
 from .rules import load_packs
 from .text import detect_language
 from .schemas import ExpressionParams, TurnPlan, ValidationReport
+from .psyche.ledger import invented_memory, unsourced_claims
 
 _SLOT = re.compile(r"\{(\w+)\}")
 _RAW_NUMBER = re.compile(r"[0-9०-९]|₹|\brs\.?\s|\binr\b", re.IGNORECASE)
@@ -49,12 +50,17 @@ _THIS_WEEK_PAD = re.compile(
 _CODES = (("invented placeholder", "invented_slot"), ("price repeated", "price_repeated"),
           ("offer phrase repeated", "offer_repeated"), ("offer phrase padded", "offer_padded"),
           ("money written", "money_in_general_answer"), ("raw number", "raw_number"),
-          ("wrong language", "wrong_script"), ("rule pack", "rulepack"))
+          ("wrong language", "wrong_script"), ("rule pack", "rulepack"), ("invented memory", "invented_memory"),
+          ("unsourced claim", "unsourced_claim"), ("repeated sentence", "repeated_sentence"), ("restated fact", "restated_fact"),
+          ("re-asked question", "reasked_question"), ("repeated opener", "repeated_opener"))
 
 
 class StreamingValidator:
     def __init__(self, plan: TurnPlan, expr: ExpressionParams, trusted: bool = False, customer_text: str = "",
-                 rule_packs=None):
+                 rule_packs=None, known=None):
+        # known = (SaidLedger, CustomerFacts): the call so far. A generation that repeats a sentence we already said, says the caller's own
+        # facts back, or re-asks a question they answered fails like any other check (the pipeline regenerates once, then uses the template)
+        self.known = known
         # rule packs: explicit list (names or objects) or the plan's own; none = unchanged behaviour
         self.rule_packs = load_packs(rule_packs if rule_packs is not None else getattr(plan, "rule_packs", []))
         self.issue_codes: list[str] = []
@@ -148,6 +154,14 @@ class StreamingValidator:
             return "rulepack:" + problem.split()[2].rstrip(":")
         return next((c for p, c in _CODES if problem.startswith(p)), "other")
 
+    def _claim_sources(self) -> str:
+        """Everything the reply may lean on: the caller's words, the plan's operator-written text and its fact values."""
+        p = self.plan
+        bits = [self.said, p.objective or ""]
+        bits += [f.value + " " + (f.description or "") for f in p.facts.values()]
+        bits += list((p.lead or {}).values()) + list(p.fallback.values())
+        return " ".join(bits)
+
     def _numbers_left(self, bare: str) -> bool:
         """A number the LLM wrote itself. Numbers inside operator-written talking points ("for the first
         3 months") may be repeated, as digits or words."""
@@ -169,8 +183,24 @@ class StreamingValidator:
         if unknown:
             return f"invented placeholder {unknown}"
         bare = _SLOT.sub("", s)
+        mem = invented_memory(bare)
+        if mem:  # always, even in operator text: the agent only knows this call
+            return f"invented memory of the caller ({mem})"
         if self.trusted:
             return None
+        claims = unsourced_claims(bare, self._claim_sources())
+        if claims:
+            return f"unsourced claim {claims[0]!r}"
+        if self.known is not None:
+            ledger, facts = self.known
+            if len(bare.split()) >= 3 and ledger.similar_to(bare):
+                return "repeated sentence"
+            if facts.restates(bare):
+                return "restated fact"
+            if facts.reasks(bare):
+                return "re-asked question"
+            if not self.emitted and facts.opener_used(bare) and len(bare.split()) >= 3:
+                return "repeated opener"  # starts the way an earlier reply started (same first words)
         if self.plan.lead and re.search(r"\$|₹|रुपय|रुपए|रुपये|डॉलर|dollar|rupe|rupay|\d+ ?%", bare, re.I):
             return "price repeated after the exact price line"
         if "offer" in self.plan.facts and "{offer}" in s:
