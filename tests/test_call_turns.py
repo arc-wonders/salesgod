@@ -319,3 +319,16 @@ def test_noise_phrase_variants():
         assert C.stock_noise(t), t
     for t in ["कर दो, बताइए price", "जी हाँ कर दो link", "मुझे join करना है"]:
         assert not C.stock_noise(t), t
+
+
+async def test_english_call_uses_the_hindi_model_only_after_the_caller_asks_for_hindi():
+    cs, _ = session()
+    cs.call.language = "en"
+    assert not cs.hindi_model_ok()
+    voice(cs, 0.8)
+    cs.app.stt.next = ("Yes, I can hear you, but can you speak in Hindi?", "")
+    await cs.handle_utterance(speech(), time.monotonic(), False)
+    assert cs.hindi_model_ok()
+    cs2, _ = session()
+    cs2.call.language = "hi"
+    assert cs2.hindi_model_ok()

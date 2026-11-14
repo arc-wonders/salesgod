@@ -232,6 +232,7 @@ class TurnResult(BaseModel):
     expression: ExpressionParams
     validation: ValidationReport
     timings_ms: dict[str, float] = Field(default_factory=dict)
+    result: dict | None = None  # the call-type pack's CallResult so far (acie/calltypes); None for the plain sales call
 
 
 from .context import CallContext  # noqa: E402  (resolves the forward reference)

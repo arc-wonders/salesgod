@@ -105,9 +105,17 @@ class App:
         else:
             product = self.products()[call.campaign]
             from acie import playbook as pbm
-            domain = ProductSalesDomain(product, customer_name=call.customer_name, world=self.world,
-                                        customer_age=call.customer_age,
-                                        playbook=pbm.load(DATA, product.tenant, product.id))
+            ct = getattr(call, "call_type", "") or ""  # call types (acie/calltypes): "" / sales_pitch = today's flow
+            if ct and ct != "sales_pitch":
+                from acie.calltypes.factory import build_domain
+                domain = build_domain(ct, product, data_dir=DATA, project_id=getattr(call, "project_id", "") or product.tenant,
+                                      customer_name=call.customer_name, customer_age=call.customer_age, world=self.world,
+                                      playbook=pbm.load(DATA, product.tenant, product.id), customer_id=call.customer_id,
+                                      phone=call.to, call_id=call.call_id)
+            else:
+                domain = ProductSalesDomain(product, customer_name=call.customer_name, world=self.world,
+                                            customer_age=call.customer_age,
+                                            playbook=pbm.load(DATA, product.tenant, product.id))
             prompt = f"{product.product_name}, {product.seller_name}, subscription, offer, हाँ, नहीं, ठीक है, बताइए"
         pipe = ACIEPipeline(DecisionEngine(domain), backend=self.backends[call.backend], store=self.store,
                             buffer_reply=call.backend != "template", nlu=self.nlu if call.backend != "template" else None,

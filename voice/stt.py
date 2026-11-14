@@ -47,7 +47,9 @@ class WhisperSTT:
                             self.model_name)
 
     def _transcribe(self, audio: np.ndarray, hint: str | None, prefer: str | None,
-                    prompt: str | None) -> tuple[str, str, str, float]:
+                    prompt: str | None, allow_hi_model: bool = True) -> tuple[str, str, str, float]:
+        # per turn, never by mutating shared state: up to STT_CONCURRENCY calls transcribe at once on threads
+        use_hi = allow_hi_model and self.hi_model is not None
         lang = hint if hint in ALLOWED else None
         if lang is None:
             # Hindi speech is sometimes detected as Urdu/Punjabi/etc: pick the likelier of en/hi,
@@ -65,7 +67,7 @@ class WhisperSTT:
             share_en = None
         mirror_en = lang == "hi" and hint is None and prefer == "en" and share_en is not None and share_en >= 0.15
         mirror_hi = lang == "en" and hint is None and prefer != "en"
-        if lang == "hi" and self.hi_model is not None and not mirror_en and self._clearly_hindi(audio, share_en):
+        if lang == "hi" and use_hi and not mirror_en and self._clearly_hindi(audio, share_en):
             return self._filter(audio, self._run_hi(audio), "hi")
         segs = self._run(audio, lang, prompt)
         if mirror_en:
@@ -84,7 +86,7 @@ class WhisperSTT:
             score = lambda ss: float(np.mean([x.avg_logprob for x in ss])) if ss else -9.0
             if score(hi_segs) + 0.15 >= score(segs):
                 segs, lang = hi_segs, "hi"
-        if lang == "hi" and self.hi_model is not None and self._clearly_hindi(audio, share_en):
+        if lang == "hi" and use_hi and self._clearly_hindi(audio, share_en):
             segs = self._run_hi(audio)  # the language comparison above used large-v3; the words come from the Hindi model
         return self._filter(audio, segs, lang)
 
@@ -153,10 +155,10 @@ class WhisperSTT:
         return text, lang, ms
 
     async def transcribe_detail(self, audio: np.ndarray, hint: str | None = None, prefer: str | None = None,
-                                prompt: str | None = None) -> tuple[str, str, float, str, float]:
+                                prompt: str | None = None, allow_hi_model: bool = True) -> tuple[str, str, float, str, float]:
         """Like transcribe, plus the words dropped ONLY for being quiet (not hallucination-like) and Whisper's
         highest no-speech probability over the kept words (real speech ~0.1-0.3, its noise phrases 0.5+)."""
         t0 = time.perf_counter()
         async with self.lock:
-            text, lang, quiet, nsp = await asyncio.to_thread(self._transcribe, audio, hint, prefer, prompt)
+            text, lang, quiet, nsp = await asyncio.to_thread(self._transcribe, audio, hint, prefer, prompt, allow_hi_model)
         return text, lang, (time.perf_counter() - t0) * 1000, quiet, nsp
