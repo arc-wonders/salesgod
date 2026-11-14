@@ -176,9 +176,8 @@ NEGATIVES = [
 ]
 
 CONCERN = [
-    "छत से कूदना",                      # method, no self-reference
-    "ज़िंदगी से हारा",                    # hopelessness only
-    "mujhe zindagi se haar mil gayi",
+    "main neend ki goli leta hoon",      # worrying but could be ordinary
+    "mujhe lagta hai sab khatam",        # hopelessness, no intent
 ]
 
 
@@ -196,7 +195,7 @@ def test_negative_stays_clean(text):
     assert not is_distress(text) and not is_concern(text)
 
 
-@pytest.mark.parametrize("text", CONCERN[:2])
+@pytest.mark.parametrize("text", CONCERN)
 def test_concern_band(text):
     assert is_concern(text) and not is_distress(text), distress_score(text)
 
@@ -218,19 +217,20 @@ def test_skeleton_spellings_agree():
 
 def test_two_turn_history_adds_up():
     # each turn alone is only worrying; together they are a crisis
-    assert is_concern("छत से कूदना") and is_concern("ज़िंदगी से हारा")
-    assert is_distress("ज़िंदगी से हारा", ["छत से कूदना"])
+    assert is_concern("main neend ki goli leta hoon") and is_concern("sab khatam")
+    assert is_distress("mujhe lagta hai sab khatam", ["main neend ki goli leta hoon"])
     assert is_distress("जिंदगी से हारा", ["मेरा गोल है छत से कूदना"])
     assert is_distress("छत से कूदना", ["hmm", "मेरा गोल है"])  # self-reference in the previous turn
     # history alone never re-fires on an unrelated current turn
 
 
 def test_old_turn_does_not_refire_on_unrelated_turn():
-    assert distress_score("haan bhej do link", ["छत से कूदना"])[0] < CONCERN_T
+    assert distress_score("haan bhej do link", ["main neend ki goli leta hoon"])[0] < CONCERN_T
 
 
 def test_history_formats():
     h = [("agent", "hello"), ("customer", "छत से कूदना"), ("agent", "kya?")]
+    assert is_distress("ज़िंदगी से थक गया", [("customer", "main neend ki goli leta hoon")])
     assert is_distress("ज़िंदगी से हारा", h)
 
 
@@ -248,3 +248,20 @@ def test_precision_recall_report():
     tp = sum(is_distress(t) for t in POSITIVES)
     fp = sum(is_distress(t) or is_concern(t) for t in NEGATIVES)
     assert tp == len(POSITIVES) and fp == 0
+
+
+def test_voice_low_raises_concern():
+    class V:
+        label = "low"
+    assert not is_concern("jeena kaisa lagta hai")
+    assert is_concern("jeena kaisa lagta hai", voice=V())
+    assert not is_concern("hello price kya hai", voice=V())  # no life/death word
+    assert is_distress("ज़िंदगी से थक गया", voice={"label": "sad"})
+
+
+def test_concern_plan_template():
+    from acie.safety import concern_plan
+    p = concern_plan()
+    assert p.intent == "safety_concern" and not p.llm_allowed and not p.end_call
+    assert set(p.fallback) == {"en", "hi", "hinglish"} and "14416" in p.facts["helpline"].value
+    assert all("{helpline}" in v for v in p.fallback.values())

@@ -53,7 +53,7 @@ def mc(text, lang="en", ledger=None, **kw):
 def test_information_moves_never_repeat_and_run_out_honestly():
     L = SaidLedger()
     said = []
-    for _ in range(14):
+    for _ in range(60):  # (was 14: the FitZone fact sheet now has ~25 items to tell before it runs out)
         ctx, L = mc("yes tell me more", ledger=L)
         m = choose_move(ctx)
         line = m.line("en")
@@ -62,7 +62,7 @@ def test_information_moves_never_repeat_and_run_out_honestly():
         L.add_text(line)
         L.add_slot(m.slot)
         L.add_move(m.name)
-        if m.end_call:
+        if m.end_call or "everything I have" in line:
             break
     assert any("everything I have" in s for s in said) and said[-1] != said[-2]
 
@@ -143,7 +143,8 @@ def test_trainer_price_asked_four_times_never_gets_membership_price_or_repeats()
         rs = asyncio.run(talk(make(flag), ["हाँ जी बताइए", "personal trainer session कितने का होगा", "पर इसमें personal trainer session कितने का होगा?",
                                          "ये तो जिन की है पर ट्रेनर कितने का है", "ये तो जिनकी है पर ट्रेनर कितने का है"]))
         texts = [r.text for r in rs[1:]]
-        assert "₹2,999" not in texts[0] and "free personal trainer" in texts[0]
+        # (was: "free personal trainer" in the Hindi reply = the English catalog fragment pasted into a Hindi call)
+        assert "₹2,999" not in texts[0] and "पर्सनल ट्रेनर" in texts[0] and "free personal trainer" not in texts[0]
         assert len(set(texts)) == len(texts)
     os.environ["ACIE_PSYCHE"] = ""
 

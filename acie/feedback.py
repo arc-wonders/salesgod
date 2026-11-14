@@ -63,7 +63,11 @@ WEIGHTS = {"frustration": 0.8, "confusion": 0.6, "positive": 0.5, "validator": 0
 # call-level credit terms (see docstring). Sale outcomes are recorded in profile.outcomes but are NOT in here: weight 0.
 CALL_CREDIT = {"calm_answered": 0.5, "respected_refusal": 0.5, "opt_out_after_push": -1.0, "hangup_after_repeat": -1.0}
 TURN_EXTRA = {"repeat": -0.5, "unanswered": -0.5}
-SALE_OUTCOME_WEIGHT = 0.0
+SALE_OUTCOME_WEIGHT = 0.0  # (a plain "accepted" label still carries no weight)
+# OWNER UPDATE 2: a closed sale in profit is credited, scaled by the margin above the profit floor:
+# +SALE_CREDIT["at_list"] when closed at list price, down to +SALE_CREDIT["at_floor"] at the profit floor. Never for hardship or
+# crisis calls. Customer-comfort terms stay; the call credit is summed and clipped to [-1, 1] as before.
+SALE_CREDIT = {"at_list": 1.0, "at_floor": 0.3}
 REPEAT_RATIO = 0.6
 PUSH_INTENTS = frozenset({"pitch", "price", "reoffer", "recover", "confirm_close", "price_floor"})
 _BENIGN = ("trimmed", "dropped echo", "regenerated", "llm repeated")
@@ -116,7 +120,9 @@ def sales_outcome(session: SessionState) -> tuple[str | None, bool]:
 
 
 class FeedbackEngine:
-    def __init__(self, weights: dict[str, float] | None = None, policy=None, memory: MemoryStore | None = None) -> None:
+    def __init__(self, weights: dict[str, float] | None = None, policy=None, memory: MemoryStore | None = None,
+                 sale_credit: dict[str, float] | None = None) -> None:
+        self.sale_credit_cfg = {**SALE_CREDIT, **(sale_credit or {})}
         self.weights = {**WEIGHTS, **_env_weights(), **(weights or {})}
         self.policy = policy  # pipeline sets this to its policy when None
         self.memory = memory if memory is not None else (make_store() if memory_enabled() else None)
@@ -252,6 +258,22 @@ class FeedbackEngine:
             c["ended_by_agent"] = True
         return extra
 
+    def sale_credit(self, session: SessionState) -> float:
+        """Credit for a closed sale: 1.0 at list price scaling down to 0.3 at the profit floor (dialog: closed_price, list_price,
+        profit_floor, written by the domain when the caller said yes to a price). 0 for anything else, and always 0 in hardship."""
+        d = session.dialog
+        if d.get("sad_hold") == "1" or d.get("safety_flag") or "payment_link" not in session.context.promised:
+            return 0.0
+        try:
+            price, lst, floor = float(d["closed_price"]), float(d["list_price"]), float(d["profit_floor"])
+        except (KeyError, ValueError):
+            return 0.0
+        if price < floor - 1e-9:
+            return 0.0  # a sale below the profit floor earns nothing
+        hi, lo = self.sale_credit_cfg["at_list"], self.sale_credit_cfg["at_floor"]
+        share = 1.0 if lst <= floor else max(0.0, min(1.0, (price - floor) / (lst - floor)))
+        return round(lo + (hi - lo) * share, 4)
+
     def call_credit(self, session: SessionState) -> float:
         c = self._call.get(session.session_id)
         if c is None:
@@ -275,7 +297,7 @@ class FeedbackEngine:
             self._resolve(sid, profile, None, False)  # last turn has no next state
         self._pending.pop(sid, None)
         turns = self._turns.pop(sid, [])
-        credit = self.call_credit(session)
+        credit = max(-1.0, min(1.0, self.call_credit(session) + self.sale_credit(session)))
         self._call.pop(sid, None)
         if outcome == "safety":
             return

@@ -42,8 +42,8 @@ from .text import normalize, tokens
 # lowers the entries marked hyper (x0.25) and only when a gym/price/laughing word is in the same turn.
 # Explicit suicide words, methods and "नहीं जीना" are never lowered.
 # Thresholds: score >= DISTRESS_T (0.75) is a crisis; CONCERN_T (0.45) <= score < DISTRESS_T gets a gentle
-# check-in (concern_plan) instead of selling. Evidence from the previous 2 customer turns counts (x0.85,
-# x0.7) when the current turn itself carries some signal (>= 0.30); cross-turn word windows work through
+# check-in (concern_plan) instead of selling. Evidence from the previous 2 customer turns counts (x0.95,
+# x0.85) when the current turn itself carries some signal (>= 0.30); cross-turn word windows work through
 # the concatenated tokens ("मेरा गोल है" / "छत से कूदना").
 # Wrong in the safe direction is the design: a false check-in costs one sentence, a miss costs a life.
 # ---------------------------------------------------------------------------------------------------------
@@ -162,8 +162,8 @@ _WANT = _set("chahta chahti chahte chahiye chahun chahu chaahta chaahti man mann
              "sochte ichha irada iraada plan goal ")
 _ZINDAGI = _set("zindagi jindagi jindgi zindgi zindagee jeevan jivan life lyf lif")
 _HOPE_W = {  # defeat words near "life": skeleton -> weight
-    **{_skel_word(w): 0.55 for w in "haar haara hara hare haari tang pareshan pareshaan bezaar bekar nafrat".split()},
-    **{_skel_word(w): 0.40 for w in "thak thaka thaki thakk".split()},
+    **{_skel_word(w): 0.78 for w in "haar haara hara hare haari tang pareshan pareshaan bezaar bekar nafrat".split()},
+    **{_skel_word(w): 0.55 for w in "thak thaka thaki thakk".split()},
     **{_skel_word(w): 0.55 for w in "bojh bhoj tut toot tuta toota".split()},
 }
 _KHATAM = _set("khatam khatm khtm")
@@ -177,7 +177,7 @@ _FANSI_RAW = frozenset(normalize(w) for w in "fansi phansi phaansi fanda phanda 
 _LATAK = _set("latak latakna latakke latkar latka")
 _PANKHA = _set("pankha pankhe pankhey")
 _NEEND = _set("neend nind nid")
-_SUICIDE = _set("suicide susaid sucide suiside suiciide सुसाइड सुसाईड सुइसाइड aatmahatya atmahatya aatmhatya atmhatya "
+_SUICIDE = _set("suicide susaid sucide suiside suiciide सुसाइड सुसाईड सुइसाइड aatmahatya atmahatya "
                 "aatmahatyaa आत्महत्या khudkushi khudkhushi khudkusi khudkashi खुदकुशी")
 _GOLI = _set("goli goliyan goliya goliyaan golian goliyo")
 _GOLI_BIG = _set("saari sari sab bahut bohot zyada ek saath overdose ")
@@ -225,6 +225,34 @@ _EN = [  # (regex over the normalized text, weight, group, hyper_capable)
      r"|\bgive up on life\b|\blife is over\b|\bnobody (would )?(care|miss me)\b", 0.5, "hopeless", False),
 ]
 _EN_RX = [(re.compile(p), w, g, h) for p, w, g, h in _EN]
+_LEGACY_PATTERNS = [  # exact-phrase net from the 14 Nov hotfix (merged in); kept as a floor under the phonetic engine
+    # Hindi (Devanagari, normalized: no nukta, anusvara)
+    r"मरने का (मन|दिल|सोच)", r"मर जाना चाहत", r"मर जाऊं", r"मर जाउं", r"मरना चाहत", r"जीने का (मन|दिल) नहीं",
+    r"जीना नहीं चाहत", r"आत्महत्या", r"खुदकुशी", r"जान दे (दूं|दूंगा|दूंगी|दू)", r"अपनी जान", r"खुद को (मार|खत्म)",
+    r"सब खत्म कर (दूं|लूं)", r"जिंदगी से (तंग|परेशान) हो", r"मरना है", r"मर जाऊंगा", r"मर जाऊंगी",
+    r"जीना नहीं", r"जी कर क्या", r"मौत", r"फांसी", r"सुसाइड",
+    # Hinglish
+    r"marne ka (man|mann|dil)", r"mar jana chah", r"mar jaun", r"jeene ka (man|mann|dil) nahi", r"jeena nahi chah",
+    r"aatmahatya", r"atmahatya", r"khudkushi", r"jaan de (dunga|dungi|du)", r"khud ko (maar|khatam)",
+    r"marna hai", r"mar jaunga", r"mar jaungi", r"suicide",
+    # English
+    r"\bkill myself\b", r"\bwant to die\b", r"\bwanna die\b", r"\bfeel like dying\b", r"\bend my life\b",
+    r"\bsuicid", r"\bdon'?t want to live\b", r"\bno reason to live\b", r"\bhurt myself\b",
+    # live call 2ccf3f1387 (14 Nov): "मेरा गोल है छत से कूदना" (ASR: "छट से कूदना") and "मैं जिंदगी से हारा हुआ हूँ
+    # मुझे नहीं जीना" (ASR: "जिन्दगी ते खारा ... नहीं दीना") were NOT caught; the agent pitched the gym and then said
+    # "आपका दिन शुभ हो". Word order, method phrases, and the ASR garbles seen on that call (only next to "जिंदगी")
+    r"(नहीं|नही) (जीना|जीना है|जीना चाहत|जीने का)", r"(नहीं|नही) रहना (इस दुनिया|दुनिया)", r"दुनिया में (नहीं|नही) रहना", r"दुनिया छोड (दूं|दू|दूंगा|दूंगी|देना)",
+    r"(जिंदगी|जिन्दगी|जिदगी) (से|ते)( मैं)? (हार|खार|तंग|परेशान|थक|ऊब)",
+    r"(जिंदगी|जिन्दगी|जिदगी)\S*( \S+){0,6} (नहीं|नही) (जीना|दीना|जीणा)",
+    r"(जिंदगी|जिन्दगी|जिदगी) (खत्म|बेकार|बोझ)",
+    r"(छत|छट|बिल्डिंग|पुल|ब्रिज|टेरेस|बालकनी) (से|पर से) (कूद|छलांग|छलाग)",
+    r"(ट्रेन|गाडी|गाड़ी) के (आगे|नीचे) (कूद|लेट|आ जा)", r"नस काट", r"(जहर|जेहर) खा", r"फंदा",
+    r"nahi?n? jeena", r"jeena nahi", r"zindagi se (haar|tang|pareshan|thak)", r"(chhat|chat|roof|building|bridge|pul) se (kood|kud|jump)",
+    r"(zeher|zehar|jahar) kha", r"nas kaat", r"duniya chhod",
+    r"\bjump(ing)? off (the |a )?(roof|building|bridge|terrace|balcony)", r"\bend it all\b", r"\bno point (in )?living\b",
+    r"\bdon'?t want to be alive\b", r"\btired of (living|life|being alive)\b", r"\bgive up on (life|living)\b",
+]
+_LEGACY_RX = re.compile("|".join(_LEGACY_PATTERNS), re.IGNORECASE)
 _EN_NEG = re.compile(r"\b(dont|do not|didnt|never|not|no)\b")
 
 
@@ -279,7 +307,7 @@ def _evidence(tok: list[str], turn: list[int], hyper: set[int], raw: list[str]) 
         for j, t in enumerate(tok):
             if t in _HOPE_W and 0 < abs(i - j) <= 4:
                 near_self = any(abs(i - s) <= 6 for s in SELF)
-                add("hopeless", min(0.65, _HOPE_W[t] + (0.1 if near_self else 0)), max(i, j), "life_defeat", True)
+                add("hopeless", min(0.9, _HOPE_W[t] + (0.1 if near_self else 0)), max(i, j), "life_defeat", True)
         for j in _idx(tok, _KHATAM):
             if abs(i - j) <= 3:
                 near_self = any(abs(i - s) <= 6 for s in SELF)
@@ -302,7 +330,7 @@ def _evidence(tok: list[str], turn: list[int], hyper: set[int], raw: list[str]) 
             if abs(i - j) <= 5 and i != j:
                 near_self = any(min(abs(s - i), abs(s - j)) <= 6 for s in SELF)
                 wants = any(abs(w - i) <= 5 for w in _idx(tok, _WANT))
-                add("method", 0.9 if (near_self or wants) else 0.55, max(i, j), "jump_place")
+                add("method", 0.9 if (near_self or wants) else 0.8, max(i, j), "jump_place")
                 break
     for i in TRAIN:
         for j, t in enumerate(tok):
@@ -319,7 +347,7 @@ def _evidence(tok: list[str], turn: list[int], hyper: set[int], raw: list[str]) 
             add("method", 0.9 if near_self else 0.7, i, "poison")
     for i in [i for i, r in enumerate(raw) if r in _FANSI_RAW]:
         near_self = any(abs(s - i) <= 5 for s in SELF)
-        add("method", 0.9 if near_self else 0.55, i, "fansi")
+        add("method", 0.9 if near_self else 0.4, i, "fansi")
     for i in _idx(tok, _LATAK):
         near_self = any(abs(s - i) <= 5 for s in SELF)
         pk = any(abs(i - j) <= 3 for j in _idx(tok, _PANKHA))
@@ -353,7 +381,7 @@ def _english_evidence(norm_text: str, turn_idx: int) -> list[tuple[str, float, i
 def _combine(ev: list[tuple[str, float, int, str]], cur: int) -> tuple[float, list[str]]:
     """Group max, then noisy-or across groups. Earlier turns are decayed and only count when the current
     turn carries a signal of its own (>= 0.30)."""
-    decay = {0: 1.0, 1: 0.85, 2: 0.7}
+    decay = {0: 1.0, 1: 0.95, 2: 0.85}
     scored = [(g, w * decay.get(cur - t, 0.0), t, r) for g, w, t, r in ev]
     current = [e for e in scored if e[2] == cur]
     if not current or max(w for _, w, _, _ in current) < 0.30:
@@ -367,6 +395,19 @@ def _combine(ev: list[tuple[str, float, int, str]], cur: int) -> tuple[float, li
     for w, _ in best.values():
         prod *= 1.0 - w
     return round(1.0 - prod, 3), [f"{g}:{lab}={w:.2f}" for g, (w, lab) in sorted(best.items())]
+
+
+_LD_RAW = frozenset(normalize(w) for w in "maut death die dead dying life zindagi jindagi jeevan mar marna mara मौत मरना जिंदगी जिन्दगी जीना जीने जीवन".split())
+
+
+def _voice_low(voice) -> bool:
+    label = voice.get("label") if isinstance(voice, dict) else getattr(voice, "label", None)
+    return str(label or "").lower() in ("low", "sad")
+
+
+def _life_death_words(tok, raw, turn, cur) -> bool:
+    return any(turn[i] == cur and (r in _LD_RAW or tok[i] in _ZINDAGI or tok[i] in _LIVE or tok[i] in _DIEV)
+               for i, r in enumerate(raw))
 
 
 def _customer_texts(history) -> list[str]:
@@ -384,9 +425,11 @@ def _customer_texts(history) -> list[str]:
     return out[-2:]
 
 
-def distress_score(text: str, history=None) -> tuple[float, list[str]]:
+def distress_score(text: str, history=None, voice=None) -> tuple[float, list[str]]:
     """(score 0..1, evidence). history = previous turns (strings, or (role, text) pairs, or Utterances);
-    only the last 2 CUSTOMER turns are used. Deterministic."""
+    only the last 2 CUSTOMER turns are used. voice = the prosody reading of THIS turn (label 'low'/'sad'): with
+    life/death words in the turn it adds a 0.5 concern signal (a flat, heavy voice says "jeena" differently
+    from a joke). Deterministic."""
     turns = _customer_texts(history) + [text or ""]
     cur = len(turns) - 1
     tok: list[str] = []
@@ -407,6 +450,15 @@ def distress_score(text: str, history=None) -> tuple[float, list[str]]:
         turn += [ti] * len(sk)
         ev += _english_evidence(normalize(t), ti)
     ev += _evidence(tok, turn, hyper, raw)
+    cur_text = turns[cur]
+    ntext = normalize(cur_text)
+    for m in list(_LEGACY_RX.finditer(ntext)) + list(_LEGACY_RX.finditer(cur_text.lower())):
+        if _EN_NEG.search((ntext[max(0, m.start() - 14):m.start()])) and m.group(0).isascii():
+            continue  # "dont want to die"
+        ev.append(("ideation", 0.9 * (0.25 if cur in hyper else 1.0), cur, "legacy_phrase"))
+        break
+    if voice is not None and _voice_low(voice) and _life_death_words(tok, raw, turn, cur):
+        ev.append(("voice", 0.5, cur, "voice_low_life_death"))
     # dedupe identical evidence found twice
     seen, uniq = set(), []
     for e in ev:
@@ -416,13 +468,13 @@ def distress_score(text: str, history=None) -> tuple[float, list[str]]:
     return _combine(uniq, cur)
 
 
-def is_distress(text: str, history=None) -> bool:
-    return distress_score(text, history)[0] >= DISTRESS_T
+def is_distress(text: str, history=None, voice=None) -> bool:
+    return distress_score(text, history, voice)[0] >= DISTRESS_T
 
 
-def is_concern(text: str, history=None) -> bool:
+def is_concern(text: str, history=None, voice=None) -> bool:
     """Worrying but not clear enough to call a crisis: check in gently instead of selling."""
-    return CONCERN_T <= distress_score(text, history)[0] < DISTRESS_T
+    return CONCERN_T <= distress_score(text, history, voice)[0] < DISTRESS_T
 
 
 def crisis_from_nlu(understanding) -> bool:
@@ -495,5 +547,25 @@ def distress_plan() -> TurnPlan:
                         "kisi se baat kijiye jo madad kar sakte hain: Tele-MANAS, {helpline}, ye free hai aur din-raat "
                         "khula hai. Agar aap khatre mein hain to {emergency} pe call kijiye. Main yahin rukta hoon. "
                         "Kya abhi aapke paas koi hai, ya koi apna jise aap phone kar sakein?",
+        },
+    )
+
+
+def concern_plan() -> TurnPlan:
+    """Middle band (CONCERN_T <= score < DISTRESS_T): a gentle check-in instead of selling. Fixed, reviewed
+    wording, no LLM. The call stays open; a clearer answer next turn moves to distress_plan."""
+    return TurnPlan(
+        intent="safety_concern",
+        objective="Gently check in on a worrying remark; do not sell this turn",
+        decision="safety: pause selling, check in, offer Tele-MANAS",
+        facts={"helpline": Fact(value="14416", description="Tele-MANAS helpline")},
+        llm_allowed=False, end_call=False,
+        fallback={
+            "en": "Are you okay? If your heart feels heavy, you can talk to Tele-MANAS on {helpline} any time, it's free. "
+                  "I'm here and listening, there's no hurry about anything else.",
+            "hi": "क्या आप ठीक हैं? अगर मन भारी है तो Tele-MANAS {helpline} पर कभी भी बात कर सकते हैं, ये मुफ़्त है। "
+                  "मैं यहीं हूँ, और किसी बात की जल्दी नहीं है।",
+            "hinglish": "Kya aap theek hain? Agar mann bhaari hai to Tele-MANAS {helpline} pe kabhi bhi baat kar sakte hain, "
+                        "ye free hai. Main yahin hoon, aur kisi baat ki jaldi nahi hai.",
         },
     )
