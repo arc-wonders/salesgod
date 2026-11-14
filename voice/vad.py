@@ -76,6 +76,8 @@ class TurnDetector:
         # inside one VAD segment and cutting the agent off every turn
         self.run_frames = 0
         self.run_energy = 0.0
+        self.frame_no = 0
+        self.run_start = -1  # frame number where the current confident-speech run began
         self.on_frame = None  # optional callback(frame, vad_prob): the call's calibrator learns line noise
 
     def feed(self, audio: np.ndarray) -> list[tuple[str, np.ndarray | None]]:
@@ -89,7 +91,10 @@ class TurnDetector:
                 self.on_frame(frame, p)
             speech = p >= self.threshold
             rms = float(np.sqrt(np.mean(frame * frame)))
+            self.frame_no += 1
             if p >= 0.7:
+                if self.run_frames == 0:
+                    self.run_start = self.frame_no
                 self.run_energy = (self.run_energy * self.run_frames + rms) / (self.run_frames + 1)
                 self.run_frames += 1
             else:
