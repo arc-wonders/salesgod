@@ -208,3 +208,21 @@ async def test_quiet_real_yes_is_kept_when_whisper_heard_speech():
     cs2.app.stt.next, cs2.app.stt.nsp = ("Okay.", ""), 0.59  # the same words from noise
     await cs2.handle_utterance(speech(amp=0.02), time.monotonic(), False, overlap=False)
     assert not [t for t in cs2.call.turns if t["role"] == "customer"]
+
+
+async def test_barge_in_gets_another_look_as_the_interruption_grows():
+    """A short clip scores lower: a caller at 0.30 on the first 0.5 s passes when 0.8 s scores 0.40."""
+    cs, _ = session()
+    cs.play_until = time.monotonic() + 5
+    d = cs.detector
+    d.in_speech, d.run_frames, d.run_start, d.run_energy = True, 16, 3, 0.2  # 512 ms
+    d.frames = [np.zeros(512, np.float32)] * 40
+    voice(cs, 0.30)
+    await cs.check_barge_in()
+    assert not cs.barge_in_pending
+    await cs.check_barge_in()  # same run, same length: no second look yet
+    assert [e["type"] for e in cs.call.events].count("barge_in_ignored") == 1
+    d.run_frames = 26  # 832 ms
+    voice(cs, 0.40)
+    await cs.check_barge_in()
+    assert cs.barge_in_pending

@@ -67,7 +67,8 @@ GOODBYE_MAX_S = 8.0  # after our goodbye, noise / half-heard words never keep th
 STOCK_NOISE = {"कर दो", "कर दो कर दो", "हुआ है", "हुआ है हुआ है", "करते हैं", "कि अ", "कर दो कि अ", "thank you",
                "thank you very much", "thanks for watching", "okay", "ok", "you", "bye", "we'll be on", "we're ready",
                "हां", "हाँ", "जी", "कि", "अ", "हम्म", "hmm", "yes", "yeah", "उनको लेकर", "कि उनको लेकर"}
-CLEAN_RMS = 0.03  # a turn loud enough (with the agent silent) to teach the caller's voice print
+CLEAN_RMS = 0.03
+BARGE_STAGES = [(500, 0.35), (800, 0.35), (1200, 0.32)]  # (ms of the caller's run, voice similarity needed)  # a turn loud enough (with the agent silent) to teach the caller's voice print
 MAX_CALL_S = 360.0
 
 
@@ -137,6 +138,7 @@ class CallSession:
         self.speak_lock = asyncio.Lock()
         self.in_turn = False  # a turn ACCEPTED as the caller's is being answered
         self.barge_checked_run = -1  # VAD run already voice-checked for barge-in
+        self.barge_stage = 0
         self.accepted_turns = 0
         self.primary: list = []  # prosody of the caller's accepted turns (speaker lock)
         self.speaker = SpeakerLock()
@@ -287,16 +289,16 @@ class CallSession:
             return
         run_ms = d.run_frames * 32
         if self.speaker.confirmed:
-            # we know the caller's voice: stop as soon as 0.5 s of THEIR voice is heard, and never for noise
-            # or a background voice (barge-ins with no caller words after them cut the agent off mid-sentence)
-            if run_ms < 500 or self.barge_checked_run == d.run_start:
+            # we know the caller's voice: stop for THEIR voice, never for noise or a background voice. Checked in
+            # stages because a short clip scores lower (voice/diag_bargein.py on 122 real caller turns: the
+            # first 0.5 / 0.8 / 1.0 s pass >= 0.35 for 66% / 88% / 94% of callers, noise 0% / 0% / 7%)
+            stage = self.barge_stage if self.barge_checked_run == d.run_start else 0
+            if stage >= len(BARGE_STAGES) or run_ms < BARGE_STAGES[stage][0]:
                 return
-            self.barge_checked_run = d.run_start
+            self.barge_checked_run, self.barge_stage = d.run_start, stage + 1
             clip = np.concatenate(d.frames[-max(16, min(d.run_frames, 40)):])
             _, _, sim = await asyncio.to_thread(self.speaker.score, clip)
-            if sim is None or sim < 0.45:
-                if run_ms >= 1500:
-                    self.barge_checked_run = -1  # a longer run gets one more look
+            if sim is None or sim < BARGE_STAGES[stage][1]:
                 self.event("barge_in_ignored", {"voice_similarity": sim, "run_ms": run_ms})
                 return
             if not (self.agent_speaking() and not self.barge_in_pending):
