@@ -1,510 +1,1199 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>SalesGod Architecture</title>
-<meta name="claude:viewport-fit-sides" content="cover">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap">
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SalesGod ACIE architecture</title>
 <style>
-/* Layout: a single spec-sheet column; every layer is a numbered stage of the call, with tables and formulas instead of prose. */
-:root{
-  --bg:#f4f6f5; --panel:#ffffff; --ink:#0f1b1d; --muted:#56666a; --line:#d6dedc;
-  --accent:#b8560f; --accent-soft:#f6e6d8; --code:#eef2f1; --ok:#1f7a4d; --warn:#a1620a; --off:#7a5a9c;
-  --sans:"Instrument Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
-  --mono:"JetBrains Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
-}
-@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
-  --bg:#0d1416; --panel:#131d20; --ink:#e3ebe9; --muted:#93a4a7; --line:#26363a;
-  --accent:#f0954b; --accent-soft:#3a2716; --code:#18252a; --ok:#5cc58e; --warn:#e3a94a; --off:#b99be0; color-scheme:dark}}
-:root[data-theme="dark"]{
-  --bg:#0d1416; --panel:#131d20; --ink:#e3ebe9; --muted:#93a4a7; --line:#26363a;
-  --accent:#f0954b; --accent-soft:#3a2716; --code:#18252a; --ok:#5cc58e; --warn:#e3a94a; --off:#b99be0; color-scheme:dark}
+:root{--bg:#f5f6f4;--panel:#ffffff;--ink:#14201f;--muted:#566664;--line:#d5dcd9;--accent:#a8500d;--soft:#f5e7d9;--code:#edf1ef;
+--sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;--mono:ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace}
+@media (prefers-color-scheme: dark){:root{--bg:#0e1517;--panel:#141e21;--ink:#e2eae8;--muted:#92a3a1;--line:#27373a;--accent:#f0954b;--soft:#3a2716;--code:#19272b;color-scheme:dark}}
 *{box-sizing:border-box}
-body{background:var(--bg);color:var(--ink);font:15px/1.55 var(--sans);margin:0}
-.wrap{max-width:1080px;margin:0 auto;padding-block:40px 80px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:grid;gap:44px}
-h1,h2,h3{text-wrap:balance;margin:0;line-height:1.2}
-h1{font-size:clamp(28px,4.4vw,42px);font-weight:700;letter-spacing:-.02em}
-h2{font-size:22px;font-weight:650;display:flex;gap:12px;align-items:baseline}
-h2 .n{font:600 13px var(--mono);color:var(--accent);min-width:2.2em}
-h3{font-size:14px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
-p{margin:0;max-width:72ch}
-.lede{color:var(--muted);max-width:72ch}
-code,.mono{font-family:var(--mono);font-size:.9em}
-section{display:grid;gap:16px;min-width:0}
-.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr));gap:16px}
-.grid2>*{min-width:0}
-.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,150px),1fr));gap:10px}
-.tile{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px 14px;display:grid;gap:2px}
-.tile b{font:600 22px var(--mono);font-variant-numeric:tabular-nums}
-.tile span{font-size:12.5px;color:var(--muted)}
-.tw{overflow-x:auto;border:1px solid var(--line);border-radius:8px;background:var(--panel)}
-table{border-collapse:collapse;width:100%;font-size:13.5px}
-th,td{padding:7px 11px;text-align:left;vertical-align:top;border-bottom:1px solid var(--line)}
-tr:last-child td{border-bottom:0}
-th{font-size:11.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:600;background:var(--code)}
-td.num,th.num{text-align:right;font-family:var(--mono);font-variant-numeric:tabular-nums;white-space:nowrap}
-td code{white-space:nowrap}
-.eq{background:var(--code);border-left:3px solid var(--accent);border-radius:0 6px 6px 0;padding:12px 16px;font:13.5px/1.7 var(--mono);overflow-x:auto;white-space:pre}
-.pill{display:inline-block;font:600 11px var(--mono);padding:2px 7px;border-radius:99px;letter-spacing:.03em;white-space:nowrap}
-.live{background:color-mix(in srgb,var(--ok) 16%,transparent);color:var(--ok)}
-.notlive{background:color-mix(in srgb,var(--off) 16%,transparent);color:var(--off)}
-.cpu{background:color-mix(in srgb,var(--warn) 16%,transparent);color:var(--warn)}
-.diagram{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:16px;overflow-x:auto}
-.note{font-size:13px;color:var(--muted)}
-.callout{background:var(--accent-soft);border-radius:8px;padding:12px 16px;font-size:14px}
-header{display:grid;gap:14px}
-.eyebrow{font:600 12px var(--mono);color:var(--accent);letter-spacing:.08em;text-transform:uppercase}
-ul.tight{margin:0;padding-left:18px;display:grid;gap:4px;max-width:80ch}
-.bar{height:22px;display:flex;border-radius:5px;overflow:hidden;border:1px solid var(--line)}
-.bar>div{display:flex;align-items:center;justify-content:center;font:600 11px var(--mono);color:var(--bg);white-space:nowrap;overflow:hidden}
-.legend{display:flex;flex-wrap:wrap;gap:14px;font-size:12.5px;color:var(--muted)}
-.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.6 var(--sans)}
+.layout{max-width:1180px;margin:0 auto;padding:32px 16px 80px;display:grid;grid-template-columns:230px minmax(0,1fr);gap:32px}
+nav{position:sticky;top:16px;align-self:start;display:grid;gap:2px;font-size:13px;max-height:calc(100vh - 32px);overflow:auto}
+nav a{color:var(--muted);text-decoration:none;padding:4px 8px;border-radius:6px}
+nav a:hover{background:var(--soft);color:var(--ink)}
+main{min-width:0}
+h1{font-size:clamp(26px,4vw,38px);line-height:1.15;margin:0 0 12px;letter-spacing:-.02em}
+h2{font-size:22px;margin:44px 0 10px;padding-top:8px;border-top:1px solid var(--line)}
+h3{font-size:16px;margin:26px 0 8px;color:var(--accent)}
+p,li{max-width:80ch}
 a{color:var(--accent)}
-:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-</style>
-</head><body>
+code{font-family:var(--mono);font-size:.88em;background:var(--code);padding:1px 5px;border-radius:4px}
+pre{margin:12px 0}
+pre.eq{background:var(--code);border-left:3px solid var(--accent);border-radius:0 6px 6px 0;padding:12px 16px;overflow-x:auto;font:13px/1.65 var(--mono)}
+pre.eq code{background:none;padding:0;font-size:inherit}
+.tw{overflow-x:auto;border:1px solid var(--line);border-radius:8px;background:var(--panel);margin:12px 0}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th,td{padding:7px 10px;text-align:left;vertical-align:top;border-bottom:1px solid var(--line)}
+tr:last-child td{border-bottom:0}
+th{font-size:11.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);background:var(--code);white-space:nowrap}
+td code{white-space:normal;word-break:break-word}
+.diagram{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:16px;overflow-x:auto;margin:12px 0}
+.diagram pre.mermaid{margin:0;background:none;text-align:center}
+hr{border:0;border-top:1px solid var(--line);margin:28px 0}
+blockquote{margin:12px 0;padding:8px 14px;background:var(--soft);border-radius:8px}
+@media (max-width:860px){.layout{grid-template-columns:1fr}nav{position:static;grid-auto-flow:column;overflow-x:auto;max-height:none;padding-bottom:6px}nav a{white-space:nowrap}}
+</style></head>
+<body><div class="layout"><nav><a href="#0-the-idea-in-one-screen">0. The idea in one screen</a><a href="#1-deterministic-before-the-llm-the-guarantee-stage-by-stage">1. Deterministic before the LLM (the guarantee, stage by stage)</a><a href="#2-models-every-model-where-it-runs-on-or-off">2. Models: every model, where it runs, on or off</a><a href="#3-the-14-dim-humanstate-acie-schemas-py-80-98-acie-signals-py-20">3. The 14-dim HumanState (`acie/schemas.py:80-98`, `acie/signals.py:20`)</a><a href="#4-layer-1-2-hearing-providers-turnsignals">4. Layer 1-2: hearing (providers -&gt; TurnSignals)</a><a href="#5-layer-3-personalization">5. Layer 3: personalization</a><a href="#6-layer-2b-emotion-table-needs-moves-ledger-acie-psyche">6. Layer 2b: emotion table, needs, moves, ledger (`acie/psyche/`)</a><a href="#7-layer-4-response-determination-acie-decision-acie-playbook-py-acie-safety-py-acie-context-py">7. Layer 4: response determination (`acie/decision/`, `acie/playbook.py`, `acie/safety.py`, `acie/context.py`)</a><a href="#8-layers-5-7-compile-express-validate">8. Layers 5-7: compile, express, validate</a><a href="#9-layer-8-feedback-acie-feedback-py">9. Layer 8: feedback (`acie/feedback.py`)</a><a href="#10-voice-layer-voice">10. Voice layer (`voice/`)</a><a href="#11-runtime-stores-all-flag-gated-defaults-are-in-process">11. Runtime stores (all flag-gated, defaults are in-process)</a><a href="#12-latency-budget">12. Latency budget</a><a href="#13-tests-and-evaluation">13. Tests and evaluation</a><a href="#14-not-on-this-commit">14. Not on this commit</a></nav><main>
+<h1>SalesGod (ACIE) architecture, as the code is now</h1>
+<p>Snapshot: branch <code>lane/docs</code>, from <code>build/acie-complete</code> @ <code>c2e6be6</code>. Every number below is read from the code at that commit;
+<code>path:line</code> points at it. The standalone, browsable version of this file is <code>docs/ARCHITECTURE.html</code>. Flags are in
+<code>docs/FLAGS.md</code>; what is done and what is left, layer by layer, is in <code>docs/STATUS.md</code>.</p>
+<p>Two things are NOT on this commit and are described in section 14 only, clearly marked: the XGBoost turn classifier
+(<code>lane/ml</code> @ <code>c7e0562</code>, not merged) and the numbers measured on the live server (given by the coordinator, not stored in the repo).</p>
+<hr />
+<h2 id="0-the-idea-in-one-screen">0. The idea in one screen</h2>
+<p>The LLM only phrases. What the agent does is decided before the LLM is called, by rules, tables, small learned models with
+fixed parameters, and business facts. The LLM sees a <code>TurnPlan</code> (objective, <code>{slot}</code> placeholders, <code>must_not_say</code>, ask) and is
+not allowed to write a number; the validator fills the real values in afterwards and replaces the whole reply with the reviewed
+template if anything is wrong.</p>
+<pre class="eq"><code> caller audio (8 kHz mu-law, Plivo)
+   -&gt; VAD (Silero) -&gt; speaker lock (WeSpeaker) -&gt; STT (Whisper large-v3) ; prosody + calibrator in parallel     voice/call.py:423
+   -&gt; ACIEPipeline.run_turn                                                                                      acie/pipeline.py:207
+        L1-2  providers: rules (+ llm NLU, + model, + http)  -&gt; fuse -&gt; TurnSignals -&gt; 14-dim HumanState (EMA)  pipeline.py:108
+        L3    explicit requests -&gt; long-term profile -&gt; style policy (rules | LinUCB | XGBoost) -&gt; ExpressionParams
+        L2b   emotion table (11 rows) -&gt; crisis override ; need table -&gt; move (ACIE_PSYCHE=1)
+        L4    DecisionEngine -&gt; ProductSalesDomain -&gt; TurnPlan  ; repeat guard (SaidLedger)
+        L5    PromptCompiler  (only if plan.llm_allowed)
+        L6    LLM expression (Qwen3-14B-AWQ, vLLM)  |  TemplateBackend (the plan&#x27;s reviewed fallback)
+        L7    StreamingValidator (per sentence)  -&gt; safe template on any failure
+        L8    FeedbackEngine (reward, profile learning, memory)
+   -&gt; sentences stream to TTS (Fish Audio, 8 kHz PCM) -&gt; mu-law -&gt; Plivo
+</code></pre>
+<div class="diagram"><pre class="mermaid">flowchart LR
+  A[&quot;Plivo audio&quot;] --&gt; B[&quot;VAD + speaker lock&quot;]
+  B --&gt; C[&quot;Whisper large-v3&quot;]
+  B --&gt; P[&quot;prosody + calibrator&quot;]
+  C --&gt; S[&quot;providers: rules, llm, model, http&quot;]
+  P --&gt; S
+  S --&gt; F[&quot;fusion to TurnSignals&quot;]
+  F --&gt; H[&quot;HumanState, 14 dims&quot;]
+  PR[(&quot;profile&quot;)] --&gt; POL[&quot;style policy&quot;]
+  H --&gt; POL
+  H --&gt; EM[&quot;emotion table&quot;]
+  EM --&gt; D[&quot;DecisionEngine: TurnPlan&quot;]
+  POL --&gt; D
+  D --&gt; C5[&quot;prompt compiler&quot;]
+  C5 --&gt; L6[&quot;LLM expression&quot;]
+  L6 --&gt; V[&quot;validator&quot;]
+  V --&gt; T[&quot;TTS Fish&quot;]
+  V --&gt; FB[&quot;feedback&quot;]
+</pre></div>
+<hr />
+<h2 id="1-deterministic-before-the-llm-the-guarantee-stage-by-stage">1. Deterministic before the LLM (the guarantee, stage by stage)</h2>
+<p>Order inside one turn (<code>acie/pipeline.py:207-430</code>): understand -&gt; profile -&gt; explicit requests -&gt; style policy -&gt; emotion row -&gt;
+(need, move) -&gt; decision plan -&gt; repeat guard -&gt; compile -&gt; LLM wording -&gt; validate. Everything before &quot;LLM wording&quot; is a function
+of (text, timing, prosody, session, profile, flags), with these exceptions, stated plainly:</p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>stage</th>
+<th>deterministic?</th>
+<th>note</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>rules provider (keywords, lexicons)</td>
+<td>yes</td>
+<td>pure Python, <code>acie/providers/rules.py</code></td>
+</tr>
+<tr>
+<td><code>model</code> provider (trained classifier)</td>
+<td>yes</td>
+<td>single-thread predict, ties to the lowest class index (lane/ml)</td>
+</tr>
+<tr>
+<td><code>llm</code> provider (NLU, Qwen3-14B-AWQ)</td>
+<td>NO (near)</td>
+<td>temperature 0 and guided JSON (<code>acie/understanding.py:128,130</code>), but a GPU LLM is not bit-exact. It is ON in the voice server (<code>voice/server.py:111</code> passes <code>nlu</code> for every non-template backend). With <code>ACIE_SIGNAL_PROVIDERS=rules</code> the hearing step is fully deterministic (<code>acie/providers/hub.py:19</code>).</td>
+</tr>
+<tr>
+<td>fusion, EMA, policy, tables, moves, ledger, plan</td>
+<td>yes</td>
+<td>no <code>random</code>, no <code>hash()</code>, sorted iteration, crc32 only (<code>acie/signals_fusion.py:5</code>, <code>acie/psyche/needs.py:195</code>, <code>acie/memory/hashing.py:25</code>)</td>
+</tr>
+<tr>
+<td>LinUCB / XGBoost style policies</td>
+<td>yes</td>
+<td>posterior mean, no exploration bonus at decision time (<code>acie/personalization/bandit.py:205</code>)</td>
+</tr>
+<tr>
+<td>expression LLM</td>
+<td>NO</td>
+<td>temperature 0.3 by default (<code>acie/expression.py:95</code>), 0.0 under <code>ACIE_PSYCHE=1</code> (<code>:104</code>). It cannot change the plan: <code>llm_allowed=False</code> plans never reach it (<code>acie/pipeline.py:318</code>) and the validator checks the rest</td>
+</tr>
+<tr>
+<td>A/B backend choice</td>
+<td>yes per session</td>
+<td>sha256 of `salt</td>
+</tr>
+<tr>
+<td>playbook generation (frontier model, temp 0.4)</td>
+<td>NO</td>
+<td>offline authoring, never in the call path (<code>acie/playbook.py:180</code>); the live picker is deterministic (section 7.4)</td>
+</tr>
+</tbody>
+</table></div>
+<p>What the LLM can and cannot do (<code>acie/compiler.py:121-141</code>, <code>acie/validator.py:160-195</code>): it gets facts only as <code>{slot}</code>
+placeholders; any digit, rupee sign, number word, invented slot, wrong script, or rule-pack hit fails the sentence and the whole
+reply becomes the plan's reviewed fallback.</p>
+<hr />
+<h2 id="2-models-every-model-where-it-runs-on-or-off">2. Models: every model, where it runs, on or off</h2>
+<p>&quot;Live&quot; = on the production voice server path by default in code. Production <code>.env</code> is not in the repo; &quot;flag&quot; rows are off unless the
+flag is set, and per the lane brief all flags added by the lanes are unset in production.</p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>#</th>
+<th>model</th>
+<th>size</th>
+<th>precision</th>
+<th>where</th>
+<th>state</th>
+<th>evidence</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>Whisper <code>large-v3</code> (faster-whisper, CTranslate2)</td>
+<td>not stated in code</td>
+<td>float16</td>
+<td>GPU (<code>device=&quot;cuda&quot;</code>), concurrency <code>STT_CONCURRENCY</code>=4</td>
+<td>live</td>
+<td><code>voice/stt.py:16-19</code></td>
+</tr>
+<tr>
+<td>2</td>
+<td>Silero VAD v5.1.2</td>
+<td>not stated in code</td>
+<td>ONNX (precision not stated)</td>
+<td>CPU, 1 intra + 1 inter thread</td>
+<td>live</td>
+<td><code>voice/vad.py:149-163</code></td>
+</tr>
+<tr>
+<td>3</td>
+<td>WeSpeaker ResNet34-LM speaker embedding</td>
+<td>256-d output</td>
+<td>ONNX</td>
+<td>CPU, 2 intra threads</td>
+<td>live</td>
+<td><code>voice/speaker.py:21-30,46-53</code></td>
+</tr>
+<tr>
+<td>4</td>
+<td>YIN pitch tracker + calibrator (numpy, not a model)</td>
+<td>-</td>
+<td>float32</td>
+<td>CPU</td>
+<td>live reading; used by the estimator only when <code>ACIE_PROSODY=1</code></td>
+<td><code>voice/prosody.py</code>, <code>voice/calibrator.py</code>, <code>acie/state/estimator.py:434</code></td>
+</tr>
+<tr>
+<td>5</td>
+<td>Qwen3-14B-AWQ as NLU (<code>llm</code> provider)</td>
+<td>14 B (from the name)</td>
+<td>AWQ weight quantisation</td>
+<td>GPU, vLLM <code>:8000</code>, 0.6 of the GPU</td>
+<td>live (voice server)</td>
+<td><code>deploy/voice/salesgod-llm.service:9-11</code>, <code>acie/understanding.py:113-130</code></td>
+</tr>
+<tr>
+<td>6</td>
+<td>Qwen3-14B-AWQ as expression writer</td>
+<td>14 B</td>
+<td>AWQ</td>
+<td>same vLLM server, <code>--max-model-len 4096 --max-num-seqs 32 --enable-prefix-caching</code></td>
+<td>live</td>
+<td><code>deploy/voice/salesgod-llm.service:9-11</code>, <code>acie/expression.py:93-115</code></td>
+</tr>
+<tr>
+<td>7</td>
+<td>Fish Audio <code>s2.1-pro-free</code> TTS</td>
+<td>hosted</td>
+<td>16-bit mono PCM, 8 kHz</td>
+<td>Fish HTTP API</td>
+<td>live</td>
+<td><code>voice/tts.py:16,22</code></td>
+</tr>
+<tr>
+<td>8</td>
+<td>Need classifier, XGBoost <code>multi:softprob</code></td>
+<td>9 classes, 164 features</td>
+<td>float32 inputs</td>
+<td>CPU, 1 thread</td>
+<td>ONLY with <code>ACIE_PSYCHE=1</code> (off)</td>
+<td><code>acie/psyche/need_model.meta.json</code>, <code>acie/psyche/needs.py:194-260</code></td>
+</tr>
+<tr>
+<td>9</td>
+<td>Turn classifier, MuRIL (<code>google/muril-base-cased</code> default; XLM-R option)</td>
+<td>not stated in code</td>
+<td>bf16 on cuda, fp32 on cpu</td>
+<td>GPU/CPU</td>
+<td>flag <code>ACIE_TURN_MODEL</code>; trainer only, no checkpoint in repo</td>
+<td><code>training/state_classifier/train.py:120</code>, <code>predict.py:107-111</code></td>
+</tr>
+<tr>
+<td>10</td>
+<td>Style policy: LinUCB (numpy ridge, 21 arms, d=53)</td>
+<td>21 x (53x53 + 53) floats</td>
+<td>float64</td>
+<td>CPU</td>
+<td>flag <code>ACIE_POLICY=bandit</code></td>
+<td><code>acie/personalization/bandit.py:53-61,85-103</code></td>
+</tr>
+<tr>
+<td>11</td>
+<td>Style policy: XGBoost regressor per arm</td>
+<td>200 trees, depth 4</td>
+<td>float32</td>
+<td>CPU, 1 thread</td>
+<td>flag <code>ACIE_POLICY=xgb</code></td>
+<td><code>acie/personalization/train_style.py:24-30</code></td>
+</tr>
+<tr>
+<td>12</td>
+<td>Memory embedder: hashing (default)</td>
+<td>256-d</td>
+<td>float</td>
+<td>CPU</td>
+<td>flag <code>ACIE_MEMORY=1</code></td>
+<td><code>acie/memory/hashing.py:21</code></td>
+</tr>
+<tr>
+<td>13</td>
+<td>Memory embedder: <code>intfloat/multilingual-e5-small</code></td>
+<td>not stated in code</td>
+<td>normalised embeddings</td>
+<td>CPU/GPU</td>
+<td>flag <code>ACIE_EMBED=st</code></td>
+<td><code>acie/memory/st.py:11</code></td>
+</tr>
+<tr>
+<td>14</td>
+<td>Playbook planner LLM (any OpenAI-compatible frontier model)</td>
+<td>n/a</td>
+<td>n/a</td>
+<td>remote</td>
+<td>offline authoring only</td>
+<td><code>acie/playbook.py:172-189</code></td>
+</tr>
+<tr>
+<td>15</td>
+<td>Expression LoRA (base <code>Qwen/Qwen2.5-7B-Instruct</code>, r=16, alpha=32, dropout 0.05, lr 1.5e-4, 2 epochs, bf16, max_len 3072)</td>
+<td>7 B base</td>
+<td>bf16</td>
+<td>training box</td>
+<td>not the live model; live unit serves base <code>Qwen3-14B-AWQ</code></td>
+<td><code>training/expression/train_lora.py:84-101</code>, <code>deploy/serve_vllm.sh:17</code></td>
+</tr>
+<tr>
+<td>16</td>
+<td>Teacher for SFT data: Qwen2.5-72B-Instruct, TP=4</td>
+<td>72 B</td>
+<td>bfloat16</td>
+<td>4 GPUs</td>
+<td>offline</td>
+<td><code>deploy/serve_teacher.sh:5,11,15</code></td>
+</tr>
+</tbody>
+</table></div>
+<p>Not models, but in the loop: world lookups (<code>acie/world.py</code>: clock, Open-Meteo weather, Wikipedia; budget 2.0 s, <code>:68</code>), the business API
+(mock or HTTP, <code>acie/business</code>), Redis/Postgres/pgvector/NATS (all flag-gated, section 11).</p>
+<hr />
+<h2 id="3-the-14-dim-humanstate-acie-schemas-py-80-98-acie-signals-py-20">3. The 14-dim HumanState (<code>acie/schemas.py:80-98</code>, <code>acie/signals.py:20</code>)</h2>
+<p>All values in [0,1]. <code>b</code> = the neutral baseline the EMA decays toward (the field default).</p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>#</th>
+<th>dim</th>
+<th>baseline b</th>
+<th>rule source</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>frustration</td>
+<td>0.0</td>
+<td>lexicon + repeat + caps/<code>!!</code> + barge-in (<code>estimator.py:227-236</code>)</td>
+</tr>
+<tr>
+<td>2</td>
+<td>confusion</td>
+<td>0.0</td>
+<td>lexicon + repeat + short question (<code>estimator.py:216-225</code>)</td>
+</tr>
+<tr>
+<td>3</td>
+<td>urgency</td>
+<td>0.0</td>
+<td>lexicon + barge-in + fast speech (<code>estimator.py:238-243</code>)</td>
+</tr>
+<tr>
+<td>4</td>
+<td>engagement</td>
+<td>0.5</td>
+<td>minimal reply 0.2 / question or long 0.8 / slow reply (<code>estimator.py:245-253</code>)</td>
+</tr>
+<tr>
+<td>5</td>
+<td>satisfaction</td>
+<td>0.5</td>
+<td><code>0.5 + 0.45*like - 0.5*dislike - 0.25*frustration</code> (<code>dims.py:242</code>)</td>
+</tr>
+<tr>
+<td>6</td>
+<td>anxiety</td>
+<td>0.0</td>
+<td>lexicon score (<code>dims.py:249-253</code>)</td>
+</tr>
+<tr>
+<td>7</td>
+<td>excitement</td>
+<td>0.0</td>
+<td>lexicon score, <code>+0.15</code> if <code>!</code>, <code>+0.1</code> if rate &gt; 3.5 wps (<code>dims.py:255-263</code>)</td>
+</tr>
+<tr>
+<td>8</td>
+<td>calmness</td>
+<td>0.5</td>
+<td><code>0.5 + 0.4*calm - 0.4*frust - 0.25*anx - 0.2*urg - 0.1*barge</code> (<code>dims.py:265-272</code>)</td>
+</tr>
+<tr>
+<td>9</td>
+<td>trust</td>
+<td>0.5</td>
+<td><code>0.5 + 0.4*trust_up - 0.5*trust_down</code> (<code>dims.py:274-280</code>)</td>
+</tr>
+<tr>
+<td>10</td>
+<td>certainty</td>
+<td>0.5</td>
+<td><code>0.5 - 0.45*hedge + 0.4*assert - 0.1*ellipsis</code> (<code>dims.py:282-290</code>)</td>
+</tr>
+<tr>
+<td>11</td>
+<td>cognitive_load</td>
+<td>0.0</td>
+<td>load lexicon + hesitations + ellipsis + confusion&gt;=0.6 (+0.2) + latency + repeat (<code>dims.py:292-314</code>)</td>
+</tr>
+<tr>
+<td>12</td>
+<td>attention</td>
+<td>0.5</td>
+<td>length/question bonuses, minimal reply -0.2 (<code>dims.py:316-332</code>)</td>
+</tr>
+<tr>
+<td>13</td>
+<td>participation</td>
+<td>0.5</td>
+<td>0.2 / 0.4 / 0.65 / 0.8 by content words, +0.15 question, +0.1 barge-in (<code>dims.py:334-347</code>)</td>
+</tr>
+<tr>
+<td>14</td>
+<td>receptiveness</td>
+<td>0.5</td>
+<td><code>0.5 + 0.4*agree - 0.5*refuse - 0.2*frust - 0.1*anx</code> (+0.1 question, -0.1 minimal) (<code>dims.py:349-359</code>)</td>
+</tr>
+</tbody>
+</table></div>
+<p><code>signals: list[str]</code> carries the evidence strings for the turn (<code>schemas.py:98</code>). Lexicon sizes (phrases): confusion 89, frustration 192, urgency 46,
+like 52, dislike 43, anxiety 54, excitement 47, calm 35, trust-up 34, trust-down 66, hedge 42, assert 35, load 55, agree 60, refuse 54
+(counted by import from <code>acie/state/estimator.py</code> and <code>acie/state/dims.py</code>).</p>
+<h3 id="3-1-lexicon-score-acie-state-estimator-py-185-188">3.1 Lexicon score (<code>acie/state/estimator.py:185-188</code>)</h3>
+<pre class="eq"><code>score(hits) = min(1.0, strongest_weight + 0.15 * (number_of_distinct_hits - 1))     0 if no hit
+</code></pre>
+<p>Phrase syntax: <code>x*</code> suffix match, <code>=x</code> whole utterance, masks replace negated phrases first (<code>estimator.py:152-182</code>). If one phrase is inside
+a longer hit only the longer one counts (<code>:175-181</code>).</p>
+<h3 id="3-2-core-four-before-smoothing-estimator-py-203-258">3.2 Core four before smoothing (<code>estimator.py:203-258</code>)</h3>
+<pre class="eq"><code>repeated      = jaccard(text, previous_customer_turn) &gt;= 0.6
+confusion    += lex + 0.3*repeated + 0.2*(text ends &quot;?&quot; and &lt;= 3 tokens)
+frustration  += lex + 0.3*repeated + 0.3*(&gt;=2 &quot;!&quot; or (len&gt;8 and UPPERCASE)) + 0.25*barge_in
+urgency      += lex + 0.2*barge_in + 0.2*(speech_rate &gt; 3.5 words/s)
+engagement    = 0.2 if every content word is a minimal reply; else 0.8 if &quot;?&quot; or &gt;=8 tokens or (&gt;=3 content words and a question word); else 0.5
+engagement   -= 0.2 if response_latency_ms &gt; 4000
+all clamped to [0,1]
+</code></pre>
+<h3 id="3-3-ema-with-a-per-dim-baseline-estimator-py-396-446">3.3 EMA with a per-dim baseline (<code>estimator.py:396-446</code>)</h3>
+<pre class="eq"><code>a = alpha_up   (0.7)  if r &gt; p     else  alpha_down (0.3)          alpha defaults: estimator.py:409
+H = b + a*(r - b) + (1 - a)*(p - b)           rounded to 3 decimals   (estimator.py:444-445)
+</code></pre>
+<p>r = raw reading this turn, p = previous smoothed value, b from <code>_BASELINE</code> = the <code>HumanState</code> field default (<code>:393</code>).
+Rise fast, decay slow; a dim whose neutral value is 0.5 decays to 0.5, not to 0. Worked example: p=0, r=0.8 -&gt; 0.56; next turn r=0 -&gt; 0.392.</p>
+<h3 id="3-4-prosody-arousal-only-with-acie-prosody-1-estimator-py-434">3.4 Prosody arousal (only with <code>ACIE_PROSODY=1</code>, <code>estimator.py:434</code>)</h3>
+<pre class="eq"><code>baseline = median of the caller&#x27;s last 8 turns (pitch st, pitch std, loudness dB); a turn &gt; 7.0 st away from the median is dropped from it  (:263-272)
+arousal  = 0.45*clip(d_pitch/4,-1,1) + 0.30*clip(var_ratio-1,-1,1) + 0.25*clip(d_loud/6,-1,1);   x min(1, n_baseline/3)         (:298-300)
+|d_pitch| &gt; 7 st -&gt; 0 (&quot;probably not the same voice&quot;)                                                                            (:294-297)
+</code></pre>
+<p>A calibrated <code>VoiceReading</code> is preferred: <code>arousal = reading.arousal * reading.confidence</code> (<code>:311-319</code>).
+<code>apply_prosody</code> (<code>:322-353</code>): arousal &gt; 0.25 with negative words -&gt; frustration <code>+0.4*a</code>, urgency <code>+0.15*a</code>, anxiety <code>+(0.4 if worried else 0.2)*a</code>,
+calmness <code>-0.4*a</code>; with neutral/positive words -&gt; engagement <code>+0.25*a</code>, frustration <code>+0.1*a</code>, excitement <code>+0.5*a</code>, calmness <code>-0.2*a</code>;
+arousal &lt; -0.25 -&gt; engagement <code>-0.4|a|</code>, calmness <code>+0.4|a|</code>, excitement <code>-0.3|a|</code>.</p>
+<h3 id="3-5-voice-calibrator-voice-calibrator-py-per-call-numpy-10-60-ms-per-turn">3.5 Voice calibrator (<code>voice/calibrator.py</code>, per call, numpy, 10-60 ms per turn)</h3>
+<pre class="eq"><code>z_k       = (feature_k - centre_k) / spread_k,  centre = median of this caller&#x27;s baseline turns (max 12, :43)
+arousal   = clip( sum_k w_k * tanh(clip(z_k,-4,4)/2) / sum_k w_k / 0.55 , -1, 1 )                       (:215)
+conf      = {1 turn: 0.5, 2 turns: 0.75, else 1.0} * min(1, voiced_seconds/0.6)
+weights   pitch .32, pitch_var .18, loudness .22, effort .18, rate .10                                 (:40)
+spread    defaults 1.5 / 0.6 / 3.0 / 2.5 / 0.9 (:39); fitted on 20 real calls: 0.971 / 0.578 / 1.334 / 1.694 / 0.618 (voice/assets/calib_stats.json)
+calibrated once &gt;= 2 baseline turns and &gt;= 1.0 s voiced (:50-51), or 1 turn + a fitted pickup offset; shifts &gt; 7.0 st = another voice (:44)
+</code></pre>
+<h3 id="3-6-fusion-with-a-trained-model-or-the-nlu">3.6 Fusion with a trained model or the NLU</h3>
+<ul>
+<li>Trained turn model (<code>ACIE_TURN_MODEL</code>, legacy scorer path): <code>raw = round(0.5*rules + 0.5*model, 3)</code> per dim the model returns (<code>estimator.py:369-372</code>).</li>
+<li>Provider fusion (<code>acie/signals_fusion.py:123-134</code>): start from the rules' dims; every other provider is blended in turn,
+<code>v = round((1 - w)*v + w*x, 3)</code> with <code>w = 0.5</code> (<code>:37</code>); <code>learned_state</code> is the learned providers' own reading.</li>
+<li>Legacy NLU path (no <code>TurnSignals</code>): <code>0.5/0.5</code> per dim the NLU supplies (<code>estimator.py:428-432</code>). The NLU supplies the 4 core dims, and all 14 only with <code>ACIE_NLU_STATE_DIMS=1</code> (<code>understanding.py:66</code>).</li>
+</ul>
+<hr />
+<h2 id="4-layer-1-2-hearing-providers-turnsignals">4. Layer 1-2: hearing (providers -&gt; TurnSignals)</h2>
+<p><code>SignalHub.run</code> (<code>acie/providers/hub.py:167-181</code>): the rules run first and are never skipped; the others run in parallel, each under a hard
+budget (<code>asyncio.wait_for</code>, <code>:159</code>); late or failing providers are dropped (rules-only turn).</p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>provider</th>
+<th>name</th>
+<th>budget</th>
+<th>needs guide</th>
+<th>skipped when</th>
+<th>evidence</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>keyword rules + lexicon scorer</td>
+<td><code>rules</code></td>
+<td>1.0 s</td>
+<td>-</td>
+<td>never</td>
+<td><code>providers/rules.py:12</code></td>
+</tr>
+<tr>
+<td>LLM NLU</td>
+<td><code>llm</code></td>
+<td><code>nlu.timeout_s + 0.5</code> = 3.0 s (<code>ACIE_NLU_TIMEOUT_S</code> 2.5)</td>
+<td>yes</td>
+<td>rules sure (intent in <code>callback</code>, <code>human_agent</code>) and &lt;= 6 words</td>
+<td><code>providers/llm.py:15-18</code>, <code>providers/hub.py:177</code></td>
+</tr>
+<tr>
+<td>trained classifier</td>
+<td><code>model</code></td>
+<td>1.0 s</td>
+<td>-</td>
+<td>no model loaded</td>
+<td><code>providers/trained.py:13</code></td>
+</tr>
+<tr>
+<td>HTTP service</td>
+<td><code>http</code></td>
+<td><code>ACIE_SIGNAL_HTTP_TIMEOUT_S</code> (1.5) + 0.5 = 2.0 s</td>
+<td>-</td>
+<td>no URL</td>
+<td><code>providers/http.py:27-28</code></td>
+</tr>
+</tbody>
+</table></div>
+<p>Unset <code>ACIE_SIGNAL_PROVIDERS</code> = <code>rules</code>, plus <code>llm</code> when the pipeline has an NLU (<code>providers/registry.py:354-357</code>).</p>
+<h3 id="4-1-fusion-rules-acie-signals-fusion-py-30-142">4.1 Fusion rules (<code>acie/signals_fusion.py:30-142</code>)</h3>
+<pre class="eq"><code>intent   rules&#x27; intent is the base; each other provider may REPLACE it only if
+           label maps into the domain vocabulary (else &quot;unknown&quot;, ignored)
+           confidence &gt;= min_confidence    model: 0.6 (ACIE_TURN_MODEL_THRESHOLD)   others: 0.0
+           others only replace an intent in FILL_SET = [unknown, tell_more, benefits, goodbye, affirm, deny]
+           model never replaces rule-first intents (clarify, human_agent, callback ...)  and a gated label (affirm/deny) needs its dialog key
+objection, question_topic, buying_interest, garbled, gist:  first provider in [llm, http, model, fake, rules] that has a value
+state    14 dims: rules value, then each learned provider 0.5/0.5 in provider order
+</code></pre>
+<h3 id="4-2-nlu-acie-understanding-py">4.2 NLU (<code>acie/understanding.py</code>)</h3>
+<p>One call per turn: <code>temperature 0</code>, <code>max_tokens 110</code> (230 with <code>ACIE_NLU_STATE_DIMS=1</code>), <code>guided_json</code> schema (intent enum from the domain
+guide, <code>buying_signal</code> 0..1, <code>question_topic</code>, <code>objection</code>, the four core dims, <code>gist</code> &lt;= 90 chars), history = last 6 turns, timeout 2.5 s.
+On any error it returns <code>None</code> and the rules decide alone (<code>:128-137</code>).</p>
+<hr />
+<h2 id="5-layer-3-personalization">5. Layer 3: personalization</h2>
+<h3 id="5-1-long-term-profile-and-confidence-update-acie-personalization-profile-store-py-52-75">5.1 Long-term profile and confidence update (<code>acie/personalization/profile_store.py:52-75</code>)</h3>
+<pre class="eq"><code>explicit statement:  value = v, confidence = 1.0, explicit = True  (locks until another explicit statement)
+no entry yet:        confidence = lr
+same value:          confidence = round(min(1, c + lr*(1 - c)), 3)
+different value:     confidence = round(max(0, c - lr), 3); if confidence &lt; 0.3 the value flips and confidence = lr
+</code></pre>
+<p>The policy acts on a stored preference only if <code>explicit</code> or <code>confidence &gt;= 0.6</code> (<code>policy.py:84,140</code>).
+Learning rates (<code>learner.py:24-25</code>): <code>LR = 0.1</code> (pronoun/explicit-marker evidence), <code>LR_WEAK = 0.05</code> (length/state evidence). Examples: verbosity &quot;low&quot; when &lt;= 4 tokens
+(<code>LR_WEAK</code>), &quot;high&quot; when &gt;= 25 (<code>LR_WEAK</code>), &quot;med&quot; 8-24 tokens (<code>LR_WEAK/2</code>); formality from aap/ji vs tum/bhai (<code>LR</code>); complexity &quot;high&quot; on jargon (<code>LR_WEAK</code>), &quot;low&quot; on &quot;samajh nahi&quot; (<code>LR</code>);
+<code>likes</code>/<code>dislikes</code>/<code>topics</code> lists capped at 20 (<code>learner.py:23</code>). Language is updated every turn with <code>lr=0.15</code> (<code>feedback.py:162</code>); complexity nudged
+down with <code>lr=0.15</code> when confusion &gt;= 0.5 and reinforced with <code>lr=0.05</code> when confusion &lt; 0.2 and frustration &lt; 0.2 (<code>feedback.py:166-170</code>).</p>
+<h3 id="5-2-explicit-requests-policy-py-16-102-knobs-py">5.2 Explicit requests (<code>policy.py:16-102</code>, <code>knobs.py</code>)</h3>
+<p>Regex tables on normalised, space-padded text; a block pattern cancels a value (&quot;hindi nahi aati&quot;); the last occurrence wins. Keys: <code>language</code> (en/hi/hinglish),
+<code>verbosity</code>, <code>complexity</code>, <code>regional_variant</code> (delhi, mumbai, lucknow, bihar, south_indian_english), <code>explanation_style</code>, <code>info_density</code>, <code>reassurance</code>.
+&quot;Hindi mein bhi baat karta hai kya?&quot; is a question about the product, not a switch (<code>pipeline.py:226-228</code>).</p>
+<h3 id="5-3-rule-policy-a-t-pi-h-t-p-t-c-t-policy-py-123-241">5.3 Rule policy A_t = pi(H_t, P_t, C_t) (<code>policy.py:123-241</code>)</h3>
+<p>Schmitt trigger (<code>policy.py:110-116</code>): <code>on</code> at <code>value &gt;= enter</code>, <code>off</code> at <code>value &lt;= exit</code>, otherwise keep the previous flag.</p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>flag</th>
+<th>input</th>
+<th>enter / exit</th>
+<th>line</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>confused</td>
+<td><code>max(confusion, 0.5 if intent==&quot;clarify&quot;)</code></td>
+<td>0.5 / 0.3</td>
+<td><code>:157</code></td>
+</tr>
+<tr>
+<td>frustrated</td>
+<td>frustration</td>
+<td>0.5 / 0.3</td>
+<td><code>:158</code></td>
+</tr>
+<tr>
+<td>urgent</td>
+<td>urgency</td>
+<td>0.5 / 0.3</td>
+<td><code>:159</code></td>
+</tr>
+<tr>
+<td>disengaged</td>
+<td><code>1 - engagement</code></td>
+<td>0.7 / 0.5</td>
+<td><code>:160</code></td>
+</tr>
+<tr>
+<td>anxious</td>
+<td>anxiety</td>
+<td>0.5 / 0.3</td>
+<td><code>:162</code></td>
+</tr>
+<tr>
+<td>distrustful</td>
+<td><code>1 - trust</code></td>
+<td>0.7 / 0.5</td>
+<td><code>:163</code></td>
+</tr>
+<tr>
+<td>overloaded</td>
+<td>cognitive_load</td>
+<td>0.5 / 0.3</td>
+<td><code>:164</code></td>
+</tr>
+<tr>
+<td>certain</td>
+<td>certainty</td>
+<td>0.7 / 0.5</td>
+<td><code>:165</code></td>
+</tr>
+<tr>
+<td>engaged</td>
+<td>engagement</td>
+<td>0.7 / 0.5</td>
+<td><code>:166</code></td>
+</tr>
+</tbody>
+</table></div>
+<p>Effects (later rules win; &quot;protected&quot; = a learned policy must never override): confused -&gt; complexity low, verbosity high-&gt;med, proactivity low;
+frustrated -&gt; warmth high, verbosity low, proactivity low, formality high (unless low -&gt; med), <code>acknowledge_emotion</code> at most once per 3 turns (<code>ACK_COOLDOWN_TURNS</code>, <code>:83</code>);
+urgent -&gt; verbosity low, proactivity low; disengaged (and not confused/frustrated) -&gt; verbosity low; anxious or distrustful -&gt; reassurance high + step_by_step;
+overloaded -&gt; info_density low + complexity low; certain and engaged -&gt; info_density high. Explicit requests then overwrite; a safety-flagged call protects every knob.
+Language: explicit &gt; explicit profile &gt; mirror the caller; an implicit switch needs 1 turn of &gt;= 4 words or 2 consecutive turns (<code>LANGUAGE_SWITCH_STREAK = 2</code>, <code>:82,240</code>).</p>
+<h3 id="5-4-learned-style-policies-flags-off">5.4 Learned style policies (flags, off)</h3>
+<p>Shared decision rule (<code>bandit.py:135-159</code>): start from the rule policy's output; for each unprotected knob, among actions with <code>&gt;= min_obs</code> observations, take the argmax of the
+predicted reward (ties -&gt; earlier action); change the knob only if <code>pred(best) - pred(rule) &gt; margin</code>. Defaults <code>min_obs = 30</code>, <code>margin = 0.1</code> (<code>bandit.py:191-192</code>;
+<code>ACIE_STYLE_MIN_OBS</code>, <code>ACIE_STYLE_MARGIN</code> for the XGBoost one, <code>xgb_style.py:34-35</code>). 7 knobs x 3 actions = 21 arms (<code>bandit.py:53-57</code>).</p>
+<p><strong>Context</strong> <code>x</code> binary, <code>d = 53 = 14*3 + 3 + 4 + 3 + 1</code> (<code>bandit.py:61</code>): 14 dims bucketed low/mid/high at 1/3, 2/3 (42); language one-hot (3); turn-index bucket {0, 1-2, 3-5, 6+} (4);
+mean profile-confidence bucket {&lt;0.3, &lt;0.6, &gt;=0.6} (3); bias (1) (<code>bandit.py:70-82</code>).</p>
+<p><strong>LinUCB posterior mean</strong> (<code>bandit.py:85-103</code>): per arm <code>A = lambda*I + sum x x^T</code>, <code>b = sum r x</code>, <code>theta = A^-1 b</code>, <code>mean(x) = theta . x</code>, <code>lambda = 1</code>, <code>A^-1</code> kept by
+Sherman-Morrison: <code>A^-1 &lt;- A^-1 - (A^-1 x)(A^-1 x)^T / (1 + x^T A^-1 x)</code>. Rewards clipped to [-1,1]. The optimistic bound <code>mean + alpha*sqrt(x^T A^-1 x)</code>
+(<code>ACIE_BANDIT_ALPHA</code> 1.0) exists for offline analysis only (<code>:205-208</code>); decisions use the pure mean. State JSON at <code>ACIE_BANDIT_STATE</code> (<code>data/bandit.json</code>), saved every 20 observations, atomic write.</p>
+<p><strong>XGBoost style policy</strong> (<code>ACIE_POLICY=xgb</code>, <code>xgb_style.py</code>, <code>train_style.py:24-30</code>): one regressor per arm, fixed
+<code>tree_method=exact, n_estimators=200, max_depth=4, learning_rate=0.1, subsample=1.0, colsample_bytree=1.0, n_jobs=1, random_state=0</code>, objective <code>reg:squarederror</code>.
+Trained offline from the JSONL log (<code>ACIE_STYLE_LOG</code>); live <code>observe</code> only appends a row. Arms with fewer than <code>--min-obs</code> (30) rows get no model and keep the rule action.</p>
+<hr />
+<h2 id="6-layer-2b-emotion-table-needs-moves-ledger-acie-psyche">6. Layer 2b: emotion table, needs, moves, ledger (<code>acie/psyche/</code>)</h2>
+<p><code>ACIE_PSYCHE=1</code> turns on needs, moves and the non-crisis emotion rows (<code>psyche/__init__.py:6</code>). Default off. The crisis row is always on.</p>
+<h3 id="6-1-emotion-policy-11-rows-first-match-wins-emotion-policy-py-34-95">6.1 Emotion policy: 11 rows, first match wins (<code>emotion_policy.py:34-95</code>)</h3>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>prio</th>
+<th>row</th>
+<th>when</th>
+<th>warmth</th>
+<th>verbosity</th>
+<th>keep selling</th>
+<th>offer human/callback</th>
+<th>acknowledge</th>
+<th>sticky</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>crisis</td>
+<td><code>is_distress(text)</code> (self-harm regex, <code>safety.py:35</code>) or call already flagged</td>
+<td>high</td>
+<td>low</td>
+<td>no</td>
+<td>yes</td>
+<td>yes</td>
+<td>yes</td>
+</tr>
+<tr>
+<td>2</td>
+<td>angry</td>
+<td>frustration &gt;= 0.70, or voice arousal &gt;= 0.60 (confidence &gt;= 0.5, calibrated) with frustration &gt;= 0.40</td>
+<td>high</td>
+<td>low</td>
+<td>no</td>
+<td>yes</td>
+<td>yes</td>
+<td>no</td>
+</tr>
+<tr>
+<td>3</td>
+<td>frustrated</td>
+<td>frustration &gt;= 0.40</td>
+<td>high</td>
+<td>low</td>
+<td>no</td>
+<td>no</td>
+<td>yes</td>
+<td>no</td>
+</tr>
+<tr>
+<td>4</td>
+<td>anxious</td>
+<td>anxiety &gt;= 0.60</td>
+<td>high</td>
+<td>med</td>
+<td>no</td>
+<td>no</td>
+<td>yes</td>
+<td>no</td>
+</tr>
+<tr>
+<td>5</td>
+<td>sad</td>
+<td>satisfaction &lt;= 0.25 and engagement &lt;= 0.40 and excitement &lt;= 0.20; or a &quot;personal&quot; intent with calmness &lt;= 0.40</td>
+<td>high</td>
+<td>low</td>
+<td>no</td>
+<td>no</td>
+<td>yes</td>
+<td>no</td>
+</tr>
+<tr>
+<td>6</td>
+<td>confused</td>
+<td>confusion &gt;= 0.60</td>
+<td>med</td>
+<td>low</td>
+<td>yes</td>
+<td>no</td>
+<td>no</td>
+<td>no</td>
+</tr>
+<tr>
+<td>7</td>
+<td>overwhelmed</td>
+<td>cognitive_load &gt;= 0.70</td>
+<td>med</td>
+<td>low</td>
+<td>yes</td>
+<td>no</td>
+<td>no</td>
+<td>no</td>
+</tr>
+<tr>
+<td>8</td>
+<td>suspicious</td>
+<td>trust &lt;= 0.30</td>
+<td>med</td>
+<td>med</td>
+<td>no</td>
+<td>no</td>
+<td>yes</td>
+<td>no</td>
+</tr>
+<tr>
+<td>9</td>
+<td>busy</td>
+<td>urgency &gt;= 0.60 and engagement &lt;= 0.40</td>
+<td>low</td>
+<td>low</td>
+<td>no</td>
+<td>yes</td>
+<td>no</td>
+<td>no</td>
+</tr>
+<tr>
+<td>10</td>
+<td>excited</td>
+<td>excitement &gt;= 0.60</td>
+<td>med</td>
+<td>med</td>
+<td>yes</td>
+<td>no</td>
+<td>no</td>
+<td>no</td>
+</tr>
+<tr>
+<td>11</td>
+<td>calm</td>
+<td>otherwise</td>
+<td>med</td>
+<td>med</td>
+<td>yes</td>
+<td>no</td>
+<td>no</td>
+<td>no</td>
+</tr>
+</tbody>
+</table></div>
+<p>Table in code: <code>emotion_policy.py:49-61</code>. <code>apply_to_expression</code> (<code>:98-108</code>) only moves toward calmer/shorter: verbosity -&gt; low, warmth -&gt; high, <code>acknowledge_emotion</code> -&gt; True; it never touches an explicit preference.
+The crisis row replaces the plan with the reviewed helpline plan (Tele-MANAS 14416, 112; <code>safety.py:8</code>) and is sticky for the whole call (<code>pipeline.py:240-247</code>); a crisis call is excluded from learning (<code>feedback.py:181</code>).</p>
+<h3 id="6-2-need-table-10-rows-first-match-wins-needs-py-166-191">6.2 Need table: 10 rows, first match wins (<code>needs.py:166-191</code>)</h3>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>row</th>
+<th>need</th>
+<th>when</th>
+<th>line</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0</td>
+<td>be_heard</td>
+<td>crisis words</td>
+<td><code>:170</code></td>
+</tr>
+<tr>
+<td>1</td>
+<td>closure</td>
+<td>goodbye / &quot;that's all&quot; and not a question; or the link already went out and the turn is short thanks / weak yes / bye</td>
+<td><code>:172</code></td>
+</tr>
+<tr>
+<td>2</td>
+<td>autonomy</td>
+<td>&quot;no&quot;, &quot;not interested&quot;, stop, later, call me back, bare &quot;nahi&quot;</td>
+<td><code>:174</code></td>
+</tr>
+<tr>
+<td>3</td>
+<td>be_heard</td>
+<td>complaint about the agent, or frustration &gt;= 0.60</td>
+<td><code>:176</code></td>
+</tr>
+<tr>
+<td>4</td>
+<td>reassurance</td>
+<td>distrust words, anxiety &gt;= 0.60, or trust &lt;= 0.30</td>
+<td><code>:178</code></td>
+</tr>
+<tr>
+<td>5</td>
+<td>clarity</td>
+<td>language trouble, confused words, confusion &gt;= 0.60; or garbled / a short turn with unknown intent</td>
+<td><code>:180-184</code></td>
+</tr>
+<tr>
+<td>6</td>
+<td>answer</td>
+<td>a question, or negotiation</td>
+<td><code>:185</code></td>
+</tr>
+<tr>
+<td>7</td>
+<td>space</td>
+<td>busy words, frustration &gt;= 0.40, or cognitive_load &gt;= 0.70</td>
+<td><code>:187</code></td>
+</tr>
+<tr>
+<td>8</td>
+<td>connection</td>
+<td>personal talk with no sale word</td>
+<td><code>:189</code></td>
+</tr>
+<tr>
+<td>9</td>
+<td>information</td>
+<td>anything else</td>
+<td><code>:191</code></td>
+</tr>
+</tbody>
+</table></div>
+<p>A price negotiation (&quot;kam nahi kar sakte?&quot;) is a question, not a decline: <code>negotiate</code> clears <code>no</code> unless an explicit firm &quot;no&quot; is also present (<code>needs.py:157-159</code>).</p>
+<p><strong>Optional XGBoost refinement</strong> (only among the soft needs <code>clarity, space, connection, information, answer</code>, only when probability &gt;= 0.70, <code>needs.py:37,258</code>):
+<code>multi:softprob</code>, <code>tree_method=exact</code>, <code>max_depth 4</code>, <code>eta 0.2</code>, <code>lambda 1.0</code>, <code>min_child_weight 1</code>, <code>seed 0</code>, <code>nthread 1</code>, 40 rounds; features = 128 crc32-hashed unigram/bigram buckets + 14 dims + 18 flags + 4 = 164 (<code>needs.py:195-206</code>,
+<code>psyche/need_model.meta.json</code>). Trained on 169 real + 369 synthetic rows; 5-fold CV accuracy 0.834 vs the table alone 0.692 (labels start from the table and 15 turns were hand-corrected: a rough guide only). <code>ACIE_NEED_MODEL=off</code> disables it (<code>needs.py:214</code>).</p>
+<h3 id="6-3-moves-and-the-no-repeat-ladder-moves-py-ledger-py">6.3 Moves and the no-repeat ladder (<code>moves.py</code>, <code>ledger.py</code>)</h3>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>need</th>
+<th>move</th>
+<th>note</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>closure</td>
+<td><code>close</code> (ends the call)</td>
+<td>one phrasing from a bank, else <code>silent_close</code></td>
+</tr>
+<tr>
+<td>autonomy</td>
+<td><code>respect_close</code> (ends the call)</td>
+<td>sets <code>ledger.refused = True</code>: never offer again (<code>moves.py:420</code>)</td>
+</tr>
+<tr>
+<td>be_heard</td>
+<td><code>ack</code></td>
+<td>apologise; repeat-complaint bank vs generic bank</td>
+</tr>
+<tr>
+<td>reassurance</td>
+<td><code>reassure</code></td>
+<td>an approved FAQ fact that matches, else a bank; never a selling question</td>
+</tr>
+<tr>
+<td>clarity</td>
+<td>ladder below</td>
+<td></td>
+</tr>
+<tr>
+<td>answer</td>
+<td><code>answer_fact</code> / price from facts</td>
+<td><code>moves.py:354</code></td>
+</tr>
+<tr>
+<td>space</td>
+<td><code>offer_stop</code></td>
+<td>brief; offer to stop or call back</td>
+</tr>
+<tr>
+<td>connection</td>
+<td><code>connect</code></td>
+<td>one warm line, no selling</td>
+</tr>
+<tr>
+<td>information</td>
+<td><code>inform</code></td>
+<td>next unsaid fact; sells only under the gate below</td>
+</tr>
+</tbody>
+</table></div>
+<p>Clarity ladder (<code>moves.py:278-310</code>), start rung = <code>count_move(&quot;need:clarity&quot;) - 1</code> (one rung further each time the caller still needs clarity):
+garbled or nothing said yet: <code>ask_repeat -&gt; offer_stop -&gt; keep_listening</code>; otherwise <code>simplify -&gt; simplify2 -&gt; ask_unclear -&gt; offer_stop -&gt; keep_listening</code>.</p>
+<p><strong>Exhaustion</strong> (<code>moves.py:244-256</code>): when nothing new is left: <code>nothing_new</code> (&quot;that is all I have&quot;) -&gt; <code>keep_listening</code> (ask what else / offer a person or a callback) -&gt; <code>listen</code> (a short cue, reused deterministically). It NEVER hangs up on its own (commit <code>5655c2f</code>); only the caller's goodbye, no or stop closes (<code>closure</code>/<code>autonomy</code>).</p>
+<p><strong>Rotation</strong> (<code>moves.py:228-237</code>): start index = how many times that move was used; take the first phrasing in the bank whose sentence is not already in the ledger. No randomness.</p>
+<p><strong>Sale gate</strong> (<code>moves.py:389-403</code>, profit-free): <code>sells = True</code> only if the need is <code>information</code>, (<code>go_on</code> or <code>sale</code> flag) and engagement &gt;= 0.4, <code>ledger.offers == 0</code>, not refused, <code>decided == &quot;undecided&quot;</code>, no payment link yet, the offer slot was already told, and the item is not the offer itself. One gentle offer per call.</p>
+<p><strong>SaidLedger</strong> (<code>ledger.py</code>): JSON in <code>session.dialog[&quot;_said&quot;]</code>: normalised sentences (last 80), whole replies (last 30), intents (count), slots, asks (last 30), moves (count), <code>offers</code>, <code>refused</code>.
+<code>SIMILAR = 0.6</code> difflib ratio (<code>:15</code>); <code>repeats</code> checks each sentence of &gt;= 3 words (<code>:72-74</code>); <code>reply_repeats</code> checks the whole reply against earlier whole replies (<code>:76-79</code>).</p>
+<p><strong>Repeat guard, always on</strong> (<code>pipeline.py:148-173</code>, <code>ACIE_REPEAT_GUARD=0</code> disables for measuring): for the product_sales domain, when a deterministic (template-only) plan whose intent is in
+<code>_REPEATABLE</code> (<code>pipeline.py:47</code>) would repeat an earlier whole reply (ratio &gt; 0.6), it is replaced by <code>repeat_move</code>: a caller goodbye/decline -&gt; <code>close</code>; <code>not_understood/clarify/hello/off_topic</code> -&gt; clarity ladder; anything else -&gt; exhaustion (<code>moves.py:445-454</code>).</p>
+<p>Other repeat-related thresholds (difflib <code>SequenceMatcher</code> ratio): within-turn duplicate sentence dropped &gt; 0.85 (<code>pipeline.py:289</code>); LLM reply too close to the previous agent reply &gt; 0.7 triggers one regeneration (<code>:381</code>), accepted if &lt;= 0.8 (<code>:388</code>), else only sentences with ratio &lt;= 0.75 vs the previous are kept (<code>:395</code>);
+echo of the caller dropped &gt; 0.88 after a question, &gt; 0.75 otherwise (<code>:369</code>); restated operator lead dropped &gt; 0.55 (<code>:378</code>); reply cut to 40 words (<code>max_reply_words</code>, <code>:63</code>, keeps the closing question).</p>
+<p>Replay result on the 38 recent real calls (<code>docs/REAL_CALLS_FINDINGS.md</code>): agent replies repeating an earlier reply: 37 as logged, 56 on this code with the guard off, 0 with the guard, 0 with <code>ACIE_PSYCHE=1</code>. It measures repetition and determinism, not sales.</p>
+<hr />
+<h2 id="7-layer-4-response-determination-acie-decision-acie-playbook-py-acie-safety-py-acie-context-py">7. Layer 4: response determination (<code>acie/decision/</code>, <code>acie/playbook.py</code>, <code>acie/safety.py</code>, <code>acie/context.py</code>)</h2>
+<p><code>DecisionEngine.decide</code> -&gt; <code>domain.plan</code> -&gt; <code>TurnPlan</code> (<code>decision/engine.py:120-131</code>). A plan is never prose: objective, facts (<code>{slot}</code> values), decision, <code>must_not_say</code>, <code>ask</code>, <code>fallback</code> templates in en/hi/hinglish,
+<code>end_call</code>, <code>llm_allowed</code>, <code>lead</code>, <code>rule_packs</code> (<code>schemas.py:156-184</code>).</p>
+<h3 id="7-1-intent-classifier-engine-py-36-117">7.1 Intent classifier (<code>engine.py:36-117</code>)</h3>
+<p>Weighted keyword hits over normalised text; <code>masks</code> remove negated phrases; <code>priority</code> groups checked in order, highest score in a group wins, ties to the earlier intent; a gated priority intent (affirm/deny) wins only if its score &gt;= the best open intent and its dialog key (<code>pending</code>) exists; weak intents (greetings, thanks) win only if nothing else matched.
+<code>HybridIntentClassifier</code> (<code>hybrid.py</code>) lets a trained model override only above <code>ACIE_TURN_MODEL_THRESHOLD</code> (0.6) and never over rule-first intents (clarify, human_agent, callback) or a missing gate.</p>
+<h3 id="7-2-the-call-policy-productsalesdomain-plan-decision-domains-product-sales-py-762-985">7.2 The call policy: <code>ProductSalesDomain._plan</code> (<code>decision/domains/product_sales.py:762-985</code>)</h3>
+<p>Fixed gate order, first plan returned wins (the same list is served to the console: <code>acie/trace.py:9-28</code>):</p>
+<ol>
+<li>safety (crisis, before the domain) -&gt; 2. compliance (opt-out, never take card/OTP, always admit being an AI, who is calling, number source) <code>:1196</code> -&gt;</li>
+<li>already decided (link sent, no, callback) <code>:1254</code> -&gt; 4. garbled line: ask to repeat, never sell on it (<code>:798-806</code>; the garbled flag comes from a learned provider, so it needs the <code>llm</code>, <code>model</code> or <code>http</code> provider) -&gt;</li>
+<li>consent and close: explicit yes + one confirmation that states the full terms before any link (<code>_confirm_plan :1310</code>, <code>_link_plan :1322</code>) -&gt;</li>
+<li>routing: callback with time, human handoff, language switch -&gt;</li>
+<li>refusal: <strong>at most one soft re-offer</strong> after a no (<code>max_reoffers</code> 1, <code>:146</code>; only if frustration &lt; 0.5 and the stage is intro/pitch/close/confirm, <code>:903</code>), then a polite goodbye -&gt;</li>
+<li>scripted steps: opening, operator pitch, exact price line, hello, slow-down -&gt;</li>
+<li>conversation (<code>_converse :1019</code>): answer what was said first, from product facts and approved answers; a playbook situation adds talking points; <code>llm_allowed=True</code>.</li>
+</ol>
+<p>Prices come only through locked slots and the <code>lead</code> line. Negotiation: <strong>there is no negotiation state machine in the code.</strong> A request for a lower price (&quot;kam nahi kar sakte?&quot;) is matched by <code>_NEGOTIATE</code> (<code>:243-249</code>, plus <code>NEGOTIATE_MORE</code> in <code>signals.py</code>) and answered once, from a template,
+with a <code>price_floor</code> plan (&quot;the price is fixed, no pressure, keep listening&quot;, <code>:888-895</code>); the call never ends on it, and <code>pending</code> is set to <code>close</code>. The ledger records <code>quoted: no_lower_price</code> (<code>context.py:57</code>).
+Declarative constraints (<code>decision/constraints.py:27</code>): <code>min_age</code>, <code>region_allow</code>, <code>exclude_existing_subscriber</code>, <code>price_floor</code>, <code>call_hours</code> (default 9-21, UTC+330 min), <code>dnc</code>, <code>max_reoffers</code>; a violation returns a reviewed template with <code>llm_allowed=False</code> and ends the call.</p>
+<h3 id="7-3-whole-call-memory-context-py-79-150">7.3 Whole-call memory (<code>context.py:79-150</code>)</h3>
+<p><code>CallContext</code> folds each turn into <code>promised</code> (payment_link, callback, number removed, team call), <code>quoted</code> (offer_price, no_lower_price), <code>told</code>, <code>questions</code>, <code>objections</code>, <code>decision</code> (accepted/declined/later/undecided), <code>outcome</code>
+(<code>_AGENT_EVENTS :49</code>, <code>_DECISIONS :66</code>, <code>_OUTCOMES :71</code>); <code>summary()</code> is injected in the prompt as &quot;CALL SO FAR&quot;.</p>
+<h3 id="7-4-playbook-picker-deterministic-acie-playbook-py-61-107">7.4 Playbook picker (deterministic, <code>acie/playbook.py:61-107</code>)</h3>
+<p>Per node: <code>+2.5</code> if any keyword regex matches; <code>+1.0</code> if the rule intent is in <code>when.intents</code>; <code>+1.0</code> if any learned provider's vote is in them; <code>+2.0</code> if the objection matches; <code>+0.5</code> if the question topic matches;
+signal ranges (<code>min_buying</code>, <code>max_buying</code>, <code>min_frustration</code>, <code>min_confusion</code>) must all hold or the node is ruled out (<code>None</code>), and a holding signal-defined node gets <code>+1.5</code>.
+Best node needs a score &gt;= 2.0; the strict <code>&gt;</code> keeps the first node on a tie; then walk down <code>children</code> while a child scores &gt;= 2.0 (the child replaces its parent). Files: <code>data/voice/playbooks/&lt;tenant&gt;/&lt;product&gt;.json</code>, seed in <code>playbooks/</code>.</p>
+<h3 id="7-5-next-best-action-only-with-acie-nba-1-decision-nba-py">7.5 Next-best-action (only with <code>ACIE_NBA=1</code>, <code>decision/nba.py</code>)</h3>
+<pre class="eq"><code>score(a) = BASE[stage][a] + 2.0*buying*READY[a] - 1.0*open_objections*PUSHY[a] + 2.5*open_objections*(a == answer_objection)
+           - 0.5*benefit_turns*(a == benefit) - 2.0*already_done(a) - 6.0*(confirm_close before the price was quoted) - 6.0*(a != soft_exit once decided)
+actions in fixed order [answer_objection, discover, pitch, quote_price, benefit, confirm_close, soft_exit]; highest score wins, ties to the earlier action
+BASE: intro {pitch 3.0, discover 1.0, quote_price 0.5}  pitch {quote_price 3.0, benefit 1.5, discover 1.0}  discovery {benefit 2.5, quote_price 1.5, discover 1.0}
+      close {confirm_close 2.0, benefit 1.5, soft_exit 0.5}  confirm {confirm_close 3.0}
+READY {confirm_close 1.5, quote_price 0.5, benefit 0.2}   PUSHY {confirm_close 1.5, quote_price 0.5, pitch 0.3, soft_exit -0.5}
+</code></pre>
+<p>It only produces a one-line hint for the objective; it never replaces the compliance policy.</p>
+<h3 id="7-6-model-agnostic-contract">7.6 Model-agnostic contract</h3>
+<p>Layer 4 reads one <code>TurnSignals</code> object (<code>acie/signals.py:77-110</code>) and never a provider's own object; see <code>docs/MODEL_AGNOSTIC.md</code> for the plug-in steps. Labels from any provider map onto the domain vocabulary through <code>DEFAULT_ALIASES</code> + the domain's <code>intent_aliases</code> + <code>ACIE_INTENT_ALIASES</code>; anything unknown becomes <code>unknown</code>.</p>
+<hr />
+<h2 id="8-layers-5-7-compile-express-validate">8. Layers 5-7: compile, express, validate</h2>
+<p><strong>Compiler</strong> (<code>acie/compiler.py</code>): system prompt = fixed HARD RULES (no new facts, <code>{slot}</code> only, mention every fact, never say <code>must_not_say</code>, end with <code>ask</code>, no echo of the customer, admit being an AI, never ask OTP/PIN/CVV)</p>
+<ul>
+<li>STYLE lines from <code>ExpressionParams</code> (language, verbosity, words, tone, proactivity, acknowledge, regional flavour, explanation style, density, reassurance). History = last 10 turns (<code>history_turns</code>, <code>:169</code>); user message = <code>CALL SO FAR</code> + optional profile and memory blocks (top 3, &lt;= 160 chars each) + <code>CUSTOMER SAID</code> + <code>PLAN</code> JSON + a language reminder.
+Verbosity rules: low = one sentence under 15 words plus the ask; med = at most two sentences; high = up to four (<code>:23-25</code>).</li>
+</ul>
+<p><strong>Expression</strong> (<code>acie/expression.py</code>): OpenAI-compatible streaming; <code>temperature 0.3</code> (0.0 with <code>ACIE_PSYCHE</code>), <code>max_tokens 320</code>, <code>timeout 5.0 s</code> (<code>:95-105</code>). <code>TemplateBackend</code> yields the plan's fallback (no LLM). Optional first-token deadline <code>ACIE_EXPR_FIRST_TOKEN_S</code> (off), <code>FailoverBackend</code> (secondary model if the primary fails before any text), sticky <code>ABBackend</code>.
+In the voice server <code>buffer_reply=True</code>: the whole reply is validated before any of it is spoken (<code>voice/server.py:111</code>, <code>pipeline.py:331</code>), so half an LLM reply is never followed by the template. A rejected reply gets one regeneration with the reason (<code>pipeline.py:337</code>).</p>
+<p><strong>Validator</strong> (<code>acie/validator.py</code>), per sentence, streaming; any failure marks the generation failed and the whole reply becomes <code>render_fallback</code>:</p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>rule</th>
+<th>code</th>
+<th>check</th>
+<th>line</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>placeholder is a plan fact and not hidden</td>
+<td><code>invented_slot</code></td>
+<td><code>{x}</code> not in <code>plan.facts</code></td>
+<td><code>:161-163</code></td>
+</tr>
+<tr>
+<td>no number from the LLM</td>
+<td><code>raw_number</code></td>
+<td>digits (incl. Devanagari digits), rupee sign, <code>rs</code>/<code>inr</code>, number words (hundred, thousand, lakh, crore, rupees, हजार, लाख, ...) unless the customer or the operator background said that number</td>
+<td><code>:24-28,144-158</code></td>
+</tr>
+<tr>
+<td>price after the exact price line</td>
+<td><code>price_repeated</code></td>
+<td><code>lead</code> set and currency/percent in the LLM text</td>
+<td><code>:167-168</code></td>
+</tr>
+<tr>
+<td>offer phrase used once, not padded</td>
+<td><code>offer_repeated</code>, <code>offer_padded</code></td>
+<td><code>{offer}</code> twice, or &quot;first 3 months&quot; next to it</td>
+<td><code>:169-174</code></td>
+</tr>
+<tr>
+<td>general-knowledge answers may say numbers, never money</td>
+<td><code>money_in_general_answer</code></td>
+<td><code>[₹$]</code>, rupee words</td>
+<td><code>:175-179</code></td>
+</tr>
+<tr>
+<td>language/script</td>
+<td><code>wrong_script</code></td>
+<td>en: any Devanagari, or &gt;= 5 Latin words that read as Hinglish; hi: no Devanagari and &gt;= 3 Latin words; hinglish: Devanagari &gt; 60% of non-space characters</td>
+<td><code>:182-190</code></td>
+</tr>
+<tr>
+<td>rule packs</td>
+<td><code>rulepack:&lt;name&gt;</code></td>
+<td><code>sales_compliance</code> (guarantee, false urgency, &quot;you must&quot;, health/financial promise, competitor disparagement), <code>banking</code> (OTP/PIN/CVV/password ask unless a warning, account/card number ask, 10+ digit runs), <code>hindi_register</code> (formal words when formality is low)</td>
+<td><code>acie/rules/*.py</code></td>
+</tr>
+<tr>
+<td>every <code>must_mention</code> fact appeared</td>
+<td><code>missing_fact</code></td>
+<td>checked at <code>finish()</code></td>
+<td><code>:90-96</code></td>
+</tr>
+<tr>
+<td>cut-off sentence</td>
+<td><code>unfinished</code></td>
+<td>dropped, not spoken</td>
+<td><code>:82-85</code></td>
+</tr>
+</tbody>
+</table></div>
+<p>Operator-written template text (<code>trusted</code>, <code>llm_allowed=False</code>) skips the number/language checks but not the placeholder check (<code>:165-166</code>). Emoji, markdown and U+FFFD are stripped (<code>:123</code>).</p>
+<hr />
+<h2 id="9-layer-8-feedback-acie-feedback-py">9. Layer 8: feedback (<code>acie/feedback.py</code>)</h2>
+<p>No profit objective: sale outcomes are recorded in <code>profile.outcomes</code> (last 50) and carry weight 0 (<code>SALE_OUTCOME_WEIGHT = 0.0</code>, <code>:66</code>).</p>
+<p><strong>Per-turn reward</strong> (<code>:128-133</code>, needs turn t+1, so (state, expr) stay pending one turn):</p>
+<pre class="eq"><code>reward = clip( -0.8*d_frustration - 0.6*d_confusion + 0.5*mean(d_engagement, d_satisfaction, d_receptiveness, d_trust) - 0.5*penalty - 0.3*barge_in , -1, 1 )
+d_x = x(next turn) - x(this turn);  penalty = 1.0 safe fallback used, 0.4 real validation issue (trim/echo/regenerate are benign), 0 clean;  barge_in = the caller interrupted that reply
+weights WEIGHTS (:62); override with ACIE_REWARD_WEIGHTS=&quot;frustration=0.9,barge=0.2&quot;
+</code></pre>
+<p><strong>Call-level credit</strong> (<code>:64,255-270</code>), summed then clipped to [-1,1], applied to every turn discounted by <code>0.9^(turns back from the last)</code> (<code>CREDIT_DISCOUNT</code>, <code>:70,284</code>) plus per-turn extras:</p>
+<pre class="eq"><code>+0.5 calm end with every question answered (last frustration &lt; 0.3, confusion &lt; 0.3, nothing unanswered, no pushing after a no)
++0.5 the caller said no/later/stop and the agent never pushed after it
+-1.0 opt-out after the agent kept pushing (PUSH_INTENTS: pitch, price, reoffer, recover, confirm_close, price_floor)
+-1.0 the caller hung up during or right after a repeated reply
+turn extras: -0.5 repeated reply (ratio &gt; 0.6 vs ANY earlier agent reply), -0.5 unanswered question (safe fallback or intent unknown)
+</code></pre>
+<p>Each turn then gets a second <code>policy.observe(...)</code>. Safety calls are excluded. <code>observe</code> exists only on the learned style policies, so under the default rule policy nothing is learned from rewards.
+<strong>Validator learning</strong>: the last 4 validation results per language are kept in <code>validator_recent_&lt;lang&gt;</code>; &gt;= 2 failures -&gt; complexity &quot;low&quot; (<code>lr 0.2</code>) and <code>prefer_templates=true</code> (<code>lr 0.4</code>); 4 clean in a row -&gt; back to false (<code>:200-210</code>).
+<strong>Outcome label</strong> per call (<code>sales_outcome</code>, <code>:103-115</code>): safety &gt; opt_out &gt; accepted/declined/later &gt; no_answer, plus <code>human_agent</code>.
+<strong>Semantic memory</strong> (<code>ACIE_MEMORY=1</code>): a compact call summary (decision, objections, last 5 questions, top 5 likes) stored at call end; top-3 similar memories recalled at turn 0 (<code>:290-320</code>, <code>pipeline.py:220</code>). Cosine over 256-d crc32 hashed bag of words + char 3/4-grams (<code>memory/hashing.py:20-40</code>) by default.</p>
+<hr />
+<h2 id="10-voice-layer-voice">10. Voice layer (<code>voice/</code>)</h2>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>piece</th>
+<th>parameters</th>
+<th>line</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>line audio</td>
+<td>G.711 mu-law 8 kHz in; 16 kHz float to VAD/STT (2x linear upsample); TTS 8 kHz PCM; 200 ms per <code>playAudio</code></td>
+<td><code>voice/audio.py</code>, <code>voice/call.py:47</code></td>
+</tr>
+<tr>
+<td>VAD</td>
+<td>frame 512 samples (32 ms), threshold 0.5, end-of-speech silence 700 ms (<code>VAD_END_SILENCE_MS</code>), min speech 200 ms, max utterance 20 s, pre-roll 300 ms</td>
+<td><code>voice/vad.py:188</code>, <code>voice/server.py:58-59</code></td>
+</tr>
+<tr>
+<td>barge-in</td>
+<td>continuous confident run (p &gt;= 0.7); staged voice-print check (run ms, similarity needed): (500, 0.35), (800, 0.35), (1200, 0.32); opening disclosure protected 4.0 s</td>
+<td><code>voice/call.py:72,55</code></td>
+</tr>
+<tr>
+<td>speaker lock</td>
+<td>same voice = cosine &gt;= 0.5 among &gt;= 2 turns; a turn below 0.4 is &quot;another voice&quot;; learns only from clean turns (rms &gt;= 0.03, &gt;= 1 s)</td>
+<td><code>voice/speaker.py:65-67,94-96</code>, <code>voice/call.py:71</code></td>
+</tr>
+<tr>
+<td>STT</td>
+<td>Whisper large-v3, beam 5, temperature 0, no VAD filter, no previous-text conditioning; languages en/hi only; &quot;en&quot; needs share &gt;= 0.92 unless the caller-side preferred language is English (then 0.5); if &quot;en&quot; was picked, the Hindi pass wins when its mean log-prob + 0.15 &gt;= the English one</td>
+<td><code>voice/stt.py:34-44,70-75</code></td>
+</tr>
+<tr>
+<td>hallucination filter</td>
+<td>drop a segment if compression ratio &gt;= 2.4, or avg log-prob &lt;= -1.2, or (no-speech &gt; 0.6 and log-prob &lt; -0.7); quiet-and-doubtful dropped; quiet segments returned for the voice check</td>
+<td><code>voice/stt.py:54-64</code></td>
+</tr>
+<tr>
+<td>watchdogs</td>
+<td>25 s silence hang-up; 8 s quiet -&gt; &quot;can you hear me?&quot; (max 2 prompts); goodbye grace 2.5 s, max 8 s; max call 360 s</td>
+<td><code>voice/call.py:48,53-54,63-64,73</code></td>
+</tr>
+<tr>
+<td>dialling</td>
+<td>window 09:00-21:00 Asia/Kolkata, enforced only with <code>CALL_HOURS=1</code>; 8 parallel calls</td>
+<td><code>voice/server.py:60,64-65,140</code></td>
+</tr>
+</tbody>
+</table></div>
+<p>Voicemail phrases hang up only at the start of a call (<code>voice/call.py:440</code>); stock noise phrases (&quot;कर दो&quot;, &quot;हुआ है&quot;, ...) are dropped unless the voice print says it is the caller.</p>
+<hr />
+<h2 id="11-runtime-stores-all-flag-gated-defaults-are-in-process">11. Runtime stores (all flag-gated, defaults are in-process)</h2>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>store</th>
+<th>default</th>
+<th>flag</th>
+<th>detail</th>
+<th>line</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>sessions</td>
+<td>in-process dict</td>
+<td><code>ACIE_SESSION_STORE=redis</code>, <code>ACIE_REDIS_URL</code></td>
+<td>JSON copy with a 2 h TTL, key prefix <code>acie:session:</code>; saved at turn end, loaded if this process has not seen the session</td>
+<td><code>store/sessions.py:13,37-53</code></td>
+</tr>
+<tr>
+<td>profiles</td>
+<td>JSON file per customer</td>
+<td><code>ACIE_PROFILE_STORE=postgres</code>, <code>ACIE_PG_DSN</code></td>
+<td>table <code>customer_profiles(customer_id, profile jsonb, updated_at)</code>, auto-migrated</td>
+<td><code>personalization/pg_store.py:9-45</code></td>
+</tr>
+<tr>
+<td>memory</td>
+<td>in-process</td>
+<td><code>ACIE_MEMORY_STORE=pgvector</code>, <code>ACIE_PG_DSN</code>, <code>ACIE_MEMORY_DIM</code> (256)</td>
+<td><code>memories</code> table, HNSW cosine index</td>
+<td><code>store/pgvector_memory.py:42-52</code></td>
+</tr>
+<tr>
+<td>events</td>
+<td>none</td>
+<td><code>ACIE_NATS_URL</code></td>
+<td>subject <code>acie.calls.&lt;call_id&gt;.context</code>, bounded queue 1000 (new events dropped when full), never raises into the call</td>
+<td><code>events.py:17-46</code></td>
+</tr>
+</tbody>
+</table></div>
+<hr />
+<h2 id="12-latency-budget">12. Latency budget</h2>
+<p>Per-stage fields written on every agent turn (<code>voice/call.py:533-535</code>): <code>latency_ms.stt</code>, <code>acie_total</code>, <code>tts_first_chunk</code>, <code>first_audio_after_speech_end</code>; pipeline stage marks <code>understand</code>, <code>adapt</code>, <code>decide</code>, <code>first_sentence</code>, <code>total</code> (<code>pipeline.py:211-215,223,236,269</code>).
+<code>first_audio_after_speech_end</code> is measured from <code>t_end</code> taken when the utterance is handed over (<code>voice/call.py:411</code>), i.e. AFTER the VAD's 700 ms end-of-speech silence (<code>vad_end_silence_ms</code>), so the caller's perceived gap is about 700 ms longer.</p>
+<p>Measured on live calls (figures supplied with this task from the call-log summary; the call logs themselves are not in the repo):</p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>stage</th>
+<th>p50</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>speech end -&gt; first audio (total)</td>
+<td>~1.48 s</td>
+</tr>
+<tr>
+<td>STT (Whisper large-v3)</td>
+<td>~415 ms</td>
+</tr>
+<tr>
+<td>ACIE <code>run_turn</code> (hearing + decision + LLM wording to the last sentence)</td>
+<td>~511 ms</td>
+</tr>
+<tr>
+<td>TTS first chunk</td>
+<td>~289 ms</td>
+</tr>
+<tr>
+<td>sum of the three named stages</td>
+<td>~1.215 s; the remaining ~0.27 s is hand-over, sentence queueing and audio framing</td>
+</tr>
+</tbody>
+</table></div>
+<p>What is deliberately kept off the critical path: the calibrator, prosody and speaker embedding run in parallel with Whisper (<code>call.py:423</code>); profile load runs in parallel with hearing (<code>pipeline.py:222</code>); the LLM NLU is skipped for short rule-sure turns (<code>hub.py:177</code>);
+deterministic plans (<code>llm_allowed=False</code>) and the template backend cost no LLM time; sentences stream to TTS as they pass validation when <code>buffer_reply</code> is off; vLLM prefix caching (<code>deploy/voice/salesgod-llm.service:11</code>);
+a first request after restart is pre-paid by the warm-up (<code>voice/server.py:248-264</code>). Hard budgets: rules 1.0 s, NLU 3.0 s, model 1.0 s, http 2.0 s (section 4), world lookup 2.0 s, expression request timeout 5.0 s.</p>
+<hr />
+<h2 id="13-tests-and-evaluation">13. Tests and evaluation</h2>
+<p>658 tests are collected on this commit (<code>pytest --collect-only</code>). Held-out audit data: <code>data/eval/turns.jsonl</code> (369 synthetic turns: en 145, hi 154, hinglish 70) via <code>scripts/eval_signals.py</code>, scripted calls via <code>scripts/eval_conversations.py</code>; see <code>docs/EVAL.md</code>. Real-call replay: <code>scripts/real_calls/replay.py</code> (real transcripts stay git-ignored under <code>data/real/</code>).</p>
+<hr />
+<h2 id="14-not-on-this-commit">14. Not on this commit</h2>
+<p><strong>XGBoost turn classifier (<code>lane/ml</code> @ <code>c7e0562</code>, unmerged).</strong> On this commit <code>training/state_classifier</code> is the MuRIL multi-head trainer (11 bank intents, 4 state dims x 3 levels, 6 explicit labels; <code>data.py:32-37</code>), and <code>TrainedTurnModel</code> has no <code>.load</code>, so
+<code>ACIE_TURN_MODEL</code> falls back to the rules (<code>estimator.py:386-390</code>). On <code>lane/ml</code>: deterministic XGBoost, one booster each for intent (<code>multi:softprob</code>, 14 intents), the 14 HumanState dims (3 levels, <code>multi:softprob</code>), and 6 explicit labels (<code>binary:logistic</code>).
+Fixed parameters (<code>lane/ml:training/state_classifier/xgb_params.py:4-10</code>): <code>tree_method=exact, n_estimators=400, max_depth=6, learning_rate=0.08, min_child_weight=1, gamma=0, reg_lambda=1.0, reg_alpha=0, subsample=1.0, colsample_bytree=1.0, n_jobs=1, random_state=0, seed=0</code>;
+no early stopping; rows sorted by id; heads in separate processes (does not change the models). Features (<code>features.py:33-44</code>): 2^14 hashed char 2-4-grams + 2^13 hashed word uni/bigrams (crc32, l2-normalised) + a dense block (rule lexicon scores, explicit-request hits, bucketed latency/rate, prosody, pending question, last agent intent, turn index, language, repetition, length);
+rows with <code>crc32(id) % 3 == 0</code> are trained without timing (<code>train_xgb.py:36</code>). Prediction: argmax with ties to the lowest class; state value = <code>(p1 + 2*p2)/2</code> (<code>predict.py:113</code>).</p>
+<p><strong>Measured live latency</strong> (section 12) comes from the production call logs; only the field names are in the repo.</p>
 
-<div class="wrap">
-
-<header>
-  <div class="eyebrow">salesgod · ACIE · voice-a100-4 · read from code on 14 Nov 2026</div>
-  <h1>SalesGod architecture</h1>
-  <p class="lede">An outbound AI phone sales agent for Hindi, Hinglish and English callers. Rules and a state machine decide <em>what</em> to say, an LLM only decides <em>how</em> to word it, and a validator stops the LLM from ever writing a price or a number itself.</p>
-  <div class="tiles">
-    <div class="tile"><b>5</b><span>neural nets on a live call</span></div>
-    <div class="tile"><b>1× A100</b><span>80 GB, 54 GB used</span></div>
-    <div class="tile"><b>1.48 s</b><span>p50 end of speech → first audio</span></div>
-    <div class="tile"><b>3.31 s</b><span>p90 end of speech → first audio</span></div>
-    <div class="tile"><b>8</b><span>max parallel calls</span></div>
-    <div class="tile"><b>2.1%</b><span>replies swapped for the safe template</span></div>
-  </div>
-  <p class="note">Measured numbers come from 31 call logs (140 agent turns) in <code>data/voice/calls/</code>. Everything else comes from the code and the live <code>/opt/salesgod/.env</code>.</p>
-</header>
-
-<section>
-  <h2><span class="n">00</span>One turn, end to end</h2>
-  <div class="diagram">
-<pre class="mermaid">
-flowchart LR
-  PH([Caller phone]) -->|"μ-law 8 kHz WS"| PL[Plivo]
-  PL --> DEC["μ-law decode<br/>8→16 kHz upsample"]
-  DEC --> VAD["Silero VAD v5<br/>32 ms frames"]
-  VAD -->|utterance| SPK["WeSpeaker ResNet34<br/>speaker lock"]
-  SPK --> STT["Whisper large-v3<br/>fp16, beam 5"]
-  STT --> PRO["YIN pitch + loudness"]
-  PRO --> A
-  subgraph ACIE["ACIE turn pipeline (asyncio)"]
-    A["Stream A<br/>keyword intent + NLU (Qwen3-14B JSON)<br/>+ state estimator"]
-    B["Stream B<br/>load customer profile"]
-    A --> POL["Adaptation policy A_t"]
-    B --> POL
-    POL --> SAF{"Distress?"}
-    SAF -->|yes| TPL["Fixed helpline template"]
-    SAF -->|no| FSM["Sales FSM + compliance<br/>+ playbook + world lookup"]
-    FSM --> CMP["Prompt compiler<br/>facts as {slots}"]
-    CMP --> LLM["Qwen3-14B-AWQ<br/>vLLM stream"]
-    LLM --> VAL["Streaming validator<br/>+ regenerate once"]
-    VAL --> FB["Feedback → profile"]
-  end
-  VAL --> TTS["Fish Audio s2.1-pro<br/>PCM 8 kHz"]
-  TPL --> TTS
-  TTS -->|"μ-law, 200 ms chunks"| PL
-</pre>
-  </div>
-</section>
-
-<section>
-  <h2><span class="n">01</span>Every model in the system</h2>
-  <div class="tw"><table>
-    <thead><tr><th>Model</th><th>Job</th><th class="num">Size</th><th>Runs on</th><th>Precision</th><th>Status</th></tr></thead>
-    <tbody>
-      <tr><td>Silero VAD v5</td><td>speech / silence per 32 ms frame</td><td class="num">2.3 MB ONNX</td><td>CPU, 1 thread</td><td>fp32</td><td><span class="pill live">live</span></td></tr>
-      <tr><td>WeSpeaker ResNet34-LM</td><td>256-d voice embedding, drops background speakers</td><td class="num">~6.6 M params</td><td>CPU, 2 threads</td><td>fp32</td><td><span class="pill live">live</span></td></tr>
-      <tr><td>Whisper large-v3 (faster-whisper / CTranslate2)</td><td>speech → text, en/hi only</td><td class="num">1.55 B</td><td>GPU</td><td>fp16</td><td><span class="pill live">live</span></td></tr>
-      <tr><td>Qwen3-14B-AWQ on vLLM, served as <code>acie-expression</code></td><td>NLU (JSON) <em>and</em> reply wording</td><td class="num">14.8 B</td><td>GPU, 60% of VRAM</td><td>4-bit AWQ</td><td><span class="pill live">live</span></td></tr>
-      <tr><td>Fish Audio s2.1-pro-free</td><td>text → speech, one cloned voice for en and hi</td><td class="num">external</td><td>Fish API</td><td>n/a</td><td><span class="pill live">live</span></td></tr>
-      <tr><td>MuRIL-base turn classifier</td><td>intent + 4 states + explicit asks, one encoder</td><td class="num">~237 M</td><td>GPU</td><td>bf16</td><td><span class="pill notlive">code only</span></td></tr>
-      <tr><td>Qwen2.5-7B + LoRA r16</td><td>fine-tuned reply writer</td><td class="num">7.6 B + 40.4 M</td><td>GPU</td><td>bf16</td><td><span class="pill notlive">code only</span></td></tr>
-      <tr><td>Qwen2.5-72B teacher</td><td>writes SFT training data</td><td class="num">72.7 B</td><td>4 GPUs, TP=4</td><td>bf16</td><td><span class="pill notlive">code only</span></td></tr>
-      <tr><td>YIN pitch tracker</td><td>F0, not a neural net</td><td class="num">0</td><td>CPU, numpy</td><td>fp32</td><td><span class="pill cpu">off by default</span></td></tr>
-    </tbody>
-  </table></div>
-  <p class="note">"Code only" means the training scripts exist, but no trained weights are on the VM. Its Hugging Face cache holds only Qwen3-14B, Qwen3-14B-AWQ, Qwen3-8B, Whisper large-v3 and WeSpeaker. The live reply writer is the stock Qwen3-14B-AWQ with thinking turned off (<code>enable_thinking: false</code>).</p>
-</section>
-
-<section>
-  <h2><span class="n">02</span>Where the time goes</h2>
-  <div class="tw"><table>
-    <thead><tr><th>Stage</th><th class="num">p50 ms</th><th class="num">p90 ms</th><th>What sets it</th></tr></thead>
-    <tbody>
-      <tr><td>VAD end-of-turn wait</td><td class="num">700</td><td class="num">700</td><td><code>VAD_END_SILENCE_MS=700</code>, fixed. Not counted in the rows below</td></tr>
-      <tr><td>Whisper STT</td><td class="num">415</td><td class="num">694</td><td>beam 5; a second Hindi pass when English is detected</td></tr>
-      <tr><td>ACIE: understand (NLU)</td><td class="num">1</td><td class="num">1,006</td><td>Qwen JSON call, skipped when the rules are sure</td></tr>
-      <tr><td>ACIE: decide</td><td class="num">2</td><td class="num">1,007</td><td>world lookups (weather, Wikipedia) when off-topic</td></tr>
-      <tr><td>ACIE: total to first validated sentence</td><td class="num">511</td><td class="num">2,549</td><td>whole reply buffered and validated before release</td></tr>
-      <tr><td>Fish TTS first chunk</td><td class="num">289</td><td class="num">338</td><td>HTTP stream, <code>latency: low</code></td></tr>
-      <tr><td><b>End of speech → first audio</b></td><td class="num"><b>1,480</b></td><td class="num"><b>3,305</b></td><td>measured on the server, excludes the 700 ms VAD wait and the phone network</td></tr>
-    </tbody>
-  </table></div>
-  <div class="bar" role="img" aria-label="p50 budget: STT 415 ms, ACIE 511 ms, TTS 289 ms, other 265 ms">
-    <div style="flex:415;background:var(--ok)">STT 415</div>
-    <div style="flex:511;background:var(--accent)">ACIE 511</div>
-    <div style="flex:289;background:var(--off)">TTS 289</div>
-    <div style="flex:265;background:var(--muted)">queue/other 265</div>
-  </div>
-  <p class="note">p50 breakdown of 1,480 ms. The caller hears roughly 700 ms of VAD wait, plus the server time, plus 100–300 ms of phone network.</p>
-</section>
-
-<section>
-  <h2><span class="n">03</span>Audio front end</h2>
-  <div class="grid2">
-    <div class="tw"><table>
-      <thead><tr><th>Parameter</th><th class="num">Value</th></tr></thead>
-      <tbody>
-        <tr><td>Line codec</td><td class="num">G.711 μ-law, 8 kHz</td></tr>
-        <tr><td>Upsample to</td><td class="num">16 kHz, 2× linear</td></tr>
-        <tr><td>VAD frame / context</td><td class="num">512 + 64 samples (32 ms)</td></tr>
-        <tr><td>VAD RNN state</td><td class="num">2×1×128</td></tr>
-        <tr><td>Speech threshold p</td><td class="num">0.5</td></tr>
-        <tr><td>End of turn</td><td class="num">700 ms silence = 21 frames</td></tr>
-        <tr><td>Min speech</td><td class="num">200 ms = 6 frames</td></tr>
-        <tr><td>Pre-roll</td><td class="num">300 ms = 9 frames</td></tr>
-        <tr><td>Max utterance</td><td class="num">20 s</td></tr>
-        <tr><td>Playback chunk</td><td class="num">200 ms = 1,600 B</td></tr>
-      </tbody>
-    </table></div>
-    <div class="tw"><table>
-      <thead><tr><th>Turn-taking rule</th><th class="num">Value</th></tr></thead>
-      <tbody>
-        <tr><td>Barge-in needs continuous speech (p ≥ 0.7)</td><td class="num">≥ 800 ms</td></tr>
-        <tr><td>Barge-in energy</td><td class="num">RMS ≥ max(0.04, 0.25·caller RMS)</td></tr>
-        <tr><td>Opening can't be interrupted for</td><td class="num">4 s</td></tr>
-        <tr><td>Burst while agent talks dropped as echo</td><td class="num">&lt; 0.8 s</td></tr>
-        <tr><td>Echo of own voice (longest match)</td><td class="num">≥ 60% of text</td></tr>
-        <tr><td>"Can you hear me?" after silence</td><td class="num">8 s, max 2 times</td></tr>
-        <tr><td>Hang up on silence</td><td class="num">25 s</td></tr>
-        <tr><td>Max call length</td><td class="num">360 s (Plivo cap 420 s)</td></tr>
-        <tr><td>Answering-machine detection</td><td class="num">5,000 ms</td></tr>
-        <tr><td>Goodbye grace</td><td class="num">2.5 s</td></tr>
-      </tbody>
-    </table></div>
-  </div>
-  <h3>Speaker lock (WeSpeaker)</h3>
-  <div class="eq">input   80-bin Kaldi fbank, 16 kHz, mean-normalised, no dither      (needs ≥ 0.5 s)
-e       = f(fbank) / ‖f(fbank)‖₂                          256-d, L2 normalised
-S       = E·Eᵀ                                            pairwise cosine of turns ≥ 1 s
-caller  = mean{ eᵢ : S[best, i] ≥ 0.5 },  best = argmaxᵢ #{ j : Sᵢⱼ ≥ 0.5 }
-keep    ⇔ e·caller ≥ 0.40                                 same speaker 0.5–0.8, other 0–0.3</div>
-  <p class="note">A second, cheaper background filter compares prosody: a turn is dropped when it is ≥ 10 dB quieter than the caller, or ≥ 5 dB quieter and its pitch is &gt; 6 semitones away.</p>
-</section>
-
-<section>
-  <h2><span class="n">04</span>Speech to text</h2>
-  <div class="eq">model  Whisper large-v3, fp16, beam_size=5, temperature=0, condition_on_previous_text=False
-hint   turn &lt; 1.6 s → force the current call language (no detection)
-detect share_en = P(en) / (P(en) + P(hi) + P(ur))
-       lang = en  if share_en ≥ 0.92   (0.50 when the call is already in English)
-retry  if lang = en: decode again as hi; switch if  mean_logprob(hi) + 0.15 ≥ mean_logprob(en)
-drop a segment if any holds:
-       no_speech > 0.6 ∧ logprob < −0.7      compression_ratio ≥ 2.4      logprob ≤ −1.2
-       no_speech > 0.4 ∧ rms < 0.025         no_speech > 0.5 ∧ logprob < −0.3 ∧ rms < 0.035
-       rms < 0.008
-concurrency  4 transcriptions at once (semaphore)</div>
-</section>
-
-<section>
-  <h2><span class="n">05</span>Prosody (pitch and loudness)</h2>
-  <p class="note">Switched off by default (<code>ACIE_PROSODY=0</code>) because a caller asked for it to be off. The features are still computed and logged on every turn.</p>
-  <div class="eq">YIN     frame 640 (40 ms), hop 160 (10 ms), F0 ∈ [75, 400] Hz, threshold 0.15
-d(τ)    = Σ (x_t − x_{t+τ})²
-d'(τ)   = d(τ) · τ / Σ_{j≤τ} d(j)                   cumulative-mean normalised difference
-τ*      = first τ with d'(τ) &lt; 0.15, walked to the local minimum, parabolic interpolation
-F0      = 16000 / τ*         octave errors removed: F0 &gt; 2·median or F0 &lt; median/2
-st      = 12 · log₂(F0 / 100 Hz)                     semitones
-
-baseline = median of the same caller's last 8 turns (outliers &gt; 7 st from the median dropped)
-Δpitch = st − base_st        ratio = σ_st / max(base_σ, 0.5)        Δloud = dB − base_dB
-arousal = [0.45·clip(Δpitch/4) + 0.30·clip(ratio − 1) + 0.25·clip(Δloud/6)] · min(1, n_base/3)
-          ignored if |Δpitch| &gt; 7 st (another voice)
-
-if arousal &gt; 0.25 and the words are negative:  frustration += 0.40a, urgency += 0.15a
-if arousal &gt; 0.25 otherwise:                   engagement  += 0.25a, frustration += 0.10a
-if arousal &lt; −0.25:                            engagement  −= 0.40|a|</div>
-  <p class="note">Measured on live calls: median caller F0 140 Hz (p90 172), loudness −22 dBFS, speech rate 2 words/s.</p>
-</section>
-
-<section>
-  <h2><span class="n">06</span>Human state estimator H<sub>t</sub></h2>
-  <p>Four values in [0, 1]: frustration, confusion, urgency, engagement. Three readings are fused, then smoothed over the call.</p>
-  <div class="grid2">
-    <div class="tw"><table>
-      <thead><tr><th>Lexicon</th><th class="num">Phrases</th><th class="num">Masks</th></tr></thead>
-      <tbody>
-        <tr><td>Confusion (en / Roman Hindi / Devanagari)</td><td class="num">90</td><td class="num">12</td></tr>
-        <tr><td>Frustration</td><td class="num">187</td><td class="num">18</td></tr>
-        <tr><td>Urgency</td><td class="num">46</td><td class="num">30</td></tr>
-      </tbody>
-    </table></div>
-    <div class="tw"><table>
-      <thead><tr><th>Phrase weight</th><th>Meaning</th></tr></thead>
-      <tbody>
-        <tr><td class="num">0.8–0.9</td><td>one turn crosses the policy threshold alone</td></tr>
-        <tr><td class="num">0.5</td><td>needs support (a repeat, barge-in, a second phrase)</td></tr>
-        <tr><td class="num">≤ 0.3</td><td>weak hint</td></tr>
-      </tbody>
-    </table></div>
-  </div>
-  <div class="eq">lexicon   score = min(1, w_max + 0.15·(hits − 1))          masks remove phrases first; longest match wins
-
-rule adds confusion  +0.3 repeated last turn (Jaccard ≥ 0.6)     +0.2 "?" with ≤ 3 tokens
-          frustration +0.3 repeated last turn   +0.3 "!!" or ALL CAPS   +0.25 barge-in
-          urgency     +0.2 barge-in             +0.2 speech &gt; 3.5 words/s
-          engagement  0.2 if the turn is only "ok / haan / hmm"
-                      0.8 if a question, ≥ 8 tokens, or ≥ 3 words with a question word
-                      −0.2 if the caller took &gt; 4,000 ms to start
-
-fusion    raw_d = 0.5·lexicon_d + 0.5·NLU_d                    when the Qwen NLU answered
-
-smoothing H_t,d = α·raw_d + (1 − α)·H_{t−1,d}
-          α = 0.7 if raw_d &gt; H_{t−1,d}   (rise fast)
-          α = 0.3 otherwise             (decay slow)</div>
-</section>
-
-<section>
-  <h2><span class="n">07</span>Neural understanding (NLU)</h2>
-  <div class="grid2">
-    <div class="eq">model        Qwen3-14B-AWQ (same vLLM server)
-temperature  0
-max_tokens   110
-timeout      2.5 s → rules decide alone
-input        last 6 turns + intent guide + product
-output       vLLM guided_json (always parseable)
-skipped when rule intent ∈ {callback, human_agent}
-             and the turn has ≤ 6 words</div>
-    <div class="tw"><table>
-      <thead><tr><th>Output field</th><th>Type</th></tr></thead>
-      <tbody>
-        <tr><td><code>intent</code></td><td>1 of 12 + unknown</td></tr>
-        <tr><td><code>buying_signal</code></td><td>0–1, ≥ 0.8 only for a clear "send it"</td></tr>
-        <tr><td><code>question_topic</code></td><td>product, offer_terms, general, conversation, none</td></tr>
-        <tr><td><code>objection</code></td><td>trust, price, need, timing, language, other, none</td></tr>
-        <tr><td><code>frustration…engagement</code></td><td>4 × 0–1, fused 50/50 into H<sub>t</sub></td></tr>
-        <tr><td><code>gist</code></td><td>≤ 90 chars, repairs garbled ASR</td></tr>
-      </tbody>
-    </table></div>
-  </div>
-  <p class="note">The 12 intents are affirm, deny, tell_more, price, benefits, callback, human_agent, clarify, goodbye, slow_down, personal and small_talk. The rules keep the final word; the NLU only replaces a rule intent of unknown, tell_more, benefits, goodbye, affirm or deny.</p>
-</section>
-
-<section>
-  <h2><span class="n">08</span>Adaptation policy A<sub>t</sub> = π(H<sub>t</sub>, P<sub>t</sub>, C<sub>t</sub>)</h2>
-  <p>Seven discrete style knobs. Levels are low, med or high, because an LLM can't follow 0.4 vs 0.5.</p>
-  <div class="grid2">
-    <div class="tw"><table>
-      <thead><tr><th>Flag</th><th class="num">On at ≥</th><th class="num">Off at ≤</th></tr></thead>
-      <tbody>
-        <tr><td>confused</td><td class="num">0.5</td><td class="num">0.3</td></tr>
-        <tr><td>frustrated</td><td class="num">0.5</td><td class="num">0.3</td></tr>
-        <tr><td>urgent</td><td class="num">0.5</td><td class="num">0.3</td></tr>
-        <tr><td>disengaged (1 − engagement)</td><td class="num">0.7</td><td class="num">0.5</td></tr>
-      </tbody>
-    </table></div>
-    <div class="tw"><table>
-      <thead><tr><th>When</th><th>Style change</th></tr></thead>
-      <tbody>
-        <tr><td>confused</td><td>complexity low, verbosity ≤ med, proactivity low</td></tr>
-        <tr><td>frustrated</td><td>warmth high, verbosity low, proactivity low, formality up one step, acknowledge emotion (cooldown 3 turns)</td></tr>
-        <tr><td>urgent</td><td>verbosity low, proactivity low</td></tr>
-        <tr><td>disengaged only</td><td>verbosity low</td></tr>
-        <tr><td>explicit ask ("Hindi mein bolo", "short mein")</td><td>always wins</td></tr>
-      </tbody>
-    </table></div>
-  </div>
-  <div class="eq">Schmitt trigger   on  ⇔ value ≥ enter          (when off)
-                  off ⇔ value ≤ exit           (when on), otherwise keep the previous state
-language          explicit ask → switch now; locked profile → keep
-                  ≥ 4-word turn in another language → switch now
-                  shorter turns → need 2 in a row (LANGUAGE_SWITCH_STREAK)
-                  loanword-only turns ("ओके थैंक यू") → no signal
-profile prefs     used only if explicit or confidence ≥ 0.6</div>
-</section>
-
-<section>
-  <h2><span class="n">09</span>Long-term profile P<sub>t</sub> and feedback</h2>
-  <div class="eq">explicit statement       value ← v,  confidence ← 1.0,  locked until the next explicit statement
-same value, implicit     c ← min(1, c + lr·(1 − c))
-other value, implicit    c ← max(0, c − lr);   if c &lt; 0.3:  value ← v, c ← lr
-learning rates           language 0.15 (each turn)   complexity → low 0.15 (if confusion ≥ 0.5)
-                         reinforce complexity 0.05 (confusion &lt; 0.2 and frustration &lt; 0.2)
-memory                   one JSON file per caller; last 50 outcomes kept</div>
-</section>
-
-<section>
-  <h2><span class="n">10</span>Decision engine (what to say)</h2>
-  <div class="grid2">
-    <div class="eq">keyword classifier
-score(i)   = Σ w_k over keyword hits, after masks
-syntax     "phrase"  whole-word match
-           "bhej*"   prefix on the last word
-           "=matlab" whole utterance (fillers removed)
-priority   clarify → human_agent → callback → (deny | affirm)
-gated      affirm / deny only while a question is pending,
-           and only if their score ≥ best open intent
-fallback   highest score among non-weak intents</div>
-    <div class="eq">sales FSM (session.dialog["pending"])
-opening → intro → pitch → close → confirm → link_sent → end
-   any "no" → one soft re-offer (max_reoffers = 1,
-              only if frustration &lt; 0.5) → goodbye
-   "later"  → callback, end
-   price / benefit / FAQ answered at any stage
-after each answer, one nudge forward:
-   intro → offer price → 1 benefit → ask about link
-   link is asked again only after ≥ 3 turns and ≥ 1 benefit
-   frustration ≥ 0.4 → apologise, no selling line</div>
-  </div>
-  <h3>Order of checks every turn</h3>
-  <div class="tw"><table>
-    <thead><tr><th>#</th><th>Check</th><th>Output</th></tr></thead>
-    <tbody>
-      <tr><td class="num">1</td><td>Suicide / self-harm words (40 patterns, en + hi), sticky for the rest of the call</td><td>Fixed Tele-MANAS 14416 + 112 template, never the LLM, selling stops</td></tr>
-      <tr><td class="num">2</td><td>Compliance: opt-out, card / OTP / PIN digits, "are you AI?", "who is this?", "where did you get my number?"</td><td>Reviewed template, word for word</td></tr>
-      <tr><td class="num">3</td><td>Customer already decided (context ledger)</td><td>No more selling</td></tr>
-      <tr><td class="num">4</td><td>FAQ marked not eligible (already a subscriber)</td><td>Honest answer, never sells</td></tr>
-      <tr><td class="num">5</td><td>NLU gist says garbled</td><td>"Line isn't clear, say again?"</td></tr>
-      <tr><td class="num">6</td><td>Yes / no / buy signals → FSM step</td><td>TurnPlan</td></tr>
-      <tr><td class="num">7</td><td>Off-topic question</td><td>Clock, Open-Meteo or Wikipedia lookup (2 s budget, 10 min cache) → LLM answers, then returns to the ask</td></tr>
-    </tbody>
-  </table></div>
-  <h3>Playbook picker (pre-written decision tree)</h3>
-  <div class="eq">for each node n (16 nodes for claude-pro, 10 for fitzone-gym):
-  score = 2.5·[keyword regex hit] + 1.0·[rule intent ∈ n] + 1.0·[NLU intent ∈ n]
-        + 2.0·[NLU objection ∈ n] + 0.5·[question topic ∈ n] + 1.5·[signal range node holds]
-  skip n if buying / frustration / confusion falls outside its range
-pick argmax score, only if score ≥ 2.0; the LLM says 1–2 of its unused talking points</div>
-  <h3>Context ledger (whole-call memory)</h3>
-  <p class="note">An append-only event log per call. It tracks what was <code>promised</code> (link, callback, removal), what was <code>quoted</code>, what was <code>told</code>, the customer's <code>questions</code> and <code>objections</code>, and their <code>decision</code> (accepted, declined, later or undecided). A plain-text summary of it goes into every prompt as "CALL SO FAR".</p>
-</section>
-
-<section>
-  <h2><span class="n">11</span>Prompt compiler and the reply writer</h2>
-  <div class="grid2">
-    <div class="eq">system   10 hard rules + STYLE block from A_t
-history  last 10 utterances
-user     CALL SO FAR + CUSTOMER SAID + PLAN (JSON)
-         + "Reply only in &lt;language&gt;"
-PLAN     objective, decision, facts as {slot}: description,
-         talking_points, must_not_say, ask,
-         background_knowledge, looked_up, tone
-hidden   prices the LLM never sees (spoken by template)
-lead     exact price line spoken BEFORE the LLM reply</div>
-    <div class="eq">vLLM     Qwen/Qwen3-14B-AWQ → "acie-expression"
-         127.0.0.1:8000, gpu-memory-utilization 0.6
-         max-model-len 4096, max-num-seqs 32
-         enable-prefix-caching
-request  temperature 0.3, max_tokens 320 default
-         stream = true, thinking off
-         timeout 5 s → safe template, call continues
-prompt   ~0.8–1.5k tokens in, ≤ 320 out</div>
-  </div>
-  <p class="note">High-stakes turns (price, closing the sale, opening, compliance, safety) set <code>llm_allowed = False</code>. Those turns speak only the reviewed template. The LLM once swapped the offer price and the original price inside a correct-looking sentence.</p>
-</section>
-
-<section>
-  <h2><span class="n">12</span>Validator and reply clean-up</h2>
-  <div class="grid2">
-    <div class="tw"><table>
-      <thead><tr><th>Per-sentence check</th><th>Fail if</th></tr></thead>
-      <tbody>
-        <tr><td>Invented slot</td><td><code>{x}</code> not in plan facts, or hidden</td></tr>
-        <tr><td>Raw number</td><td>digit, ०–९, ₹, rs, INR, or hundred / thousand / lakh / crore / हजार / रुपये not said by the customer or the operator</td></tr>
-        <tr><td>Price after the lead</td><td>$, ₹, dollar, rupee or % after the exact price line</td></tr>
-        <tr><td>Offer padding</td><td><code>{offer}</code> twice, or with "first 3 months"</td></tr>
-        <tr><td>Wrong script</td><td>Devanagari in English; ≥ 5 Roman Hindi words in English; no Devanagari and ≥ 3 Latin words in Hindi; &gt; 60% Devanagari in Hinglish</td></tr>
-        <tr><td>Missing fact</td><td>a <code>must_mention</code> fact never appeared</td></tr>
-        <tr><td>Cut-off</td><td>last sentence has no ending punctuation → dropped</td></tr>
-      </tbody>
-    </table></div>
-    <div class="tw"><table>
-      <thead><tr><th>Post-processing</th><th class="num">Threshold</th></tr></thead>
-      <tbody>
-        <tr><td>Failed reply → regenerate once with the reason, then the template</td><td class="num">1 retry</td></tr>
-        <tr><td>Trim long replies, keep the closing question</td><td class="num">40 words</td></tr>
-        <tr><td>Drop the opening echo of the customer (after a question)</td><td class="num">similarity &gt; 0.88</td></tr>
-        <tr><td>Drop the opening echo (otherwise)</td><td class="num">&gt; 0.75</td></tr>
-        <tr><td>Drop sentences restating the lead</td><td class="num">&gt; 0.55</td></tr>
-        <tr><td>Same as last reply → regenerate</td><td class="num">&gt; 0.70</td></tr>
-        <tr><td>Accept regenerated reply</td><td class="num">≤ 0.80</td></tr>
-        <tr><td>Keep only new sentences vs the last reply</td><td class="num">≤ 0.75</td></tr>
-      </tbody>
-    </table></div>
-  </div>
-  <p class="note">Similarity is <code>difflib.SequenceMatcher.ratio()</code>. The validator fills <code>{slots}</code> with real values only after a sentence passes, so the LLM never writes a price.</p>
-  <div class="tiles">
-    <div class="tile"><b>85.7%</b><span>turns with zero validator issues</span></div>
-    <div class="tile"><b>2.1%</b><span>turns spoken as the safe template</span></div>
-    <div class="tile"><b>80%</b><span>replies in Hindi (112 of 140)</span></div>
-    <div class="tile"><b>20%</b><span>replies in English (28 of 140)</span></div>
-  </div>
-</section>
-
-<section>
-  <h2><span class="n">13</span>Text to speech and the phone line</h2>
-  <div class="eq">Fish Audio  POST api.fish.audio/v1/tts, model s2.1-pro-free, format pcm, 8,000 Hz, latency "low"
-            language hi for hi + hinglish, else en; one reference voice id for both
-            per-product respellings on Hindi turns: Claude → क्लॉड, SMS → एस एम एस, AI → ए आई
-encode      PCM16 → μ-law lookup table (65,536 entries) → base64 playAudio, 200 ms per message
-barge-in    speaking_epoch += 1 → stale audio stops, Plivo clearAudio
-Plivo       outbound Call API, bidirectional Stream XML, signature v3 (HMAC-SHA256) on webhooks</div>
-</section>
-
-<section>
-  <h2><span class="n">14</span>Training code (written, not yet deployed)</h2>
-  <div class="grid2">
-    <div class="eq">TURN CLASSIFIER  google/muril-base-cased (or XLM-R)
-input    [CLS] context [SEP] customer text [SEP], len 128
-pool     mean over real tokens, dropout 0.1
-heads    intent: Linear(768 → 11), softmax
-         4 states: Linear(768 → 3) each, softmax
-         explicit asks: Linear(768 → 6), sigmoid
-loss     1.0·CE_intent (label smoothing 0.05)
-       + 0.5·Σ CE_state  + 0.5·BCE_explicit
-weights  inverse-sqrt class frequency
-optim    AdamW, encoder lr 3e-5, heads lr 1e-3
-         wd 0.01, warmup 6%, linear decay
-         6 epochs, batch 64, timing dropout 0.3
-select   (intent macro-F1 + mean state F1
-          + explicit F1) / 3</div>
-    <div class="eq">REPLY WRITER  Qwen/Qwen2.5-7B-Instruct + LoRA
-LoRA     r 16, α 32 (scale 2.0), dropout 0.05
-targets  q k v o gate up down (all linear)
-params   28 layers × 1.44 M = 40.4 M trainable
-         (0.53% of 7.6 B)
-optim    lr 1.5e-4 cosine, warmup 3%, 2 epochs
-         batch 8 × grad-accum 2 = 16, bf16
-         max len 3,072, loss on final reply only
-data     142 hand-written gold rows (64 hi,
-         57 en, 21 hinglish), upsampled ×4
-       + 8,000 teacher rows from Qwen2.5-72B
-         filtered by the runtime validator
-eval     400 held-out prompts</div>
-  </div>
-  <p class="note">LoRA count per layer: r·(in + out) summed over q (3584→3584), k and v (3584→512), o (3584→3584), and gate, up and down (3584↔18944) = 1,441,792. The eval set (369 labelled turns and 28 conversations) is kept out of training by path checks and exact-match dedup.</p>
-</section>
-
-<section>
-  <h2><span class="n">15</span>Deployment</h2>
-  <div class="tw"><table>
-    <thead><tr><th>Piece</th><th>Value</th></tr></thead>
-    <tbody>
-      <tr><td>VM</td><td>GCP <code>voice-a100-4</code>, asia-southeast1-c, 34.143.141.218, 1× A100-SXM4 80 GB (54 GB in use)</td></tr>
-      <tr><td><code>salesgod-llm.service</code></td><td>vLLM, Qwen3-14B-AWQ, 127.0.0.1:8000</td></tr>
-      <tr><td><code>salesgod-voice.service</code></td><td>FastAPI + uvicorn, 127.0.0.1:8080, WebSocket ping 20 s; Whisper and the call sessions live here</td></tr>
-      <tr><td>Caddy</td><td>TLS for voice.arkinkansra.in → :8080</td></tr>
-      <tr><td>Telephony</td><td>Plivo +91 80655 89999, max 8 parallel calls, optional 09:00–21:00 IST window (off)</td></tr>
-      <tr><td>State</td><td>sessions in process memory; profiles, calls and audio as JSON / WAV under <code>data/voice/</code></td></tr>
-      <tr><td>Secrets</td><td><code>/opt/salesgod/.env</code>, mode 600, not copied to the laptop</td></tr>
-    </tbody>
-  </table></div>
-  <div class="callout">The design doc plans Redis, Postgres with pgvector, and NATS. None of these is running yet. Sessions live in memory, and profiles are one JSON file per caller.</div>
-</section>
-
-</div>
-<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script><script>mermaid.initialize({startOnLoad:true,theme:matchMedia("(prefers-color-scheme: dark)").matches?"dark":"default"});</script></body></html>
+<hr><p style="color:var(--muted);font-size:13px">Generated from <code>docs/ARCHITECTURE.md</code>; every number is read from the code, with <code>path:line</code> citations in that file. Companions: <code>docs/FLAGS.md</code>, <code>docs/STATUS.md</code>.</p>
+</main></div>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
+<script>
+(function(){
+  var dark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+  if (window.mermaid) { mermaid.initialize({startOnLoad:true, theme: dark ? "dark" : "default", securityLevel:"strict", flowchart:{useMaxWidth:true}}); }
+  else { document.querySelectorAll("pre.mermaid").forEach(function(p){p.style.textAlign="left";p.style.fontFamily="var(--mono)";}); }
+})();
+</script></body></html>

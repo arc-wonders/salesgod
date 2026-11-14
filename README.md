@@ -6,6 +6,8 @@ Adaptive Conversational Intelligence Engine: the layer of a voice agent between 
 
 See [docs/CONTEXT.md](docs/CONTEXT.md) for the original concept.
 
+Current documentation: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) (every model, formula and threshold, with file:line; open `docs/ARCHITECTURE.html` locally for the browsable version), [docs/FLAGS.md](docs/FLAGS.md) (every env var and flag), [docs/STATUS.md](docs/STATUS.md) (what is done and left against CONTEXT.md). The layer table below is the original v1 summary.
+
 ## Layers
 
 | # | Layer | Module | v1 implementation | Upgrade path |
