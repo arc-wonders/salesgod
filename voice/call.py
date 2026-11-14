@@ -68,7 +68,7 @@ class CallRecord:
     to: str
     customer_id: str = "c1"
     language: str = "hi"  # opening language
-    backend: str = "llm"  # llm | template
+    backend: str = "llm"  # llm (default reply model) | gemini | qwen | template
     campaign: str = "bank_demo"  # bank_demo | <product id>
     customer_name: str = ""
     customer_age: int | None = None  # optional: how the agent pitches and explains (a 21-year-old is not a 70-year-old)
