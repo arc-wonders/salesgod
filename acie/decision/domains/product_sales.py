@@ -10,13 +10,20 @@ Call flow (FSM in session.dialog):
 
 from __future__ import annotations
 
+import asyncio
 import json
+import os
 import re
 
 from pydantic import BaseModel, Field
 
+from ...business import Customer, MockBusinessAPI
+from ...context import _OUTCOMES
 from ...schemas import Fact, SessionState, TurnInput, TurnPlan
+from .. import constraints as cons
+from .. import nba
 from ..engine import KeywordIntentClassifier
+from ..hybrid import HybridIntentClassifier, load_turn_model
 from .bank_demo import KEYWORDS as BANK_KEYWORDS, MASKS as BANK_MASKS
 
 
@@ -174,6 +181,9 @@ class Product(BaseModel):
         "hinglish": "Aap ise zyadatar kis kaam ke liye use karenge?"})
     tenant: str = "default"  # whose campaign this is: playbooks are stored per tenant and product
     use_playbook: bool = True  # use the pre-generated decision tree (data/voice/playbooks/<tenant>/<id>.json)
+    # Declarative rules checked before every plan (acie/decision/constraints.py). Empty = no rules, unchanged behaviour.
+    constraints: list[dict] = Field(default_factory=list)
+    playbook_tree: str = ""  # optional path of a hand-written tree file (acie.playbook.load_tree), used when no playbook is passed
 
 
 KEYWORDS = {
@@ -404,7 +414,18 @@ class ProductSalesDomain:
     confident_intents = {"callback", "human_agent"}
 
     def __init__(self, product: Product, customer_name: str = "", world=None, customer_age: int | None = None,
-                 playbook=None):
+                 playbook=None, business=None, customer: Customer | dict | None = None, turn_model=None,
+                 now_fn=None, dnc_lookup=None):
+        self.business = business if business is not None else MockBusinessAPI()  # default mock = today's behaviour
+        cust = Customer.model_validate(customer) if isinstance(customer, dict) else (customer or Customer())
+        if customer_age is not None and cust.age is None:
+            cust = cust.model_copy(update={"age": customer_age})
+        if customer_name and not cust.name:
+            cust = cust.model_copy(update={"name": customer_name})
+        self.customer = cust
+        self._now_fn = now_fn
+        self._dnc_lookup = dnc_lookup
+        self._tasks: set = set()
         self.p = product
         self.about = (f"{product.product_name} ({product.one_liner}) from {product.seller_name}, offered at "
                       f"{product.offer_price} instead of {product.original_price} {product.offer_validity}")
@@ -418,11 +439,20 @@ class ProductSalesDomain:
                 "renewal_note": {k: v for k, v in product.renewal_note.items() if "$" not in v},
                 "annual_note": {k: v for k, v in product.annual_note.items() if "$" not in v}})
         self.p = product
+        if playbook is None and product.playbook_tree:
+            from ... import playbook as pbm
+            try:
+                playbook = pbm.load_tree(product.playbook_tree)
+            except Exception:
+                playbook = None  # a broken tree file never stops a call
         self.playbook = playbook if product.use_playbook else None  # acie.playbook.Playbook (pre-call decision tree)
         self.world = world  # acie.world.WorldKnowledge: weather / clock / encyclopedia for off-topic questions
         self.interim = None  # set by the pipeline: speak a short line now ("one second, let me check")
         self.classifier = KeywordIntentClassifier(KEYWORDS, gated=GATED, priority=PRIORITY, masks=MASKS,
                                                   weak=["goodbye"])
+        model = turn_model if turn_model is not None else load_turn_model()  # ACIE_TURN_MODEL; None = keywords only
+        if model is not None:
+            self.classifier = HybridIntentClassifier(self.classifier, model, known=set(KEYWORDS) | set(self.intent_guide))
         self._faq = [(f, [k[3:] if k.startswith("re:") else re.escape(k.lower())
                                        for k in f.keywords if k.strip()]) for f in product.faqs if f.answer]
 
@@ -584,7 +614,7 @@ class ProductSalesDomain:
 
     async def plan(self, intent: str, turn: TurnInput, session: SessionState) -> TurnPlan:
         d = session.dialog
-        plan = await self._plan(intent, turn, session)
+        plan = await self._guarded_plan(intent, turn, session)
         u = self._nlu(d)
         if u is not None and u.objection != "none":
             d.setdefault("_objection", u.objection)
@@ -592,7 +622,116 @@ class ProductSalesDomain:
             plan.persona = ((self.p.tone + ". ") if self.p.tone else "") + self._audience()
         d["last_intent"] = plan.intent
         d["last_customer"] = turn.text
+        self._outcome(plan, session)
         return plan
+
+    # ------------------------------------------------------------------ business API, constraints, next best action
+
+    async def _api(self, coro, default=None, budget: float = 1.5):
+        """A business-API call that can never stall a turn longer than `budget` seconds or raise."""
+        try:
+            return await asyncio.wait_for(coro, budget)
+        except Exception:
+            return default
+
+    def _constraint_ctx(self, d: dict, session: SessionState) -> cons.ConstraintContext:
+        c = self.customer
+        sub = c.existing_subscriber
+        if d.get("_elig_reason") == "existing_subscriber":
+            sub = True
+        return cons.ConstraintContext(product=self.p, phone=c.id or session.customer_id, age=c.age, region=c.region,
+                                      existing_subscriber=sub, reoffers=int(d.get("reoffers", "0")),
+                                      now=self._now_fn() if self._now_fn else None, dnc_lookup=self._dnc_lookup)
+
+    async def _guarded_plan(self, intent: str, turn: TurnInput, session: SessionState) -> TurnPlan:
+        d = session.dialog
+        ctx = getattr(session, "context", None)
+        rules = self.p.constraints
+        if intent == "greet":
+            await self._opening_lookups(d)
+        if (rules or d.get("_elig_blocked")) and not (ctx is not None and ctx.outcome):
+            if d.get("_elig_blocked"):
+                v = cons.Violation("eligibility", d["_elig_blocked"])
+            else:
+                v = cons.evaluate(rules, self._constraint_ctx(d, session), types=cons.PRE)
+            if v is not None:
+                d.pop("pending", None)
+                return cons.violation_plan(v)
+        if nba.enabled() and intent != "greet":
+            self._nba(d, ctx)
+        plan = await self._plan(intent, turn, session)
+        if rules and plan.intent == "reoffer":
+            v = cons.evaluate(rules, self._constraint_ctx(d, session), types=("max_reoffers",))
+            if v is not None:  # the rule forbids another offer: respect the no
+                d.pop("pending", None)
+                d["reoffers"] = str(int(d.get("reoffers", "1")) - 1)
+                return self._declined_plan()
+        if plan.intent == "link_sent":
+            await self._payment_link_fact(plan, d, session)
+        return plan
+
+    def _declined_plan(self) -> TurnPlan:
+        return TurnPlan(intent="declined", llm_allowed=False, decision="customer declined", end_call=True,
+                        objective="Thank them and say goodbye; do not pitch again",
+                        fallback=_tpl("No problem at all. Thanks for your time, have a good day!",
+                                      "कोई बात नहीं। आपके समय के लिए धन्यवाद, आपका दिन शुभ हो!",
+                                      "Koi baat nahi. Aapke time ke liye thank you, aapka din accha ho!"))
+
+    async def _opening_lookups(self, d: dict) -> None:
+        """Before the first line: is this person eligible, and what is the verified offer? Facts only."""
+        elig, quote = await asyncio.gather(self._api(self.business.eligibility(self.customer)),
+                                           self._api(self.business.quote(self.p, self.customer)))
+        if elig is not None and not elig.eligible:
+            d["_elig_reason"] = elig.reason
+            if elig.verified:  # an unverified (mock/fallback) "no" never ends a call by itself
+                d["_elig_blocked"] = elig.reason or "not eligible"
+        if quote is not None and quote.verified:
+            upd = {k: v for k, v in (("offer_price", quote.price), ("original_price", quote.original_price),
+                                     ("offer_validity", quote.validity)) if v}
+            if quote.terms:
+                upd["terms"] = dict(quote.terms)
+            self.p = self.p.model_copy(update=upd)
+            d["quote_verified"] = "1"
+
+    async def _payment_link_fact(self, plan: TurnPlan, d: dict, session: SessionState) -> None:
+        link = await self._api(self.business.create_payment_link(self.p, self.customer))
+        url = link.url if link is not None and link.url else self.p.payment_link
+        d["payment_link_url"] = url  # voice/call.py sends this one by SMS
+        d["payment_link_verified"] = "1" if link is not None and link.verified else "0"
+        if url:
+            plan.facts["payment_link"] = Fact(value=url, description="the payment link (sent by SMS, never spoken)",
+                                              must_mention=False, hidden=True)
+
+    def _nba(self, d: dict, ctx) -> None:
+        u = self._nlu(d)
+        stage = d.get("pending") or "intro"
+        action, scores = nba.next_best_action(stage, u.buying_signal if u is not None else 0.0,
+                                              list(ctx.objections) if ctx is not None else [], ctx,
+                                              benefit_turns=int(d.get("benefit_turns", "0")))
+        d["nba"] = action
+        d["nba_scores"] = json.dumps(scores)
+
+    def _outcome(self, plan: TurnPlan, session: SessionState) -> None:
+        """Every terminal path leaves one consistent outcome label (the same one the ledger folds into
+        session.context.outcome / decision / promised) and tells the business API once."""
+        d = session.dialog
+        label = _OUTCOMES.get(plan.intent)
+        if label is None:
+            if plan.intent in ("link_cancelled", "confirm_close"):
+                d["outcome"] = ""
+                d.pop("_outcome_sent", None)
+            return
+        d["outcome"] = label
+        if d.get("_outcome_sent") == label:
+            return
+        d["_outcome_sent"] = label
+        try:
+            t = asyncio.get_running_loop().create_task(
+                self._api(self.business.record_outcome(session.session_id, label)))
+        except RuntimeError:
+            return
+        self._tasks.add(t)
+        t.add_done_callback(self._tasks.discard)
 
     async def _plan(self, intent: str, turn: TurnInput, session: SessionState) -> TurnPlan:
         d, text, p = session.dialog, turn.text, self.p
@@ -905,6 +1044,11 @@ class ProductSalesDomain:
                         fallback=fb)
 
     def _stage(self, text: str, d: dict, ctx, frustration: float, u) -> str:
+        base = self._stage_base(text, d, ctx, frustration, u)
+        hint = nba.HINT.get(d.get("nba", "")) if nba.enabled() and d.get("nba") != "confirm_close" else None
+        return f"{base} {hint}" if hint else base
+
+    def _stage_base(self, text: str, d: dict, ctx, frustration: float, u) -> str:
         """One small step forward after answering, from where the sale stands (context ledger)."""
         if d.get("existing_user") == "1":
             return ("They already pay for Pro, so this offer (new subscriptions only) does not apply to them: say so plainly "

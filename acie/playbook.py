@@ -45,6 +45,11 @@ class Node(BaseModel):
     points_hi: list[str] = Field(default_factory=list)
     ask_hi: str = ""
     goal: str = ""  # what this turn should achieve
+    # hand-written decision tree: once this node matches, a matching child is more specific and wins
+    children: list["Node"] = Field(default_factory=list)
+
+
+Node.model_rebuild()
 
 
 class Playbook(BaseModel):
@@ -53,33 +58,51 @@ class Playbook(BaseModel):
     generated_by: str = ""
     nodes: list[Node] = Field(default_factory=list)
 
+    @staticmethod
+    def _score(n: "Node", low: str, nlu, intent: str) -> float | None:
+        """A node's match score, or None when one of its signal ranges rules it out."""
+        w, score = n.when, 0.0
+        if any(re.search(k, low, re.I) for k in w.keywords if k):
+            score += 2.5
+        if intent and intent in w.intents:
+            score += 1.0
+        if nlu is not None:
+            if nlu.intent in w.intents:
+                score += 1.0
+            if nlu.objection != "none" and nlu.objection in w.objections:
+                score += 2.0
+            if nlu.question_topic != "none" and nlu.question_topic in w.topics:
+                score += 0.5
+            ok = ((w.min_buying is None or nlu.buying_signal >= w.min_buying)
+                  and (w.max_buying is None or nlu.buying_signal <= w.max_buying)
+                  and (w.min_frustration is None or nlu.frustration >= w.min_frustration)
+                  and (w.min_confusion is None or nlu.confusion >= w.min_confusion))
+            if not ok:
+                return None
+            if any(v is not None for v in (w.min_buying, w.min_frustration, w.min_confusion)):
+                score += 1.5  # a signal-defined node whose signal holds
+        return score
+
     def pick(self, text: str, nlu=None, intent: str = "") -> tuple[Node | None, float]:
         low = text.lower()
         best, best_score = None, 0.0
         for n in self.nodes:
-            w, score = n.when, 0.0
-            if any(re.search(k, low, re.I) for k in w.keywords if k):
-                score += 2.5
-            if intent and intent in w.intents:
-                score += 1.0
-            if nlu is not None:
-                if nlu.intent in w.intents:
-                    score += 1.0
-                if nlu.objection != "none" and nlu.objection in w.objections:
-                    score += 2.0
-                if nlu.question_topic != "none" and nlu.question_topic in w.topics:
-                    score += 0.5
-                ok = ((w.min_buying is None or nlu.buying_signal >= w.min_buying)
-                      and (w.max_buying is None or nlu.buying_signal <= w.max_buying)
-                      and (w.min_frustration is None or nlu.frustration >= w.min_frustration)
-                      and (w.min_confusion is None or nlu.confusion >= w.min_confusion))
-                if not ok:
-                    continue
-                if any(v is not None for v in (w.min_buying, w.min_frustration, w.min_confusion)):
-                    score += 1.5  # a signal-defined node whose signal holds
-            if score > best_score:
+            score = self._score(n, low, nlu, intent)
+            if score is not None and score > best_score:
                 best, best_score = n, score
-        return (best, best_score) if best_score >= 2.0 else (None, best_score)
+        if best_score < 2.0:
+            return None, best_score
+        # tree: walk down while a child matches on its own (score >= 2.0); the child replaces its parent
+        while best is not None and best.children:
+            kid, kid_score = None, 0.0
+            for c in best.children:
+                sc = self._score(c, low, nlu, intent)
+                if sc is not None and sc > kid_score:
+                    kid, kid_score = c, sc
+            if kid is None or kid_score < 2.0:
+                break
+            best, best_score = kid, kid_score
+        return best, best_score
 
 
 def playbook_dir(data: Path) -> Path:
@@ -93,10 +116,17 @@ def load(data: Path, tenant: str, product_id: str) -> Playbook | None:
     """The tenant's saved playbook, else the default tenant's, else the seed shipped in the repo."""
     for root in (playbook_dir(data), SEED):
         for t in (tenant, "default"):
-            f = root / t / f"{product_id}.json"
-            if f.exists():
-                return Playbook.model_validate_json(f.read_text())
+            # a hand-written tree file (<product>.tree.json) beats the generated flat playbook
+            for name in (f"{product_id}.tree.json", f"{product_id}.json"):
+                f = root / t / name
+                if f.exists():
+                    return Playbook.model_validate_json(f.read_text())
     return None
+
+
+def load_tree(path: Path | str) -> Playbook:
+    """Load one hand-written tree file: {"product_id", "tenant"?, "nodes": [{... "children": [...]}]}."""
+    return Playbook.model_validate_json(Path(path).read_text())
 
 
 def save(data: Path, pb: Playbook) -> Path:
