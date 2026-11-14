@@ -326,6 +326,10 @@ def build_app() -> tuple[FastAPI, App]:
             raise HTTPException(404, "not found")
         return FileResponse(path, headers={"Cache-Control": "no-cache"})
 
+    @api.get("/m")
+    async def mobile() -> FileResponse:  # phone view (added on the VM 14 Nov, captured into git)
+        return FileResponse(STATIC / "mobile.html", headers={"Cache-Control": "no-cache"})
+
     @api.get("/classic")
     async def classic() -> FileResponse:
         return FileResponse(STATIC / "index.html")
