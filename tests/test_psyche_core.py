@@ -98,7 +98,7 @@ def test_clarity_ladder_escalates():
         m = choose_move(ctx)
         names.append(m.name)
         L.add_text(m.line("en"))
-    assert names[0] == "ask_repeat" and names[1] == "offer_stop" and names[2] == "close"
+    assert names[0] == "ask_repeat" and names[1] == "offer_stop" and names[2] == "keep_listening"
 
 
 # ---------------------------------------------------------------- emotion policy
@@ -173,3 +173,45 @@ def test_psyche_replay_is_deterministic():
     b = [r.text for r in asyncio.run(talk(make(True), ["हेलो", "नहीं चाहिए"]))]
     os.environ["ACIE_PSYCHE"] = ""
     assert a == b
+
+
+def test_exhaustion_never_ends_the_call():
+    """Live replay 9bde114312: running out of fresh wording hung up on a caller with ten questions left."""
+    from acie.psyche.moves import MoveContext, _exhausted
+    from acie.psyche.ledger import SaidLedger
+    from acie.psyche.needs import NeedResult
+    L = SaidLedger()
+    seen = []
+    for _ in range(12):
+        mc = MoveContext(need=NeedResult(need="answer", rule="t"), ledger=L, lang="en")
+        m = _exhausted(mc, "test")
+        assert not m.end_call and m.text["en"]
+        seen.append(m.name)
+        L.add_move(m.name) if hasattr(L, "add_move") else None
+        L.add_text(m.text["en"])
+    assert "keep_listening" in seen and "listen" in seen
+
+
+def test_same_sentence_never_spoken_twice_in_one_turn():
+    """Live call 7abf60f9bd: the lead and the safe template carried the same answer."""
+    import asyncio
+    from acie.pipeline import ACIEPipeline
+    from acie.decision.engine import DecisionEngine
+    from acie.schemas import TurnInput, TurnPlan
+    plan = TurnPlan(intent="faq", objective="x", llm_allowed=False,
+                    lead={"en": "Fair question. It is a launch offer."},
+                    fallback={"en": "Fair question. It is a launch offer. Anything else?"})
+
+    class D:
+        name = "t"
+        class classifier:
+            @staticmethod
+            def classify(text, session):
+                return "unknown"
+        async def plan(self, intent, turn, session):
+            return plan
+    out = []
+    p = ACIEPipeline(DecisionEngine(D()), buffer_reply=True)
+    asyncio.run(p.run_turn(TurnInput(session_id="s", customer_id="c", text="is it real?"), on_sentence=out.append))
+    spoken = " ".join(out)
+    assert spoken.count("Fair question.") == 1 and "Anything else?" in spoken

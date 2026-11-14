@@ -131,6 +131,20 @@ CLOSE = [
       "Aapke time ke liye thank you. Dhyan rakhiye, namaste."),
     T("Alright, bye for now.", "ठीक है, फिर मिलते हैं।", "Theek hai, phir milte hain."),
 ]
+KEEP_LISTENING = [
+    T("Sure. What else would you like to know?", "जी, और क्या जानना चाहेंगे?", "Ji, aur kya jaanna chahenge?"),
+    T("I'm listening, please go ahead.", "मैं सुन रहा हूँ, बताइए।", "Main sun raha hoon, bataiye."),
+    T("If it helps, someone from the team can call you with more detail. Would you like that?",
+      "अगर चाहें तो टीम से कोई आपको पूरी जानकारी के साथ कॉल कर सकता है। ऐसा करें?",
+      "Agar chahein to team se koi aapko poori jaankari ke saath call kar sakta hai. Aisa karein?"),
+    T("I can also call back at a time that suits you. Would that be better?",
+      "मैं आपके सुविधा के समय पर दोबारा कॉल भी कर सकता हूँ। वो ठीक रहेगा?",
+      "Main aapke suvidha ke time pe dobara call bhi kar sakta hoon. Wo theek rahega?"),
+]
+# the last rung: a short listening cue. Reused in a fixed rotation if every one was said: a two-word cue said again
+# is far better than hanging up on a caller who is still asking (live replay: hung up with ten questions left)
+LISTEN_CUES = [T("Yes, go on.", "जी, बताइए।", "Ji, bataiye."), T("Yes?", "जी?", "Ji?"),
+               T("I'm here.", "जी, मैं यहीं हूँ।", "Ji, main yahin hoon.")]
 NOTHING_NEW = [
     T("Honestly, that's everything I have on this. Is there anything else you'd like to ask, or shall I let you go?",
       "ईमानदारी से, इस बारे में मेरे पास बस इतना ही है। कुछ और पूछना हो तो बताइए, या मैं आपको जाने दूँ?",
@@ -228,13 +242,18 @@ def _mk(name: str, mc: MoveContext, text: dict[str, str] | None, **kw) -> Move |
 
 
 def _exhausted(mc: MoveContext, why: str) -> Move:
-    """Nothing new to say: be honest, offer to stop, then close, then fall silent. Never repeat."""
+    """Nothing new to say: be honest, then keep listening (ask what else / offer a person or a callback), then a
+    short listening cue. NEVER ends the call: only the caller's own goodbye, no or stop does (closure/autonomy)."""
     L, p, lang = mc.ledger, mc.product, mc.lang
-    for name, bank, end in (("nothing_new", NOTHING_NEW, False), ("close", CLOSE, True)):
-        m = _mk(name, mc, _rotate(bank, L, name, p, lang), end_call=end, brief=True, note=why)
+    for name, bank in (("nothing_new", NOTHING_NEW), ("keep_listening", KEEP_LISTENING)):
+        m = _mk(name, mc, _rotate(bank, L, name, p, lang), brief=True, note=why)
         if m is not None:
             return m
-    return Move(name="silent_close", need=mc.need.need, text=_all(""), end_call=True, brief=True, note=why)
+    m = _mk("listen", mc, _rotate(LISTEN_CUES, L, "listen", p, lang), brief=True, note=why)
+    if m is not None:
+        return m
+    cue = LISTEN_CUES[L.count_move("listen") % len(LISTEN_CUES)]  # deterministic reuse, never silence + hang-up
+    return Move(name="listen", need=mc.need.need, text=dict(cue), brief=True, note=why)
 
 
 def _info_items(mc: MoveContext, kinds=("fact", "benefit", "faq")) -> list[Item]:
@@ -267,9 +286,9 @@ def _do_clarity(mc: MoveContext) -> Move:
         if m:
             return m
     if f.get("garbled") or not L.sentences:
-        ladder = [("ask_repeat", ASK_REPEAT), ("offer_stop", LINE_POOR), ("close", CLOSE)]
+        ladder = [("ask_repeat", ASK_REPEAT), ("offer_stop", LINE_POOR), ("keep_listening", KEEP_LISTENING)]
     else:
-        ladder = [("simplify", None), ("simplify2", None), ("ask_unclear", ASK_UNCLEAR), ("offer_stop", LINE_POOR), ("close", CLOSE)]
+        ladder = [("simplify", None), ("simplify2", None), ("ask_unclear", ASK_UNCLEAR), ("offer_stop", LINE_POOR), ("keep_listening", KEEP_LISTENING)]
     start = max(0, L.count_move("need:clarity") - 1)  # (the pipeline counts the need before choosing)  # one rung further each time the caller still needs clarity
     for step, (name, bank) in enumerate(ladder[start:], start):
         if bank is None:
@@ -386,6 +405,9 @@ def _do_information(mc: MoveContext) -> Move:
 
 def _simple(name: str, bank, mc: MoveContext, need_name: str, **kw) -> Move:
     m = _mk(name, mc, _rotate(bank, mc.ledger, name, mc.product, mc.lang), brief=True, **kw)
+    if m is None and kw.get("end_call"):
+        # the caller said goodbye / no and every closing line was used: end quietly rather than repeat
+        return Move(name="silent_close", need=mc.need.need, text=_all(""), end_call=True, brief=True)
     return m or _exhausted(mc, f"{name} already said")
 
 
@@ -424,7 +446,7 @@ def repeat_move(mc: MoveContext, intent: str) -> Move:
     """A deterministic plan was about to repeat an earlier reply word for word (or nearly). Say something that
     helps instead: a garbled/unclear turn gets a different request, a finished call a polite close, anything
     else the honest "that's all I have"."""
-    if mc.has_link or intent in ("goodbye", "link_sent", "declined"):
+    if intent in ("goodbye", "declined"):  # the caller's own goodbye / no: the only repeat that may close the call
         return _simple("close", CLOSE, mc, "closure", end_call=True, note="Close politely; do not repeat.")
     if intent in ("not_understood", "clarify", "hello", "off_topic"):
         mc.need.flags["garbled"] = True

@@ -265,8 +265,21 @@ class ACIEPipeline:
         validator = StreamingValidator(plan, expr, trusted=not plan.llm_allowed, customer_text=turn.text)
         sentences: list[str] = []
 
+        spoken_parts: list[str] = []  # every sentence already spoken this turn (lead, interim, reply)
+
         async def emit(batch: list[str]) -> None:
             for s in batch:
+                # live call 7abf60f9bd: the lead and the safe template carried the same answer, so one reply said
+                # "अच्छा सवाल है। ये इस हफ्ते का लॉन्च ऑफर है…" twice. Never speak a sentence twice in one turn.
+                parts = [x for x in re.split(r"(?<=[.!?।])\s+", s.strip()) if x]
+                fresh = [x for x in parts if not any(
+                    difflib.SequenceMatcher(None, x.strip(" ।.!?,").lower(), y.strip(" ।.!?,").lower()).ratio() > 0.85
+                    for y in spoken_parts)]
+                if parts and not fresh:
+                    continue
+                if len(fresh) < len(parts):
+                    s = " ".join(fresh)
+                spoken_parts.extend(fresh)
                 if not sentences:
                     mark("first_sentence")
                 sentences.append(s)
