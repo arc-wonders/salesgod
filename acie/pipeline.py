@@ -580,8 +580,38 @@ class ACIEPipeline:
             if lead:
                 await emit([validator.fill(lead)])
 
+        last_agent_text = next((u.text for u in reversed(session.history) if u.role == "agent"), "")
+        early = {"spoken": False}
+        session.dialog.pop("_early_spoken", None)
+
+        def early_ok(s: str) -> bool:
+            """ACIE_HI_EARLY_SPEAK=1 (default off): a Hindi/Hinglish reply is buffered whole, and Devanagari costs ~4.4
+            tokens a word, so the caller waits ~1.5 s. The first sentence may be spoken while the rest is generated, but
+            only a real content sentence that already passed the per-sentence validator and every reply-level check the
+            buffered path would run on it (echo, filler opener, repeat of the last reply, ledger repeats, restated or
+            re-asked facts, unsourced claims). Whatever happens to the rest of the reply, this sentence stays true."""
+            if early["spoken"] or validator.failed or plan.lead or not plan.llm_allowed:
+                return False
+            if os.getenv("ACIE_HI_EARLY_SPEAK", "0") != "1" or expr.language not in ("hi", "hinglish"):
+                return False
+            t = s.strip()
+            if t.endswith("?") or _FILLER_OPEN.search(t):
+                return False
+            if len(reply_length.words(t)) <= 8 and not reply_length._FACTY.search(t):
+                return False  # a short opener ("जी, बिल्कुल।") is what reply_length.fit drops first
+            core = t.strip(" ।.!?,").lower()
+            if difflib.SequenceMatcher(None, core, turn.text.strip(" ।.!?,").lower()).ratio() > 0.75:
+                return False  # echo of the customer
+            if last_agent_text and difflib.SequenceMatcher(None, core, last_agent_text.lower()).ratio() > 0.6:
+                return False
+            return not self.reply_issues(t, ledger, facts, turn.text, plan)
+
         async def release(batch: list[str]) -> None:
             if self.buffer_reply:
+                if batch and not held and early_ok(batch[0]):
+                    early["spoken"] = True
+                    session.dialog["_early_spoken"] = "1"  # trace only; not a validator issue (that would mark the turn not ok)
+                    await emit([batch[0]])  # emit() never speaks it twice: the buffered reply skips it later
                 held.extend(batch)
             else:
                 await emit(batch)

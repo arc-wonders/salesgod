@@ -12,12 +12,22 @@ buffered, so every extra sentence is also extra silence before the caller hears 
 
 from __future__ import annotations
 
+import os
 import re
 
 _WORD = re.compile(r"[\wऀ-ॣॱ-ॿ{}₹]+", re.UNICODE)
 _FACTY = re.compile(r"[{}₹\d]|रुपय|rupay|rupee", re.I)
 _SPLIT = re.compile(r"(?<=[.!?।])\s+")
-LANG_WORDS = {"en": 1.0, "hi": 1.3, "hinglish": 1.15}
+LANG_WORDS = {"en": 1.0, "hi": 1.3, "hinglish": 1.3}  # hinglish loosened (15 Nov): Roman Hindi is cheap to generate
+
+
+def hi_max_words() -> int:
+    """Hindi (Devanagari) costs ~4.4 tokens per word vs ~1.3 in English, and live replies are buffered, so every Hindi word
+    is caller wait. Content words allowed in a Hindi reply, besides the closing question (ACIE_HI_MAX_WORDS, default 14)."""
+    try:
+        return int(os.getenv("ACIE_HI_MAX_WORDS", "14"))
+    except ValueError:
+        return 14
 
 
 def words(s: str) -> list[str]:
@@ -39,7 +49,10 @@ def budget(plan, expr) -> tuple[int, int]:
     max_s = {"low": 1, "med": 2, "high": 4}.get(verb, 2) + ask + ack
     nfacts = len(getattr(plan, "facts", {}) or {})
     max_w = {"low": 17, "med": 38, "high": 75}.get(verb, 38) + 10 * ask + 9 * ack + 3 * max(0, nfacts - 1)
-    return max_s, int(max_w * LANG_WORDS.get(getattr(expr, "language", "en"), 1.0))
+    lang = getattr(expr, "language", "en")
+    if lang == "hi":  # facts are never dropped by fit(), so a fact-heavy reply may still run over this
+        return max_s, min(int(max_w * LANG_WORDS["hi"]), hi_max_words() + 10 * ask + 3 * max(0, nfacts - 1))
+    return max_s, int(max_w * LANG_WORDS.get(lang, 1.0))
 
 
 def _n_sent(ss: list[str]) -> int:

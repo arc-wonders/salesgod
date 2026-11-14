@@ -9,7 +9,8 @@ EXPR = lambda lang="en", v="med": NS(verbosity=v, language=lang, acknowledge_emo
 
 def test_budget_follows_eval_rule():
     assert budget(MED_ASK, EXPR()) == (3, 48)
-    assert budget(NS(ask=None, facts={}), EXPR("hi", "low")) == (1, 22)
+    assert budget(NS(ask=None, facts={}), EXPR("hi", "low")) == (1, 14)  # Hindi cap (ACIE_HI_MAX_WORDS)
+    assert budget(MED_ASK, EXPR("hi")) == (3, 24)
 
 
 def test_empty_opener_dropped_first_question_kept():
