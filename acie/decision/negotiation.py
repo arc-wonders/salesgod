@@ -46,7 +46,8 @@ _TRIAL = re.compile(r"free trial|trial|ट्रायल|demo|try (it )?(first|
 _COUNTER = re.compile(r"(?:₹|rs\.?|rupees?)\s*\d[\d,]{2,}|\b\d[\d,]{2,}\s*(?:pe|par|tak|mein|me|में)\s*(?:ho|chalega|done|final|kar|de)|\b\d[\d,]{2,}\s*(?:rupe\w*|rs)\b|\d[\d,]*\s*(rupe\w*|rs\.?|₹|dollars?|\$|bucks)?\s*(kam|कम|off|less|discount)\b|"
                       r"(₹|rs\.?|\$)\s*\d[\d,]*\s*(mein|me|में|for|tak|तक)?\s*(do|de|dedo|दो|दे|chahiye|चाहिए)?|\d[\d,]*\s*(rupe\w*|rs|₹|dollars?)?\s*(mein|me|में|for|tak|तक)\s*(do|de|dedo|दो|दे|chahiye|चाहिए|milega|मिलेगा|ho jayega|हो जाएगा)|"
                       r"(give|do|de|दो|दे)\s*(it|me)?\s*(for|at|in)?\s*(₹|rs\.?|\$)?\s*\d[\d,]*", _I)
-_COUNTER_MORE = re.compile(r"\b(?:for|at|around|about|to|in)\s*(?:₹|rs\.?|rupees?|\$)?\s*\d[\d,]{2,}\b|\b(?:want|need|make|give|take|do)\b.{0,18}\b\d[\d,]{2,}\b|"
+_COUNTER_MORE = re.compile(r"\b\d[\d,]{2,}\s*(?:rupe\w*|rs)?\s*(?:kar\s?do|kardo|karo|de\s?do|dedo|कर\s?दो|करो|दे\s?दो)(?![\wऀ-ॿ])|"
+                          r"\b(?:for|at|around|about|to|in)\s*(?:₹|rs\.?|rupees?|\$)?\s*\d[\d,]{2,}\b|\b(?:want|need|make|give|take|do)\b.{0,18}\b\d[\d,]{2,}\b|"
                           r"\b\d[\d,]{2,}\s*(?:max|only|hi|bas|tak|se zyada nahi)\b", _I)
 _COMP_NAME = re.compile(r"cult|gold.?s|anytime fitness|competitor|chatgpt|gpt|gemini|copilot|other (gym|app|plan)|dusr[ae] (gym|app|jagah)|doosre|दूसरे|कहीं और|kahin aur|elsewhere|वहाँ|wahan", _I)
 _COMP_PRICE = re.compile(r"cheap|sasta|सस्ता|सस्ती|price|dollar|\$|₹|rupe|रुपये|\b\d{3,5}\b|kitna|कितना|cost|monthly|मंथली|महंगा|mehenga|expensive|same|20|free hai|फ्री है", _I)
@@ -98,6 +99,7 @@ class NegState:
     perks: list[str] = field(default_factory=list)    # ladder perks already offered
     ask_i: int = -1                                   # the closing-ask form used last (never the same twice in a row)
     sweet: bool = False                               # the last perk-only sweetener at the floor was given
+    notlast: bool = False                             # "going lower is difficult" was said once (never twice on a call)
     agreed: float = 0.0                               # the price the caller said yes to (never retracted, never re-offered higher)
 
     @classmethod
@@ -393,6 +395,12 @@ def _ladder_reply(p, kind: str, text: str, st: NegState, need_known: str, commit
     say = lambda *banks: {l: _join(*(b[l] for b in banks)) for l in LANGS}
     g = _grid(L)
 
+    def notlast(cond: bool = True) -> dict[str, str]:
+        if not cond or st.notlast:
+            return {l: "" for l in LANGS}
+        st.notlast = True
+        return _say(nb.NOT_LAST, tone, st, "notlast")
+
     def accept(price: float, note: str) -> NegReply:
         seq_ = ladder_prices(L, floor)
         st.price, st.final_said = min(price, cur), st.final_said or bool(seq_ and price <= seq_[-1])
@@ -428,7 +436,7 @@ def _ladder_reply(p, kind: str, text: str, st: NegState, need_known: str, commit
             final = bool(seq) and mid == seq[-1]
             st.final_said = st.final_said or final
             return NegReply("price_floor" if final else "negotiation",
-                            say(_say(nb.MID, tone, st, "mid", p=_fmt(p, mid)), _say(nb.NOT_LAST, tone, st, "notlast") if not final else {l: "" for l in LANGS},
+                            say(_say(nb.MID, tone, st, "mid", p=_fmt(p, mid)), notlast(not final),
                                 _ask(p, st, tone, mid)), st, offer={"price": float(mid)}, note="Met in the middle, never below the floor; one closing ask.", toned=True)
     if nxt is not None:
         st.price = float(nxt)
@@ -436,7 +444,7 @@ def _ladder_reply(p, kind: str, text: str, st: NegState, need_known: str, commit
         st.final_said = st.final_said or final
         lead = _say(nb.NO_NUM_THEN, tone, st, "nothen", n=_fmt(p, target)) if target is not None else {l: "" for l in LANGS}
         body = _say(nb.FINAL, tone, st, "final", p=_fmt(p, nxt)) if final else say(
-            _say(nb.STEP, tone, st, "step", p=_fmt(p, nxt)), _say(nb.NOT_LAST, tone, st, "notlast") if cur < L else {l: "" for l in LANGS})
+            _say(nb.STEP, tone, st, "step", p=_fmt(p, nxt)), notlast(cur < L))
         return NegReply("price_floor" if final else "negotiation", say(lead, body, _ask(p, st, tone, nxt)), st, offer={"price": float(nxt)},
                         note="Final price, said once, warmly." if final else "One concession tied to a closing ask.", toned=True)
     # at the floor: no more cash. State it once, then one honest sweetener, then a warm goodbye
