@@ -34,7 +34,7 @@ answers may not contain price literals (they use slots); offering price >= its f
 ## Shipped KBs
 | product | file | provenance | size |
 |---|---|---|---|
-| `fitzone-gym` (operator's own demo gym) | `data/voice/knowledge/default/fitzone-gym.json` | synthetic | 160 entries, 35 topic nodes (23 top level), 15 interest tags, 9 offerings |
+| `fitzone-gym` (operator's own demo gym) | `data/voice/knowledge/default/fitzone-gym.json` | synthetic | 160 entries, 35 topic nodes (22 top level), 15 interest tags, 9 offerings |
 | `claude-pro` (a REAL company's product) | `data/voice/knowledge/default/claude-pro.json` | public, `allow_synthetic: false` | 33 entries, 7 topics, 9 tags, 2 offerings (yearly billing, Team plan) |
 
 ### Synthetic data policy
