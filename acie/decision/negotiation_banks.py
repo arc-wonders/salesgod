@@ -243,3 +243,16 @@ CLOSED_AGAIN = _b(
          "Baat karne ke liye shukriya bhai; jo bhi tay karein, achha laga baat karke."),
     ],
 )
+
+# "can I just pay 33 a day?": one payment covers the whole plan, the per-day figure is only the maths
+PER_DAY_Q = _b(
+    professional=[("Sir, it is one payment of {p} for {u}; the {d} a day is only the arithmetic, not a daily payment.",
+                   "सर, यह {u} के लिए एक ही भुगतान {p} है; {d} रोज़ का केवल हिसाब है, रोज़ का भुगतान नहीं।",
+                   "Sir, yeh {u} ke liye ek hi payment {p} hai; {d} roz ka sirf hisaab hai, roz ka payment nahi.")],
+    mid=[("It's one payment of {p} for {u}; the {d} a day is just the maths, not a daily payment.",
+          "यह {u} के लिए एक ही पेमेंट {p} है; {d} रोज़ का बस हिसाब है, रोज़ का पेमेंट नहीं।",
+          "Yeh {u} ke liye ek hi payment {p} hai; {d} roz ka bas hisaab hai, roz ka payment nahi.")],
+    casual=[("Bhai, it's one payment of {p} for {u}; {d} a day is just the maths, not a daily payment.",
+             "भाई, यह {u} के लिए एक ही पेमेंट {p} है; {d} रोज़ का बस हिसाब है, रोज़ का पेमेंट नहीं।",
+             "Bhai, yeh {u} ke liye ek hi payment {p} hai; {d} roz ka bas hisaab hai, roz ka payment nahi.")],
+)

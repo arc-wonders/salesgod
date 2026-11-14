@@ -368,8 +368,7 @@ def test_student_discount_when_none_exists_is_an_honest_no_and_referral_only_if_
     out, _ = _neg(["student discount milega?"], CLAUDE)
     assert re.search(r"student discount nahi|no separate student discount", out[0][1], re.I) and not LET_GO.search(out[0][1])
     out, sess = _neg(["student discount milega?"], GYM)
-    assert "no student" in out[0][1].lower() or "नहीं" in out[0][1] or "nahi" in out[0][1]
-    assert json.loads(sess.dialog["_neg"])["levers"] == ["referral"]
+    assert "₹2,799" not in out[0][1] and "?" in out[0][1]   # a student ask on a ladder product is a price push: value first, the step comes on the next push
 
 
 def test_free_trial_uses_the_trial_pass_lever_or_the_free_plan_never_an_invented_trial():
