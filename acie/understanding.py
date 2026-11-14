@@ -39,6 +39,10 @@ class Understanding(BaseModel):
     urgency: float = Field(0.0, ge=0, le=1)
     engagement: float = Field(0.5, ge=0, le=1)
     gist: str = ""
+    # safety second net: the model thinks the caller may be expressing suicidal thoughts / self-harm, even
+    # through garbled words. Optional (older servers omit it). It can only ADD a safety trigger.
+    crisis: bool = False
+    crisis_reason: str = ""
     # extended human-state dims: None = the server did not return it (old servers / flag off), so it
     # is simply not fused and the lexicon alone decides
     satisfaction: float | None = Field(None, ge=0, le=1)
@@ -82,7 +86,9 @@ Output JSON only, following the schema.
   facts, small talk), "conversation" (who are you, why calling, what did you say), or "none".
 - objection: their concern if any.
 - frustration / confusion / urgency / engagement: how the customer sounds in THIS turn, 0..1.
-- gist: what they mean, at most 12 words (e.g. "wants to try it", "asks how to pay")."""
+- gist: what they mean, at most 12 words (e.g. "wants to try it", "asks how to pay").
+- crisis: true if the caller may be expressing suicidal thoughts or self-harm, even if the words are garbled
+  (e.g. jumping from a roof, not wanting to live, being defeated by life). crisis_reason: a few words why."""
 
 
 def _schema(intents: list[str]) -> dict:
@@ -105,6 +111,8 @@ def _base_schema(intents: list[str], lvl: dict) -> dict:
             "objection": {"type": "string", "enum": ["trust", "price", "need", "timing", "language", "other", "none"]},
             "frustration": lvl, "confusion": lvl, "urgency": lvl, "engagement": lvl,
             "gist": {"type": "string", "maxLength": 90},
+            "crisis": {"type": "boolean"},
+            "crisis_reason": {"type": "string", "maxLength": 90},
         },
         "required": ["intent", "buying_signal", "question_topic", "objection", "frustration", "confusion",
                      "urgency", "engagement", "gist"],
@@ -125,7 +133,7 @@ class LLMUnderstanding:
         guide = "\n".join(f"- {k}: {v}" for k, v in intents.items())
         user = (f"WHAT THE AGENT IS CALLING ABOUT: {about}\n\nINTENTS:\n{guide}\n\nCONVERSATION SO FAR:\n{convo}\n\n"
                 f"CUSTOMER NOW SAYS: {text}")
-        body = {"model": self.model, "temperature": 0, "max_tokens": 230 if state_dims_enabled() else 110,
+        body = {"model": self.model, "temperature": 0, "max_tokens": 260 if state_dims_enabled() else 140,
                 "messages": [{"role": "system", "content": SYSTEM + (STATE_DIMS_PROMPT if state_dims_enabled() else "")}, {"role": "user", "content": user}],
                 "guided_json": _schema(list(intents)), **self.extra_body}
         try:
