@@ -389,7 +389,7 @@ def _ladder_reply(p, kind: str, text: str, st: NegState, need_known: str, commit
     if kind == "counter_offer" or (re.search(r"\d[\d,]{2,}", text) and not _NOT_A_PRICE.search(text)):  # "mera budget 2000 hai" names a rate too
         n = counter_number(text)
         if n is not None:
-            target = float(max(0, cur - n)) if re.search(r"kam|कम|off|less", text, _I) and n < cur else float(n)
+            target = float(max(0, cur - n)) if re.search(r"\d\s*(?:rupe\w*|rs\.?|₹)?\s*(?:kam|कम|off|less)\b", text, _I) and n < cur else float(n)
     say = lambda *banks: {l: _join(*(b[l] for b in banks)) for l in LANGS}
     g = _grid(L)
 
