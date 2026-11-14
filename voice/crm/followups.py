@@ -22,19 +22,47 @@ from .store import JsonStore
 
 DAY = 86400
 NURTURE_DAYS = int(os.getenv("CRM_NURTURE_DAYS", "30"))
-ALIASES = {"accepted": "accepted", "won": "accepted", "sold": "accepted", "link_sent": "accepted", "interested": "interested",
+ALIASES = {"callback_requested": "callback", "callback_booked": "callback", "qualified": "interested", "not_qualified": "undecided",
+           "link_sent": "accepted", "promised_to_pay": "accepted", "paid": "accepted", "ready_to_buy": "accepted", "not_interested": "declined",
+           "human_requested": "interested", "appointment_booked": "interested", "completed": "undecided", "feedback_given": "undecided",
+           "ended_early": "undecided",
+           "accepted": "accepted", "won": "accepted", "sold": "accepted", "link_sent": "accepted", "interested": "interested",
            "callback": "callback", "callback_later": "callback", "later": "later", "undecided": "undecided",
            "declined": "declined", "lost": "declined", "opt_out": "opt_out", "dnc": "opt_out", "do_not_call": "opt_out",
            "no_answer": "no_answer", "voicemail": "voicemail", "machine": "voicemail", "failed": "failed",
            "demo_booked": "interested", "safety": "opt_out"}
 
 
+_NA_TYPE = {"follow_up_call": "follow_up", "human_call": "follow_up", "book_demo": "follow_up", "book_callback": "callback",
+            "book_appointment": "follow_up", "send_link": "follow_up", "nurture": "nurture"}
+
+
+def _na_from_result(na) -> dict | None:
+    """CallResult.next_action {type, due_at ISO, call_type} -> the CRM's next_action dict (epoch due_at, None = not scheduled)."""
+    if not isinstance(na, dict) or not na.get("type") or na["type"] == "none":
+        return None
+    due = na.get("due_at")
+    if isinstance(due, str) and due:
+        try:
+            due = datetime.fromisoformat(due).timestamp()
+        except ValueError:
+            due = None
+    elif not isinstance(due, (int, float)):
+        due = None
+    out = {"type": _NA_TYPE.get(na["type"], na["type"]), "due_at": due, "call_type": na.get("call_type") or None}
+    return {k: v for k, v in out.items() if v is not None or k == "due_at"}
+
+
 def derive(rec: dict) -> dict:
     """Structured result for a call record: use rec['result'] when valid, else read the context ledger."""
-    res = rec.get("result")
+    res = (rec.get("context") or {}).get("result")  # acie.calltypes.CallResult, rebuilt by the call-type pack every turn
+    if not (isinstance(res, dict) and res.get("outcome")):
+        res = rec.get("result")  # older records / direct callers
     if isinstance(res, dict) and res.get("outcome"):
         out = dict(res)
         out["outcome"] = ALIASES.get(str(res["outcome"]).lower(), str(res["outcome"]).lower())
+        out["answers"] = {**(res.get("facts") or {}), **(res.get("answers") or {})}
+        out["next_action"] = _na_from_result(res.get("next_action"))
         out["derived"] = False
         return out
     ctx = rec.get("context") or {}

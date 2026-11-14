@@ -21,7 +21,8 @@ from voice.plivo import e164
 
 from . import ai_assist, followups, importer
 from . import queue as Q
-from .models import (BUILTIN_CALLTYPES, Campaign, CallType, Customer, FieldDef, ID_RE, NextAction, Project, STAGES, slug, new_id)
+from acie.calltypes.schema import validate_call_type
+from .models import (BUILTIN_CALLTYPES, CT_ID_RE, Campaign, CallType, Customer, FieldDef, ID_RE, NextAction, Project, STAGES, ct_slug, slug, new_id)
 from .scoring import score
 from .store import JsonStore
 
@@ -189,6 +190,11 @@ def register(api: FastAPI, require: Callable[[Request], None], data: Path, calls
     def _all_calltypes(project: str | None) -> list[CallType]:
         return list(BUILTIN_CALLTYPES) + store.calltypes(project) if project else list(BUILTIN_CALLTYPES) + store.calltypes()
 
+    def _check_ct(ct: CallType) -> None:
+        problems = validate_call_type(ct)
+        if problems:
+            raise HTTPException(422, "; ".join(problems[:6]))
+
     @api.get("/api/calltypes")
     async def list_calltypes(request: Request, project: str | None = None) -> dict:
         require(request)
@@ -203,12 +209,13 @@ def register(api: FastAPI, require: Callable[[Request], None], data: Path, calls
             raise HTTPException(400, "project is required")
         project_or_404(project)
         b = {**b, "project_id": project, "builtin": False}
-        b.setdefault("id", slug(str(b.get("name", ""))))
+        b.setdefault("id", ct_slug(str(b.get("name", ""))))
         try:
             ct = CallType(**b)
         except ValidationError as e:
             raise _422(e)
-        if not ID_RE.match(ct.id) or any(x.id == ct.id for x in BUILTIN_CALLTYPES) or any(x.id == ct.id for x in store.calltypes(project)):
+        _check_ct(ct)
+        if not CT_ID_RE.match(ct.id) or any(x.id == ct.id for x in BUILTIN_CALLTYPES) or any(x.id == ct.id for x in store.calltypes(project)):
             raise HTTPException(409, "call type id is taken or invalid")
         store.put_calltype(ct)
         return {"calltype": ct.model_dump()}
@@ -225,6 +232,7 @@ def register(api: FastAPI, require: Callable[[Request], None], data: Path, calls
             ct = CallType(**{**cur.model_dump(), **(await _body(request)), "id": ctid, "project_id": cur.project_id, "builtin": False})
         except ValidationError as e:
             raise _422(e)
+        _check_ct(ct)
         store.put_calltype(ct)
         return {"calltype": ct.model_dump()}
 
@@ -254,11 +262,11 @@ def register(api: FastAPI, require: Callable[[Request], None], data: Path, calls
             raise HTTPException(400, "project is required")
         project_or_404(project)
         name = str(b.get("name") or f"{src.name} (copy)")[:60]
-        nid, i = slug(name), 2
+        nid, i = ct_slug(name), 2
         taken = {x.id for x in _all_calltypes(project)}
         base = nid
         while nid in taken:
-            nid, i = f"{base}-{i}", i + 1
+            nid, i = f"{base}_{i}", i + 1
         ct = CallType(**{**src.model_dump(), "id": nid, "name": name, "project_id": project, "builtin": False})
         store.put_calltype(ct)
         return {"calltype": ct.model_dump()}
@@ -595,9 +603,10 @@ def register(api: FastAPI, require: Callable[[Request], None], data: Path, calls
             cust.events.append({"t": now, "type": "call_started", "call_id": res["call_id"], "call_type": call_type, "campaign_id": c.id})
             cust.updated_at = now
             store.put_customer(cust)
-            c.stats["last_dial_at"] = int(now)
-            c.stats["dialed"] = c.stats.get("dialed", 0) + 1
-            store.put_campaign(c)
+            if c.id:  # a single call (no campaign) leaves no campaign stats behind
+                c.stats["last_dial_at"] = int(now)
+                c.stats["dialed"] = c.stats.get("dialed", 0) + 1
+                store.put_campaign(c)
         return res
 
     @api.post("/api/campaigns/{cid}/call/{customer_id}")
@@ -616,6 +625,29 @@ def register(api: FastAPI, require: Callable[[Request], None], data: Path, calls
         if ct not in {x.id for x in _all_calltypes(c.project_id)}:
             raise HTTPException(400, f"unknown call type {ct!r}")
         res = await _dial(c, cust, ct, b.get("language"))
+        if res.get("error") and not res.get("call_id"):
+            raise HTTPException(409, res["error"])
+        return res
+
+    @api.post("/api/customers/{cid}/call")
+    async def call_customer(cid: str, request: Request) -> dict:
+        """Operator-triggered single call without a campaign (the customer page's Call now). Same dial path and gates as a campaign
+        call; the call is linked to the customer so its outcome updates the stage, score and next action."""
+        require(request)
+        cust = customer_or_404(cid)
+        try:
+            b = await request.json()
+        except Exception:
+            b = {}
+        b = b if isinstance(b, dict) else {}
+        pid = str(b.get("product_id") or "")
+        if not pid:
+            raise HTTPException(400, "product_id is required")
+        ct = b.get("call_type") or (cust.next_action.call_type if cust.next_action and cust.next_action.call_type else None) or "sales_pitch"
+        if ct not in {x.id for x in _all_calltypes(cust.project_id)}:
+            raise HTTPException(400, f"unknown call type {ct!r}")
+        stub = Campaign(id="", project_id=cust.project_id, product_id=pid, call_type_id=ct, name="single call", language=cust.language)
+        res = await _dial(stub, cust, ct, b.get("language"))
         if res.get("error") and not res.get("call_id"):
             raise HTTPException(409, res["error"])
         return res

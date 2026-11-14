@@ -424,3 +424,51 @@ def test_assist_llm_request_shape_has_no_seed_and_no_key_in_errors(monkeypatch):
     with pytest.raises(ai_assist.AssistError) as e:
         asyncio.run(ai_assist.assist(llm, "campaign", "x"))
     assert "SECRET-KEY-123" not in e.value.msg
+
+
+# ---- fields the console stores (UI/API integration)
+
+def test_project_keeps_stage_names_default_calltypes_and_onboarding(tmp_path):
+    c, _, _ = setup(tmp_path)
+    body = {"stages": {"new": "Fresh lead"}, "default_calltypes": {"lead": "lead_qualification"}, "onboarding": {"step": 3, "productId": "p1"}}
+    p = c.put("/api/projects/acme", json=body, headers=H).json()["project"]
+    assert p["stages"] == {"new": "Fresh lead"} and p["default_calltypes"]["lead"] == "lead_qualification" and p["onboarding"]["step"] == 3
+    assert c.get("/api/projects/acme", headers=H).json()["project"]["onboarding"]["productId"] == "p1"
+    assert c.put("/api/projects/acme", json={"name": "Acme 2"}, headers=H).json()["project"]["stages"] == {"new": "Fresh lead"}  # a partial PUT keeps them
+
+
+def test_campaign_keeps_tone_level(tmp_path):
+    c, _, _ = setup(tmp_path)
+    cp = camp(c, tone_level="casual")
+    assert cp["tone_level"] == "casual" and camp(c)["tone_level"] == "mid"
+    assert c.put(f"/api/campaigns/{cp['id']}", json={"tone_level": "professional"}, headers=H).json()["campaign"]["tone_level"] == "professional"
+    assert c.put(f"/api/campaigns/{cp['id']}", json={"tone_level": "shouty"}, headers=H).status_code == 422
+
+
+def test_single_call_from_the_customer_page(tmp_path):
+    d = FakeDialer()
+    c, out, _ = setup(tmp_path, dialer=d)
+    cu = customer(c)
+    assert c.post(f"/api/customers/{cu['id']}/call", json={}, headers=H).status_code == 400  # product required
+    assert c.post(f"/api/customers/{cu['id']}/call", json={"product_id": "p1", "call_type": "nope"}, headers=H).status_code == 400
+    r = c.post(f"/api/customers/{cu['id']}/call", json={"product_id": "p1", "call_type": "follow_up"}, headers=H)
+    assert r.status_code == 200 and r.json()["call_id"] == "call0001"
+    assert d.calls[0]["link"] == {"project_id": "acme", "customer_id": cu["id"], "campaign_id": "", "call_type": "follow_up"}
+    assert out["store"].call_link("call0001")["customer_id"] == cu["id"]
+    assert [e["type"] for e in c.get(f"/api/customers/{cu['id']}/timeline", headers=H).json()["timeline"]][0] == "call_started"
+    assert c.get("/api/campaigns?project=acme", headers=H).json()["campaigns"] == []  # no stray campaign
+    d2 = FakeDialer(block="outside calling hours")
+    (tmp_path / "b").mkdir()
+    c2, _, _ = setup(tmp_path / "b", dialer=d2)
+    cu2 = customer(c2)
+    r = c2.post(f"/api/customers/{cu2['id']}/call", json={"product_id": "p1"}, headers=H)
+    assert r.status_code == 409 and "outside calling hours" in r.json()["detail"]
+    c.put(f"/api/customers/{cu['id']}", json={"consent": {"dnc": True}}, headers=H)
+    assert c.post(f"/api/customers/{cu['id']}/call", json={"product_id": "p1"}, headers=H).status_code == 409
+
+
+def test_import_with_comma_header_is_not_sniffed_into_another_delimiter(tmp_path):
+    c, _, _ = setup(tmp_path)
+    csv_text = "name,phone,tags\n\"Rao; Asha\",9876543210,a;b\nMehta; Rahul,9999911111,\n"
+    r = c.post("/api/customers/import", json={"project": "acme", "csv": csv_text, "commit": True}, headers=H).json()
+    assert r["counts"]["new"] == 2 and r["columns"] == ["name", "phone", "tags"]

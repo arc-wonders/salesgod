@@ -34,10 +34,13 @@ def parse_csv(text: str) -> tuple[list[str], list[dict]]:
     if len(text.encode("utf-8", "ignore")) > MAX_BYTES:
         raise ImportError_("file too large (max 2 MB)")
     text = text.lstrip("﻿")
-    try:
-        dialect = csv.Sniffer().sniff(text[:4096], delimiters=",;\t|")
-    except csv.Error:
+    if "," in text.split("\n", 1)[0]:  # a comma in the header row: plain CSV, no guessing (the console always sends commas)
         dialect = csv.excel
+    else:
+        try:
+            dialect = csv.Sniffer().sniff(text[:4096], delimiters=",;\t|")
+        except csv.Error:
+            dialect = csv.excel
     rd = csv.reader(io.StringIO(text), dialect)
     rows = [r for r in rd if any(c.strip() for c in r)]
     if not rows:
@@ -89,8 +92,16 @@ def _row_to_customer(row: dict, mapping: dict[str, str], project: Project, defau
     c.tags = sorted(set(_split_tags(g("tags")) + default_tags))
     for f in project.fields:
         v = g(f"custom.{f.key}")
-        if v:
-            c.custom[f.key] = v
+        if not v:
+            continue
+        if f.type == "number":  # same typing as a hand-edited customer (api._check_custom)
+            try:
+                v = float(v.replace(",", ""))
+            except ValueError:
+                continue
+        elif f.type == "bool":
+            v = v.lower() in ("1", "true", "yes", "y")
+        c.custom[f.key] = v
     return c, ""
 
 

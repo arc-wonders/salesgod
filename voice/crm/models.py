@@ -50,6 +50,9 @@ class Project(BaseModel):
     compliance_notes: str = ""
     fields: list[FieldDef] = Field(default_factory=list)
     webhook_token: str = ""  # lead webhook secret; generated on create, shown only to admins
+    stages: dict[str, str] = Field(default_factory=dict)  # operator's own names for the pipeline stages {stage: label}; order/meaning never change
+    default_calltypes: dict[str, str] = Field(default_factory=dict)  # {lead|follow_up|payment|default: call type id}
+    onboarding: dict[str, Any] = Field(default_factory=dict)  # the console's resumable setup-wizard state
     created_at: float = Field(default_factory=time.time)
 
     @field_validator("id")
@@ -167,55 +170,25 @@ class Campaign(BaseModel):
     schedule: Schedule = Field(default_factory=Schedule)
     status: Literal["draft", "running", "paused", "done"] = "draft"
     dial_mode: Literal["manual", "auto"] = "manual"  # auto needs the explicit operator switch (see api.py)
+    tone_level: Literal["professional", "mid", "casual"] = "mid"  # stored per campaign; the console's Tone dropdown
     auto_confirmed: bool = False
     stats: dict[str, int] = Field(default_factory=dict)
     created_at: float = Field(default_factory=time.time)
 
 
-# ---------------------------------------------------------------- call types (mirror of acie.calltypes.schema)
-# TODO(merge): when acie/calltypes/schema.py exists, import CallType from there and delete this mirror.
+# ---------------------------------------------------------------- call types (the schema lives in acie.calltypes)
+from acie.calltypes import CallType  # noqa: E402  (shared contract: acie/calltypes/schema.py)
+from acie.calltypes.builtins import builtin_call_types  # noqa: E402
+from acie.calltypes.schema import AnswerType  # noqa: E402
 
-class CallStep(BaseModel):
-    id: str
-    text: dict[str, str] = Field(default_factory=dict)  # per language
-    answer_type: Literal["text", "yes_no", "number", "choice", "date", "none"] = "text"
-    required: bool = False
-
-
-class CallType(BaseModel):
-    id: str
-    name: str
-    project_id: str | None = None  # None = built-in
-    objective: str = ""
-    opening: dict[str, str] = Field(default_factory=dict)
-    steps: list[CallStep] = Field(default_factory=list)
-    allowed_actions: list[str] = Field(default_factory=list)
-    success_outcomes: list[str] = Field(default_factory=list)
-    closing: dict[str, str] = Field(default_factory=dict)
-    tone: str = ""
-    max_call_seconds: int = 360
-    selling_allowed: bool = True
-    negotiation_allowed: bool = True
-    compliance_lines: list[str] = Field(default_factory=list)
-    builtin: bool = False
+BUILTIN_CALLTYPES = list(builtin_call_types().values())
+CT_ID_RE = re.compile(r"^[a-z][a-z0-9_]{0,39}$")
 
 
-BUILTIN_CALLTYPES = [
-    CallType(id="sales_pitch", name="Sales pitch", builtin=True, objective="Present the product and close the sale at a fair price",
-             allowed_actions=["send_link", "book_callback", "transfer_human", "opt_out"], success_outcomes=["accepted"]),
-    CallType(id="lead_qualification", name="Lead qualification", builtin=True, selling_allowed=False, negotiation_allowed=False,
-             objective="Find need, budget, authority and timeline; book a demo or callback, no hard sell",
-             allowed_actions=["book_demo", "book_callback", "opt_out"], success_outcomes=["demo_booked", "callback"]),
-    CallType(id="follow_up", name="Follow-up", builtin=True, objective="Continue from the last call: answer open questions, close or reschedule",
-             allowed_actions=["send_link", "book_callback", "transfer_human", "opt_out"], success_outcomes=["accepted", "callback"]),
-    CallType(id="payment_reminder", name="Payment reminder", builtin=True, selling_allowed=False, negotiation_allowed=False,
-             objective="Remind about a pending payment politely", allowed_actions=["send_link", "book_callback", "opt_out"]),
-    CallType(id="feedback_survey", name="Feedback survey", builtin=True, selling_allowed=False, negotiation_allowed=False,
-             objective="Collect short feedback", allowed_actions=["opt_out"]),
-    CallType(id="appointment_booking", name="Appointment booking", builtin=True, selling_allowed=False,
-             objective="Book an appointment or demo", allowed_actions=["book_demo", "book_callback", "opt_out"]),
-    CallType(id="custom", name="Custom", builtin=True, objective="Operator-defined steps", allowed_actions=["opt_out"]),
-]
+def ct_slug(name: str) -> str:
+    """A call type id from a name: lower-case letters, digits and _, starting with a letter."""
+    s = re.sub(r"[^a-z0-9]+", "_", (name or "").lower()).strip("_")[:40].strip("_")
+    return s if s and s[0].isalpha() else ("ct_" + s if s else "custom_call")[:40]
 
 
 # ---------------------------------------------------------------- AI assist: kind -> model of the returned draft
@@ -230,8 +203,9 @@ class ProductDraft(BaseModel):
 class StepDraft(BaseModel):
     id: str = ""
     text: dict[str, str] = Field(default_factory=dict)
-    answer_type: Literal["text", "yes_no", "number", "choice", "date", "none"] = "text"
-    required: bool = False
+    answer_type: AnswerType = "text"
+    required: bool = True
+    keywords: list[str] = Field(default_factory=list)
 
 
 class CampaignDraft(BaseModel):
@@ -250,7 +224,12 @@ class ReplyDraft(BaseModel):
     text: dict[str, str]
 
 
+class CallTypeDraft(CallType):
+    """A drafted call type has no id yet: the server derives it from the name when it is saved."""
+    id: str = ""
+
+
 ASSIST_MODELS: dict[str, type[BaseModel]] = {
-    "product": ProductDraft, "calltype": CallType, "campaign": CampaignDraft,
+    "product": ProductDraft, "calltype": CallTypeDraft, "campaign": CampaignDraft,
     "customer_fields": CustomerFieldsDraft, "step": StepDraft, "reply": ReplyDraft,
 }

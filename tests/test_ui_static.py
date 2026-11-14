@@ -19,7 +19,7 @@ _spec.loader.exec_module(ui_stub)
 # PLATFORM_SPEC.md "Backend API" + endpoints the console already used before this work
 SPEC = ["/api/projects", "/api/projects/*", "/api/projects/*/fields", "/api/projects/*/fields/*", "/api/calltypes", "/api/calltypes/*", "/api/calltypes/*/duplicate",
         "/api/customers", "/api/customers/*", "/api/customers/import", "/api/leads/webhook/*", "/api/customers/*/timeline",
-        "/api/campaigns", "/api/campaigns/*", "/api/campaigns/*/start", "/api/campaigns/*/pause", "/api/campaigns/*/queue", "/api/campaigns/*/call/*",
+        "/api/campaigns", "/api/campaigns/*", "/api/campaigns/*/start", "/api/campaigns/*/pause", "/api/campaigns/*/queue", "/api/campaigns/*/call/*", "/api/customers/*/call",
         "/api/followups", "/api/ai/assist"]
 EXISTING = ["/api/tenants", "/api/tenants/*", "/api/products", "/api/calls", "/api/sim/start", "/api/sim/*", "/api/progress", "/productgen"]
 

@@ -56,5 +56,16 @@ The reply is validated against the kind's pydantic model; on failure one repair 
 Returns `{kind, draft, repaired, saved: false}` and never saves. Keys are never logged or returned.
 
 ## Call types
-`voice/crm/models.py` mirrors the CallType schema (TODO: import from `acie.calltypes.schema` once merged). Built-ins are listed with
-custom per-project ones; built-ins cannot be edited, only duplicated.
+The schema is `acie.calltypes.CallType` (see docs/CALL_TYPES.md): ids are `lower_snake` (`^[a-z][a-z0-9_]{0,39}$`, derived from the name),
+`pack` picks the domain, steps carry `answer_type` (yes_no|choice|number|text|date_time|money), `choices`, `keywords`, and every language in
+`languages` needs opening/closing/step text. Create and edit run `validate_call_type` and answer 422 with the problems. Built-ins are listed
+with the project's own; built-ins cannot be edited, only duplicated. A call's result is read from `call.context.result` (`CallResult`).
+
+## Single call
+`POST /api/customers/{id}/call {product_id, call_type?, language?}`: operator-triggered call without a campaign, same dial gates (409 with the
+reason when refused), linked to the customer so the outcome is applied. Calls set `call.call_type` and `call.project_id`.
+
+## Stored for the console
+Project: `stages` (own stage names), `default_calltypes`, `onboarding` (wizard state). Campaign: `tone_level` (professional|mid|casual).
+CSV import: `{project, csv, mapping {field: column | "custom.<key>"}, commit, on_duplicate, tags}`; custom values are typed like hand edits.
+Customer do-not-call is one-way: `consent:{dnc:true, reason}` (a stage move out of do_not_call is a 409).
