@@ -151,6 +151,18 @@ CLOSE_WARM = [
        "ठीक है, आप आराम से सोचिए; कोई सवाल हो तो मैं यहीं हूँ।",
        "Theek hai, aap aaram se sochiye; koi sawal ho to main yahin hoon."),
 ]
+CLOSED_AGAIN = [  # after the warm goodbye was said, a caller who keeps pushing hears something new each time, never a push
+    CLOSE_WARM[1],
+    _t("I hear you. The price stays where we agreed, and the link is ready whenever you want it.",
+       "मैं समझता हूँ। कीमत वही रहेगी जो तय हुई, और लिंक जब चाहें तब तैयार है।",
+       "Main samajhta hoon. Keemat wahi rahegi jo tay hui, aur link jab chahein tab ready hai."),
+    _t("No hurry at all; if you like, I can also call you back at a time that suits you.",
+       "कोई जल्दी नहीं है; चाहें तो मैं आपके सुविधा वाले समय पर वापस कॉल कर सकता हूँ।",
+       "Koi jaldi nahi hai; chahein to main aapke suvidha wale time par wapas call kar sakta hoon."),
+    _t("Thank you for hearing me out; whatever you decide, it was good talking to you.",
+       "मेरी बात सुनने के लिए शुक्रिया; आप जो भी तय करें, आपसे बात करके अच्छा लगा।",
+       "Meri baat sunne ke liye shukriya; aap jo bhi tay karein, aapse baat karke achha laga."),
+]
 NO_GROUP = _t("There is no student, friend or group discount in this offer, and I can't make one up.",
               "इस ऑफर में स्टूडेंट, दोस्त या ग्रुप डिस्काउंट नहीं है, और मैं अपनी तरफ़ से कोई बना नहीं सकता।",
               "Is offer mein student, friend ya group discount nahi hai, aur main apni taraf se koi bana nahi sakta.")
@@ -266,8 +278,19 @@ def _round50(x: float) -> int:
     return int(round(x / 50.0)) * 50
 
 
+def _perk_cost(eco, ids) -> float:
+    return sum(x.cost for x in eco.ladder if x.kind == "perk" and x.id in ids)
+
+
+def effective_floor(eco, st: NegState) -> float:
+    """The profit floor plus what the perks already promised cost us: a sale with a perk must still clear the margin."""
+    return eco.profit_floor + _perk_cost(eco, st.perks)
+
+
 def _remaining(eco, st: NegState, cur: float, floor: float):
-    perks = [x for x in eco.ladder if x.kind == "perk" and x.id not in st.perks and all(x.text.get(l) for l in LANGS)]
+    # at most ONE perk per sale (a second perk would be stacking); cost counts against the margin through effective_floor()
+    perks = [x for x in eco.ladder if x.kind == "perk" and not st.perks and x.id not in st.perks and all(x.text.get(l) for l in LANGS)
+             and cur >= eco.profit_floor + x.cost]
     prices = sorted((x for x in eco.ladder if x.kind == "price" and floor <= x.price < cur), key=lambda x: -x.price)
     return perks, prices
 
@@ -279,8 +302,8 @@ def _ladder_reply(p, kind: str, text: str, st: NegState, need_known: str, commit
     to a commitment (no deadline, no scarcity), state the final price once, give one last honest sweetener, then walk away warmly.
     Every price on the table is at or above the profit floor; every line is picked so no sentence repeats on the call."""
     eco = p.economics
-    floor = eco.profit_floor
     st = NegState(**asdict(st))
+    floor = effective_floor(eco, st)
     cur = st.price or eco.list_price
     st.pushes += 1
     say = lambda *banks: {l: _join(*(b[l] for b in banks)) for l in LANGS}
@@ -297,7 +320,7 @@ def _ladder_reply(p, kind: str, text: str, st: NegState, need_known: str, commit
         a = _fill(ACCEPT_LINES[_pick(st, "accept", len(ACCEPT_LINES))], p, price)
         return NegReply("negotiation", say(a, _ask(p, st, price)), st, offer={"price": price}, note="Accepted at once; one closing ask.")
     if st.closed:
-        return NegReply("negotiation", CLOSE_WARM[1], st)
+        return NegReply("negotiation", CLOSED_AGAIN[_pick(st, "closed", len(CLOSED_AGAIN))], st)
     if st.pushes == 1 and target is None:  # first vague push: anchor at list, value, and let them name their number first
         if committed:
             return NegReply("negotiation", say(lead, FIRST_NUMBER), st, note="Already keen: let them name their number first.")
@@ -309,6 +332,7 @@ def _ladder_reply(p, kind: str, text: str, st: NegState, need_known: str, commit
     if perks:  # value before cash
         stp = perks[0]
         st.perks.append(stp.id)
+        floor = effective_floor(eco, st)
         line = {l: stp.text[l] for l in LANGS}
         return NegReply("negotiation", say(PERK_LEADS[_pick(st, "perk", len(PERK_LEADS))], line, _ask(p, st, cur)), st,
                         offer={"price": cur, "perk": stp.id}, note="A perk instead of a price cut, then a closing ask.")

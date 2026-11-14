@@ -109,6 +109,7 @@ class Ctx:
     allowed_numbers: set[str]
     product_name: str
     other_products: list[str] = field(default_factory=list)
+    prior_intents: list[str] = field(default_factory=list)  # intents of earlier agent replies
     expect_lang: str | None = None  # language the reply must be in (language-switch fixtures)
 
     @property
@@ -160,6 +161,9 @@ def c_link_unasked(c: Ctx):
 
 def c_push_after_no(c: Ctx):
     if c.refused and (c.intent in SELL_INTENTS) and not (c.tags & {"asks_price"}):
+        # OWNER UPDATE 2: after the first soft no the agent asks why (reason_ask); ONE value-based re-offer is then allowed
+        if c.intent == "reoffer" and "reason_ask" in c.prior_intents and "reoffer" not in c.prior_intents and not (c.tags & {"firm_no"}):
+            return None
         return f"sales intent {c.intent!r} after a no"
 
 

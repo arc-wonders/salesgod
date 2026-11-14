@@ -766,7 +766,8 @@
       "en": "plus one extra week free",
       "hi": "और एक हफ़्ता फ्री",
       "hinglish": "aur ek hafta free"
-     }
+     },
+     "cost": 150
     },
     {
      "kind": "perk",
@@ -780,7 +781,8 @@
       "en": "plus two extra free trainer sessions",
       "hi": "और दो एक्स्ट्रा फ्री ट्रेनर सेशन",
       "hinglish": "aur do extra free trainer session"
-     }
+     },
+     "cost": 300
     },
     {
      "kind": "price",

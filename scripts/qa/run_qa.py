@@ -117,7 +117,7 @@ def evaluate(fx: dict, recs: list[dict], prods_raw: dict) -> list[dict]:
         tags = set(turn.get("tags", []))
         ctx = C.Ctx(reply=rec["reply"], intent=rec["intent"], end_call=rec["end_call"], ask=rec["ask"], say=rec["say"],
                     tags=tags, lang=turn.get("lang", fx.get("lang", "hinglish")), prior_replies=list(prior_replies),
-                    prior_tags=list(prior_tags), allowed_numbers=allowed | said_numbers, product_name=prod["product_name"],
+                    prior_tags=list(prior_tags), prior_intents=[r_["intent"] for r_ in recs[1:i + 1]], allowed_numbers=allowed | said_numbers, product_name=prod["product_name"],
                     other_products=others, expect_lang=turn.get("expect_lang"))
         skip = set(turn.get("skip", []))
         # an explicit end-of-call expectation implies the agent may end here

@@ -49,10 +49,10 @@ def test_never_below_the_floor_for_any_counter(counter):
 
 
 def test_counter_below_current_meets_halfway_with_friendly_rounding():
-    out = play(["2350 mein do"] * 3)  # perk, perk, then the middle of 2999 and 2350 = 2674 -> 2650
-    assert out[2].offer == {"price": 2650.0}
-    assert "beech" in out[2].text["hinglish"] and "बीच" in out[2].text["hi"] and "middle" in out[2].text["en"]
-    assert out[2].offer["price"] % 50 == 0 and out[2].offer["price"] >= FLOOR
+    out = play(["2350 mein do"] * 2)  # one perk, then the middle of 2999 and 2350 = 2674 -> 2650
+    assert out[1].offer == {"price": 2650.0}
+    assert "beech" in out[1].text["hinglish"] and "बीच" in out[1].text["hi"] and "middle" in out[1].text["en"]
+    assert out[1].offer["price"] % 50 == 0 and out[1].offer["price"] >= FLOOR
 
 
 def test_vague_push_asks_their_number_once_then_concedes():
@@ -69,12 +69,12 @@ def test_committed_buyer_is_just_asked_for_their_number():
 
 def test_value_before_cash_shrinking_steps_and_commitment_wording():
     out = play(["kam karo"] * 6)
-    assert out[1].offer["perk"] == "extra_week" and out[2].offer["perk"] == "pt_sessions"
-    assert [o.offer["price"] for o in out[3:5]] == [2800, 2700]
+    assert out[1].offer["perk"] == "extra_week" and "perk" not in out[2].offer  # at most ONE perk per sale
+    assert [o.offer["price"] for o in out[2:4]] == [2800, 2700]
     assert "free" in out[1].text["en"] and "फ्री" in out[1].text["hi"] and "free" in out[1].text["hinglish"]
     for l in LANGS:
-        assert re.search(r"now|today|अभी|आज|abhi|aaj|ready", out[3].text[l], re.I)
-        assert not re.search(r"last chance|only \d+ left|hurry|expires", out[3].text[l], re.I)
+        assert re.search(r"now|today|अभी|आज|abhi|aaj|ready", out[2].text[l], re.I)
+        assert not re.search(r"last chance|only \d+ left|hurry|expires", out[2].text[l], re.I)
 
 
 @pytest.mark.parametrize("lang", LANGS)
@@ -88,7 +88,7 @@ def test_eight_round_haggle_never_repeats_one_final_price_line_then_warm_goodbye
     assert not any(BAD.search(t) for t in texts)
     assert out[-1].state.closed or out[-2].state.closed
     assert all(prices(r)[0] >= FLOOR for r in out if prices(r))
-    assert out[-1].text == negotiation.CLOSE_WARM[0] or out[-1].text == negotiation.CLOSE_WARM[1]
+    assert out[-1].text in [negotiation.CLOSE_WARM[0]] + negotiation.CLOSED_AGAIN
     assert "?" in out[-2].text[lang] or out[-2].state.closed
 
 
@@ -102,8 +102,8 @@ def test_after_the_floor_one_last_new_offer_then_goodbye():
 
 
 def test_number_at_or_above_floor_after_the_floor_is_still_accepted():
-    out = play(["kam karo"] * 7 + ["2500 mein de do"])
-    assert out[-1].offer == {"price": 2500.0}
+    out = play(["kam karo"] * 7 + ["2600 mein de do"])
+    assert out[-1].offer == {"price": 2600.0}
 
 
 def test_closing_ask_varies_never_the_same_form_twice_in_a_row():
