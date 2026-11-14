@@ -330,14 +330,20 @@ class CallSession:
                 await self.no_response()
             elif idle > SILENCE_HANGUP_S and self.utterances.empty():
                 await self.hangup("silence")
-            elif (self.hangup_after_speaking and not self.agent_speaking() and not self.in_turn
-                  and now - self.play_until > GOODBYE_GRACE_S
-                  and ((self.utterances.empty() and not self.detector.in_speech and not self.busy
-                        and now - self.last_activity > GOODBYE_GRACE_S)
-                       or now - self.play_until > GOODBYE_MAX_S)):
+            elif self.goodbye_due(now):
                 # wait for a quiet moment after the goodbye: the caller often says "ok thanks" or asks
                 # something else, and hanging up 0.6 s after the agent stops felt like being cut off
                 await self.hangup(getattr(self, "hangup_reason", "agent_ended"))
+
+    def goodbye_due(self, now: float) -> bool:
+        """After our goodbye: hang up at the first quiet moment (the caller often says "ok thanks"), and
+        in any case GOODBYE_MAX_S after it finished, unless the caller's own new turn is being answered."""
+        if not self.hangup_after_speaking or self.agent_speaking() or self.in_turn:
+            return False
+        since = now - self.play_until
+        quiet = (self.utterances.empty() and not self.detector.in_speech and not self.busy
+                 and now - self.last_activity > GOODBYE_GRACE_S)
+        return since > GOODBYE_GRACE_S and (quiet or since > GOODBYE_MAX_S)
 
     async def no_response(self) -> None:
         sess = self.pipeline.sessions.get(self.session_id)
@@ -532,7 +538,8 @@ class CallSession:
 
     @staticmethod
     def stock_noise(text: str) -> bool:
-        t = re.sub(r"[^\w\s']", " ", text.lower())
+        # punctuation only: \w does not cover Devanagari vowel signs ("कर दो" became "कर द")
+        t = re.sub(r"[.,!?।॥…\"“”‘’()\[\]:;~-]", " ", text.lower())
         t = re.sub(r"\s+", " ", t).strip()
         return t in STOCK_NOISE
 
