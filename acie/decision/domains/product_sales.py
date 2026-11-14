@@ -1291,7 +1291,7 @@ class ProductSalesDomain:
         elif asked:  # a real question: the catalog item it matches, else the honest line; never "I didn't get that"
             from ...psyche.moves import build_catalog, _matches
             hit = next((i for i in build_catalog(p) if i.kind != "faq" and _matches(i, text)), None)
-            generic = self._tpl3(lambda l: (hit.text.get(l) if hit is not None else None) or honest.unknown_variants(p, l)[0])
+            generic = self._tpl3(lambda l: (hit.text.get(l) if hit is not None else None) or self._unknown_answer(text, d, l))
         else:
             generic = _tpl("Sorry, I didn't quite get that. Could you say it once more?",
                            "माफ़ कीजिए, मैं ठीक से समझ नहीं पाया। एक बार फिर से बताएँगे?",
@@ -1411,6 +1411,15 @@ class ProductSalesDomain:
     def _tpl3(self, fn) -> dict[str, str]:
         return {l: fn(l) for l in ("en", "hi", "hinglish")}
 
+    def _unknown_answer(self, text: str, d: dict | None, lang: str, n: int = 0) -> str:
+        """The ONE place where the product has nothing to say about a question: the honest-but-helpful line (rotating wording).
+        The knowledge-base lane swaps this function for its lookup; nothing else in this domain writes an "I don't have that" line."""
+        p = self.p
+        topics = honest.find_topics(p, text)
+        if topics:
+            return honest.unknown_combo(p, lang, topics, min(n, 2))
+        return honest.unknown_variants(p, lang)[min(n, 2)]
+
     def _answer_text(self, text: str, lang: str, n: int = 0) -> str | None:
         """What the agent says to this question when the facts decide it: the operator's approved FAQ answer, or the honest
         "I don't have that detail" for a topic the facts do not cover. None = the conversation turn (LLM) answers."""
@@ -1421,7 +1430,7 @@ class ProductSalesDomain:
         if topics and topics[0].id == "payer":
             return honest.payer_variants(p, lang)[n % 2]
         if topics and (topics[0].beats_faq or not honest.covered_by_faq(p, text)):
-            return honest.unknown_combo(p, lang, topics, min(n, 2))  # a different wording each time the call hits a gap
+            return self._unknown_answer(text, None, lang, n)  # a different wording each time the call hits a gap
         faq = self._faq_match(text)
         if faq is not None and not faq.not_eligible:
             return ({"hi": faq.answer_hi, "hinglish": faq.answer_hinglish}.get(lang) or (faq.answer if lang == "en" else "")) or None
