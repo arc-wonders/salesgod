@@ -1,0 +1,1587 @@
+{
+ "allow_synthetic": false,
+ "description": "Real company's product: public facts only; no synthetic entries may exist or be served.",
+ "entries": [
+  {
+   "answer": {
+    "en": "Claude is an AI assistant made by Anthropic. You type or talk to it to write and edit text, write and debug code, analyse documents and data, research topics and brainstorm.",
+    "hi": "Claude Anthropic का बनाया AI असिस्टेंट है। आप टाइप करके या बोलकर इससे लिखवा और एडिट करवा सकते हैं, कोड लिखवा और डीबग करवा सकते हैं, दस्तावेज़ और डेटा का विश्लेषण, रिसर्च और ब्रेनस्टॉर्म करवा सकते हैं।",
+    "hinglish": "Claude Anthropic ka banaya AI assistant hai. Aap type karke ya bolkar isse likhwa aur edit karwa sakte hain, code likhwa aur debug karwa sakte hain, documents aur data ka analysis, research aur brainstorm karwa sakte hain."
+   },
+   "confidence": 1.0,
+   "facts": {},
+   "id": "cp-what",
+   "interests": [
+    "writing",
+    "coding",
+    "research"
+   ],
+   "offerings": [],
+   "provenance": "public",
+   "question_variants": {
+    "en": [
+     "what is Claude",
+     "what is Claude Pro",
+     "what does it do",
+     "what can it do"
+    ],
+    "hi": [
+     "Claude क्या है",
+     "Claude Pro क्या करता है"
+    ],
+    "hinglish": [
+     "Claude kya hai",
+     "Claude Pro kya karta hai",
+     "ye kya kar sakta hai"
+    ]
+   },
+   "source": "anthropic.com / claude.ai public pages",
+   "teach": false,
+   "topic_path": "product"
+  },
+  {
+   "answer": {
+    "en": "It works on the web at claude.ai, in iPhone and Android apps and on desktop.",
+    "hi": "ये वेब पर claude.ai पर, iPhone और Android ऐप में और डेस्कटॉप पर चलता है।",
+    "hinglish": "Ye web par claude.ai par, iPhone aur Android apps mein aur desktop par chalta hai."
+   },
+   "confidence": 1.0,
+   "facts": {},
+   "id": "cp-where",
+   "interests": [],
+   "offerings": [],
+   "provenance": "public",
+   "question_variants": {
+    "en": [
+     "where can I use it",
+     "does it have an app",
+     "is there a phone app",
+     "desktop"
+    ],
+    "hi": [
+     "कहाँ इस्तेमाल कर सकते हैं",
+     "फोन ऐप है"
+    ],
+    "hinglish": [
+     "kahan use kar sakte hain",
+     "phone app hai kya",
+     "desktop par chalta hai"
+    ]
+   },
+   "source": "anthropic.com / claude.ai public pages",
+   "teach": false,
+   "topic_path": "product"
+  },
+  {
+   "answer": {
+    "en": "It is software, not a physical product; nothing is shipped.",
+    "hi": "ये सॉफ्टवेयर है, कोई भौतिक चीज़ नहीं; कुछ भेजा नहीं जाता।",
+    "hinglish": "Ye software hai, physical product nahi; kuch ship nahi hota."
+   },
+   "confidence": 1.0,
+   "facts": {},
+   "id": "cp-software",
+   "interests": [],
+   "offerings": [],
+   "provenance": "public",
+   "question_variants": {
+    "en": [
+     "is it a physical product",
+     "will something be shipped",
+     "is it software"
+    ],
+    "hi": [
+     "क्या कोई चीज़ भेजी जाएगी",
+     "ये सॉफ्टवेयर है"
+    ],
+    "hinglish": [
+     "kya koi cheez bheji jayegi",
+     "ye software hai kya"
+    ]
+   },
+   "source": "anthropic.com / claude.ai public pages",
+   "teach": false,
+   "topic_path": "product"
+  },
+  {
+   "answer": {
+    "en": "Yes, it works in Hindi and many other languages.",
+    "hi": "हाँ, ये हिंदी और कई और भाषाओं में चलता है।",
+    "hinglish": "Haan, ye Hindi aur kai aur languages mein chalta hai."
+   },
+   "confidence": 1.0,
+   "facts": {},
+   "id": "cp-hindi",
+   "interests": [],
+   "offerings": [],
+   "provenance": "public",
+   "question_variants": {
+    "en": [
+     "does it work in Hindi",
+     "can I talk in Hindi",
+     "other languages"
+    ],
+    "hi": [
+     "हिंदी में चलता है",
+     "हिंदी में बात कर सकते हैं"
+    ],
+    "hinglish": [
+     "Hindi mein chalta hai kya",
+     "Hindi mein baat kar sakte hain"
+    ]
+   },
+   "source": "anthropic.com / claude.ai public pages",
+   "teach": false,
+   "topic_path": "product"
+  },
+  {
+   "answer": {
+    "en": "The offer is {offer_price}, normally {original_price}, {discount}, {offer_validity}.",
+    "hi": "ऑफर {offer_price} का है, जो आम तौर पर {original_price} होता है, {discount}, {offer_validity}।",
+    "hinglish": "Offer {offer_price} ka hai, jo normally {original_price} hota hai, {discount}, {offer_validity}."
+   },
+   "confidence": 1.0,
+   "facts": {},
+   "id": "cp-offer",
+   "interests": [
+    "budget"
+   ],
+   "offerings": [],
+   "provenance": "public",
+   "question_variants": {
+    "en": [
+     "what is the offer",
+     "how much is it",
+     "what is the price",
+     "what do I pay"
+    ],
+    "hi": [
+     "ऑफर क्या है",
+     "कितने का है",
+     "कीमत क्या है"
+    ],
+    "hinglish": [
+     "offer kya hai",
+     "kitne ka hai",
+     "price kya hai"
+    ]
+   },
+   "source": "anthropic.com / claude.ai public pages",
+   "teach": false,
+   "topic_path": "plans"
+  },
+  {
+   "answer": {
+    "en": "Pro gives much more usage than the free plan, access to Anthropic's most capable models, and Projects to keep documents and chats together.",
+    "hi": "Pro में फ्री प्लान से कहीं ज़्यादा इस्तेमाल, Anthropic के सबसे सक्षम मॉडल तक पहुँच, और दस्तावेज़ व चैट एक साथ रखने के लिए Projects मिलते हैं।",
+    "hinglish": "Pro mein free plan se kahin zyada usage, Anthropic ke sabse capable models tak access, aur documents aur chats saath rakhne ke liye Projects milte hain."
+   },
+   "confidence": 1.0,
+   "facts": {},
+   "id": "cp-free-vs-pro",
+   "interests": [
+    "budget",
+    "research"
+   ],
+   "offerings": [],
+   "provenance": "public",
+   "question_variants": {
+    "en": [
+     "what is different from the free plan",
+     "why pay for Pro",
+     "free vs pro"
+    ],
+    "hi": [
+     "फ्री प्लान से क्या अलग है",
+     "Pro क्यों लें"
+    ],
+    "hinglish": [
+     "free plan se kya alag hai",
+     "Pro kyun lein"
+    ]
+   },
+   "source": "anthropic.com / claude.ai public pages",
+   "teach": false,
+   "topic_path": "plans"
+  },
+  {
+   "answer": {
+    "en": "This offer is for new Pro subscriptions; if you already pay for Pro, your current plan and price stay as they are.",
+    "hi": "ये ऑफर नए Pro सब्सक्रिप्शन के लिए है; अगर आप पहले से Pro लेते हैं, तो आपका मौजूदा प्लान और कीमत वैसी ही रहती है।",
+    "hinglish": "Ye offer naye Pro subscriptions ke liye hai; agar aap pehle se Pro lete hain, toh aapka current plan aur price waise hi rehte hain."
+   },
+   "confidence": 1.0,
+   "facts": {},
+   "id": "cp-existing",
+   "interests": [],
+   "offerings": [],
+   "provenance": "public",
+   "question_variants": {
+    "en": [
+     "I already have Pro",
+     "I already pay for Claude",
+     "existing subscriber"
+    ],
+    "hi": [
+     "मेरे पास पहले से Pro है",
+     "मैं पहले से पैसे देता हूँ"
+    ],
+    "hinglish": [
+     "mere paas pehle se Pro hai",
+     "main pehle se pay karta hoon"
+    ]
+   },
+   "source": "anthropic.com / claude.ai public pages",
+   "teach": false,
+   "topic_path": "plans"
+  },
+  {
+   "answer": {
+    "en": "Yes, yearly billing is {price:yearly-billing}; this {offer_price} offer is only for the monthly plan.",
+    "hi": "हाँ, सालाना बिलिंग {price:yearly-billing} है; ये {offer_price} वाला ऑफर सिर्फ़ मंथली प्लान पर है।",
+    "hinglish": "Haan, yearly billing {price:yearly-billing} hai; ye {offer_price} wala offer sirf monthly plan par hai."
+   },
+   "confidence": 1.0,
+   "facts": {},
+   "id": "cp-yearly",
+   "interests": [
+    "budget"
+   ],
+   "offerings": [
+    "yearly-billing"
+   ],
+   "provenance": "public",
+   "question_variants": {
+    "en": [
+     "is there a yearly plan",
+     "annual billing",
+     "cheaper per month"
+    ],
+    "hi": [
+     "सालाना प्लान है",
+     "साल भर का"
+    ],
+    "hinglish": [
+     "yearly plan hai kya",
+     "annual billing",
+     "saal bhar ka"
+    ]
+   },
+   "source": "anthropic.com / claude.ai public pages",
+   "teach": false,
+   "topic_path": "plans"
+  },
+  {
+   "answer": {
+    "en": "A Pro subscription is for one person and should not be shared; groups use the separate Team plan, with prices on the website. Colleagues who do not have Pro can each take this offer on their own account.",
+    "hi": "Pro सब्सक्रिप्शन एक व्यक्ति के लिए है और शेयर नहीं करना चाहिए; ग्रुप के लिए अलग Team प्लान है, कीमतें वेबसाइट पर हैं। जिन साथियों के पास Pro नहीं है, वे हर एक अपने अकाउंट पर ये ऑफर ले सकते हैं।",
+    "hinglish": "Pro subscription ek vyakti ke liye hai aur share nahi karna chahiye; groups ke liye alag Team plan hai, prices website par hain. Jin colleagues ke paas Pro nahi hai, wo har ek apne account par ye offer le sakte hain."
+   },
+   "confidence": 1.0,
+   "facts": {},
+   "id": "cp-team",
+   "interests": [
+    "team"
+   ],
+   "offerings": [
+    "team-plan"
+   ],
+   "provenance": "public",
+   "question_variants": {
+    "en": [
+     "can my team share one account",
+     "can my colleagues use it",
+     "team plan",
+     "share with friends"
+    ],
+    "hi": [
+     "टीम एक अकाउंट शेयर कर सकती है",
+     "साथी इस्तेमाल कर सकते हैं"
+    ],
+    "hinglish": [
+     "team ek account share kar sakti hai",
+     "colleagues use kar sakte hain",
+     "team plan"
+    ]
+   },
+   "source": "anthropic.com / claude.ai public pages",
+   "teach": false,
+   "topic_path": "plans"
+  },
+  {
+   "answer": {
+    "en": "There is no separate student discount in this offer; the discount already applies.",
+    "hi": "इस ऑफर में अलग स्टूडेंट डिस्काउंट नहीं है; डिस्काउंट पहले से लागू है।",
+    "hinglish": "Is offer mein alag student discount nahi hai; discount pehle se lagu hai."
+   },
+   "confidence": 1.0,
+   "facts": {},
+   "id": "cp-student",
+   "interests": [
+    "study",
+    "budget"
+   ],
+   "offerings": [],
+   "provenance": "public",
+   "question_variants": {
+    "en": [
+     "is there a student discount",
+     "discount for students"
+    ],
+    "hi": [
+     "स्टूडेंट डिस्काउंट है"
+    ],
+    "hinglish": [
+     "student discount hai kya"
+    ]
+   },
+   "source": "anthropic.com / claude.ai public pages",
+   "teach": false,
+   "topic_path": "plans"
+  },
+  {
+   "answer": {
+    "en": "The price and the offer are set by Anthropic and I cannot change them; {offer_price} already includes {discount}.",
+    "hi": "कीमत और ऑफर Anthropic तय करता है और मैं उन्हें बदल नहीं सकता; {offer_price} में पहले से {discount} शामिल है।",
+    "hinglish": "Price aur offer Anthropic tay karta hai aur main unhe badal nahi sakta; {offer_price} mein pehle se {discount} shamil hai."
+   },
+   "confidence": 1.0,
+   "facts": {},
+   "id": "cp-negotiate",
+   "interests": [
+    "budget"
+   ],
+   "offerings": [],
+   "provenance": "public",
+   "question_variants": {
+    "en": [
+     "can you reduce the price",
+     "better deal",
+     "more discount"
+    ],
+    "hi": [
+     "कीमत कम कर सकते हैं",
+     "और डिस्काउंट"
+    ],
+    "hinglish": [
+     "price kam ho sakta hai",
+     "aur discount"
+    ]
+   },
+   "source": "anthropic.com / claude.ai public pages",
+   "teach": false,
+   "topic_path": "plans"
+  },
+  {
+   "answer": {
+    "en": "Usage is roughly five times the free plan, counted in sessions that reset every five hours; the exact number of messages depends on their length, so there is no fixed message count.",
+    "hi": "इस्तेमाल फ्री प्लान का लगभग पाँच गुना है, जो हर पाँच घंटे में रीसेट होने वाले सेशन में गिना जाता है; मैसेज की सही संख्या उनकी लंबाई पर निर्भर है, इसलिए कोई तय संख्या नहीं है।",
+    "hinglish": "Usage free plan ka lagbhag paanch guna hai, jo har paanch ghante mein reset hone wale sessions mein ginta hai; messages ki exact sankhya unki lambai par nirbhar hai, isliye koi fixed count nahi hai."
+   },
+   "confidence": 1.0,
+   "facts": {},
+   "id": "cp-usage",
+   "interests": [
+    "research"
+   ],
+   "offerings": [],
+   "provenance": "public",
+   "question_variants": {
+    "en": [
+     "how much more usage",
+     "how many messages",
+     "what are the limits"
+    ],
+    "hi": [
+     "कितना ज़्यादा इस्तेमाल",
+     "कितने मैसेज",
+     "लिमिट क्या है"
+    ],
+    "hinglish": [
+     "kitna zyada usage",
+     "kitne messages",
+     "limits kya hain"
+    ]
+   },
+   "source": "anthropic.com / claude.ai public pages",
+   "teach": false,
+   "topic_path": "usage"
+  },
+  {
+   "answer": {
+    "en": "Pro includes Anthropic's latest Claude models, including the most capable Opus and the fast Sonnet.",
+    "hi": "Pro में Anthropic के नवीनतम Claude मॉडल शामिल हैं, जिनमें सबसे सक्षम Opus और तेज़ Sonnet हैं।",
+    "hinglish": "Pro mein Anthropic ke latest Claude models shamil hain, jinme sabse capable Opus aur fast Sonnet hain."
+   },
+   "confidence": 1.0,
+   "facts": {},
+   "id": "cp-models",
+   "interests": [],
+   "offerings": [],
+   "provenance": "public",
+   "question_variants": {
+    "en": [
+     "which models are included",
+     "do I get Opus",
+     "latest Claude model"
+    ],
+    "hi": [
+     "कौन से मॉडल मिलते हैं",
+     "Opus मिलेगा"
+    ],
+    "hinglish": [
+     "kaun se models milte hain",
+     "Opus milega kya"
+    ]
+   },
+   "source": "anthropic.com / claude.ai public pages",
+   "teach": false,
+   "topic_path": "usage"
+  },
+  {
+   "answer": {
+    "en": "Projects let you keep related documents and chats together so Claude can work with them as context.",
+    "hi": "Projects में आप जुड़े हुए दस्तावेज़ और चैट एक साथ रख सकते हैं ताकि Claude उन्हें संदर्भ की तरह इस्तेमाल करे।",
+    "hinglish": "Projects mein aap jude hue documents aur chats saath rakh sakte hain taaki Claude unhe context ki tarah use kare."
+   },
+   "confidence": 1.0,
+   "facts": {},
+   "id": "cp-projects",
+   "interests": [
+    "research",
+    "business"
+   ],
+   "offerings": [],
+   "provenance": "public",
+   "question_variants": {
+    "en": [
+     "what are Projects",
+     "organise documents",
+     "keep my chats together"
+    ],
+    "hi": [
+     "Projects क्या हैं",
+     "दस्तावेज़ कैसे रखें"
+    ],
+    "hinglish": [
+     "Projects kya hain",
+     "documents kaise organise karein"
+    ]
+   },
+   "source": "anthropic.com / claude.ai public pages",
+   "teach": false,
+   "topic_path": "usage"
+  },
+  {
+   "answer": {
+    "en": "Yes, it can read and understand long documents, PDFs, files and images you upload.",
+    "hi": "हाँ, आपके अपलोड किए लंबे दस्तावेज़, PDF, फ़ाइलें और इमेज ये पढ़ और समझ सकता है।",
+    "hinglish": "Haan, aapke upload kiye lambe documents, PDFs, files aur images ye padh aur samajh sakta hai."
+   },
+   "confidence": 1.0,
+   "facts": {},
+   "id": "cp-long-docs",
+   "interests": [
+    "research",
+    "writing"
+   ],
+   "offerings": [],
+   "provenance": "public",
+   "question_variants": {
+    "en": [
+     "can it read long documents",
+     "PDF",
+     "upload files",
+     "images"
+    ],
+    "hi": [
+     "लंबे दस्तावेज़ पढ़ सकता है",
+     "PDF अपलोड"
+    ],
+    "hinglish": [
+     "long documents padh sakta hai",
+     "PDF upload",
+     "files"
+    ]
+   },
+   "source": "anthropic.com / claude.ai public pages",
+   "teach": false,
+   "topic_path": "usage"
+  },
+  {
+   "answer": {
+    "en": "Yes, it explains problems step by step, helps debug, and can read long code files; it is good for practising DSA.",
+    "hi": "हाँ, ये समस्याओं को कदम-दर-कदम समझाता है, डीबग में मदद करता है और लंबी कोड फ़ाइलें पढ़ सकता है; DSA प्रैक्टिस के लिए अच्छा है।",
+    "hinglish": "Haan, ye problems ko step by step samjhata hai, debug mein madad karta hai aur lambi code files padh sakta hai; DSA practice ke liye achha hai."
+   },
+   "confidence": 1.0,
+   "facts": {},
+   "id": "cp-coding",
+   "interests": [
+    "coding",
+    "study"
+   ],
+   "offerings": [],
+   "provenance": "public",
+   "question_variants": {
+    "en": [
+     "can it help with coding",
+     "debug my code",
+     "DSA practice",
+     "read code files"
+    ],
+    "hi": [
+     "कोडिंग में मदद करता है",
+     "कोड डीबग",
+     "DSA प्रैक्टिस"
+    ],
+    "hinglish": [
+     "coding mein madad karta hai",
+     "code debug",
+     "DSA practice"
+    ]
+   },
+   "source": "anthropic.com / claude.ai public pages",
+   "teach": false,
+   "topic_path": "work"
+  },
+  {
+   "answer": {
+    "en": "Yes, it writes and edits reports, assignments and emails; check the final text before you use it.",
+    "hi": "हाँ, ये रिपोर्ट, असाइनमेंट और ईमेल लिखता और एडिट करता है; इस्तेमाल से पहले अंतिम टेक्स्ट जाँच लें।",
+    "hinglish": "Haan, ye reports, assignments aur emails likhta aur edit karta hai; use karne se pehle final text check kar lein."
+   },
+   "confidence": 1.0,
+   "facts": {},
+   "id": "cp-writing",
+   "interests": [
+    "writing",
+    "study"
+   ],
+   "offerings": [],
+   "provenance": "public",
+   "question_variants": {
+    "en": [
+     "can it write reports",
+     "help with assignments",
+     "edit my writing",
+     "emails"
+    ],
+    "hi": [
+     "रिपोर्ट लिख सकता है",
+     "असाइनमेंट में मदद"
+    ],
+    "hinglish": [
+     "reports likh sakta hai",
+     "assignments mein madad",
+     "emails"
+    ]
+   },
+   "source": "anthropic.com / claude.ai public pages",
+   "teach": false,
+   "topic_path": "work"
+  },
+  {
+   "answer": {
+    "en": "Yes, it can explain homework step by step; students, writers, developers and small businesses use it.",
+    "hi": "हाँ, ये होमवर्क कदम-दर-कदम समझा सकता है; स्टूडेंट, लेखक, डेवलपर और छोटे बिज़नेस इसे इस्तेमाल करते हैं।",
+    "hinglish": "Haan, ye homework step by step samjha sakta hai; students, writers, developers aur chhote businesses ise use karte hain."
+   },
+   "confidence": 1.0,
+   "facts": {},
+   "id": "cp-homework",
+   "interests": [
+    "study"
+   ],
+   "offerings": [],
+   "provenance": "public",
+   "question_variants": {
+    "en": [
+     "can it explain homework",
+     "help me study",
+     "exam preparation"
+    ],
+    "hi": [
+     "होमवर्क समझा सकता है",
+     "पढ़ाई में मदद"
+    ],
+    "hinglish": [
+     "homework samjha sakta hai",
+     "padhai mein madad",
+     "exam preparation"
+    ]
+   },
+   "source": "anthropic.com / claude.ai public pages",
+   "teach": false,
+   "topic_path": "work"
+  },
+  {
+   "answer": {
+    "en": "For a shop or small business it helps with GST calculations, bill formats, lists of dues (udhaari), and drafting WhatsApp or SMS messages to customers; it writes them and you send them, and you should check the numbers. It is not a replacement for Tally, but works alongside it.",
+    "hi": "दुकान या छोटे बिज़नेस में ये GST गणना, बिल के फॉर्मेट, उधारी की लिस्ट और ग्राहकों को WhatsApp या SMS संदेश लिखने में मदद करता है; ये लिखता है, भेजते आप हैं, और नंबर आपको जाँचने चाहिए। ये टैली का विकल्प नहीं, पर उसके साथ काम करता है।",
+    "hinglish": "Dukan ya chhote business mein ye GST calculations, bill formats, udhaari lists aur customers ko WhatsApp ya SMS messages likhne mein madad karta hai; ye likhta hai, bhejte aap hain, aur numbers aapko check karne chahiye. Ye Tally ka replacement nahi, par uske saath kaam karta hai."
+   },
+   "confidence": 1.0,
+   "facts": {},
+   "id": "cp-shop",
+   "interests": [
+    "business"
+   ],
+   "offerings": [],
+   "provenance": "public",
+   "question_variants": {
+    "en": [
+     "can it help my shop",
+     "GST bills",
+     "udhaari list",
+     "WhatsApp messages",
+     "Tally"
+    ],
+    "hi": [
+     "दुकान में मदद करेगा",
+     "GST बिल",
+     "उधारी की लिस्ट",
+     "टैली"
+    ],
+    "hinglish": [
+     "dukan mein madad karega",
+     "GST bills",
+     "udhaari list",
+     "WhatsApp messages",
+     "Tally"
+    ]
+   },
+   "source": "anthropic.com / claude.ai public pages",
+   "teach": false,
+   "topic_path": "work"
+  },
+  {
+   "answer": {
+    "en": "Many people use Claude alongside other assistants such as ChatGPT; people often pick Claude for careful writing, working with long documents and coding help.",
+    "hi": "कई लोग Claude को ChatGPT जैसे दूसरे असिस्टेंट के साथ इस्तेमाल करते हैं; लोग अक्सर सावधानी से लिखने, लंबे दस्तावेज़ों और कोडिंग में मदद के लिए Claude चुनते हैं।",
+    "hinglish": "Kai log Claude ko ChatGPT jaise doosre assistants ke saath use karte hain; log aksar careful writing, lambe documents aur coding help ke liye Claude chunte hain."
+   },
+   "confidence": 1.0,
+   "facts": {},
+   "id": "cp-vs-chatgpt",
+   "interests": [
+    "compare"
+   ],
+   "offerings": [],
+   "provenance": "public",
+   "question_variants": {
+    "en": [
+     "how is it different from ChatGPT",
+     "Claude vs ChatGPT",
+     "which is better"
+    ],
+    "hi": [
+     "ChatGPT से कैसे अलग है",
+     "कौन बेहतर है"
+    ],
+    "hinglish": [
+     "ChatGPT se kaise alag hai",
+     "Claude vs ChatGPT",
+     "kaun better hai"
+    ]
+   },
+   "source": "anthropic.com / claude.ai public pages",
+   "teach": false,
+   "topic_path": "work"
+  },
+  {
+   "answer": {
+    "en": "Yes, it renews automatically every month; after the first 3 months it renews at {original_price} until you cancel.",
+    "hi": "हाँ, हर महीने अपने आप रिन्यू होता है; पहले 3 महीने के बाद आपके कैंसल करने तक {original_price} पर रिन्यू होता है।",
+    "hinglish": "Haan, har mahine apne aap renew hota hai; pehle 3 mahine ke baad aapke cancel karne tak {original_price} par renew hota hai."
+   },
+   "confidence": 1.0,
+   "facts": {},
+   "id": "cp-renewal",
+   "interests": [
+    "budget"
+   ],
+   "offerings": [],
+   "provenance": "public",
+   "question_variants": {
+    "en": [
+     "does it renew automatically",
+     "will money be taken every month",
+     "after 3 months what happens"
+    ],
+    "hi": [
+     "अपने आप रिन्यू होता है",
+     "3 महीने बाद क्या होगा"
+    ],
+    "hinglish": [
+     "apne aap renew hota hai kya",
+     "3 mahine baad kya hoga"
+    ]
+   },
+   "source": "anthropic.com / claude.ai public pages",
+   "teach": false,
+   "topic_path": "billing"
+  },
+  {
+   "answer": {
+    "en": "Cancelling stops the next renewal and access continues until the end of the paid month; refunds follow the policy on the website.",
+    "hi": "कैंसल करने से अगला रिन्यूअल रुक जाता है और चुकाए महीने के अंत तक एक्सेस रहता है; रिफंड वेबसाइट की नीति के अनुसार होते हैं।",
+    "hinglish": "Cancel karne se agla renewal ruk jata hai aur paid month ke ant tak access rehta hai; refunds website ki policy ke hisaab se hote hain."
+   },
+   "confidence": 1.0,
+   "facts": {},
+   "id": "cp-cancel",
+   "interests": [
+    "budget"
+   ],
+   "offerings": [],
+   "provenance": "public",
+   "question_variants": {
+    "en": [
+     "how do I cancel",
+     "can I cancel anytime",
+     "what happens when I cancel"
+    ],
+    "hi": [
+     "कैसे कैंसल करूँ",
+     "कभी भी कैंसल कर सकता हूँ"
+    ],
+    "hinglish": [
+     "kaise cancel karun",
+     "kabhi bhi cancel kar sakta hoon"
+    ]
+   },
+   "source": "anthropic.com / claude.ai public pages",
+   "teach": false,
+   "topic_path": "billing"
+  },
+  {
+   "answer": {
+    "en": "I send a secure payment link by SMS to this number; it opens Anthropic's official claude.ai page, and the page shows the payment methods, usually card. Nothing is taken on this call.",
+    "hi": "मैं इसी नंबर पर SMS से सुरक्षित पेमेंट लिंक भेजता हूँ; वो Anthropic के आधिकारिक claude.ai पेज पर खुलता है, और पेज पर पेमेंट के तरीके दिखते हैं, आम तौर पर कार्ड। इस कॉल पर कुछ नहीं लिया जाता।",
+    "hinglish": "Main isi number par SMS se secure payment link bhejta hoon; wo Anthropic ke official claude.ai page par khulta hai, aur page par payment ke tareeke dikhte hain, aam taur par card. Is call par kuch nahi liya jata."
+   },
+   "confidence": 1.0,
+   "facts": {},
+   "id": "cp-how-pay",
+   "interests": [
+    "budget"
+   ],
+   "offerings": [],
+   "provenance": "public",
+   "question_variants": {
+    "en": [
+     "how do I pay",
+     "payment link",
+     "which payment methods",
+     "UPI"
+    ],
+    "hi": [
+     "पेमेंट कैसे करूँ",
+     "पेमेंट लिंक",
+     "UPI"
+    ],
+    "hinglish": [
+     "payment kaise karun",
+     "payment link",
+     "UPI"
+    ]
+   },
+   "source": "anthropic.com / claude.ai public pages",
+   "teach": false,
+   "topic_path": "billing"
+  },
+  {
+   "answer": {
+    "en": "Receipts and invoices for each payment are in your account's billing settings.",
+    "hi": "हर पेमेंट की रसीद और इनवॉइस आपके अकाउंट की बिलिंग सेटिंग्स में मिलते हैं।",
+    "hinglish": "Har payment ki receipt aur invoice aapke account ki billing settings mein milte hain."
+   },
+   "confidence": 1.0,
+   "facts": {},
+   "id": "cp-receipt",
+   "interests": [],
+   "offerings": [],
+   "provenance": "public",
+   "question_variants": {
+    "en": [
+     "will I get an invoice",
+     "receipt",
+     "bill"
+    ],
+    "hi": [
+     "बिल मिलेगा",
+     "रसीद"
+    ],
+    "hinglish": [
+     "invoice milega kya",
+     "receipt",
+     "bill"
+    ]
+   },
+   "source": "anthropic.com / claude.ai public pages",
+   "teach": false,
+   "topic_path": "billing"
+  },
+  {
+   "answer": {
+    "en": "The SMS usually arrives within a couple of minutes, from Anthropic and not from a bank, and opens Anthropic's own claude.ai page.",
+    "hi": "SMS आम तौर पर कुछ ही मिनट में आता है, Anthropic की तरफ़ से और किसी बैंक से नहीं, और Anthropic के अपने claude.ai पेज पर खुलता है।",
+    "hinglish": "SMS aam taur par kuch hi minute mein aata hai, Anthropic ki taraf se aur kisi bank se nahi, aur Anthropic ke apne claude.ai page par khulta hai."
+   },
+   "confidence": 1.0,
+   "facts": {},
+   "id": "cp-sms-time",
+   "interests": [],
+   "offerings": [],
+   "provenance": "public",
+   "question_variants": {
+    "en": [
+     "when will the SMS arrive",
+     "I did not get the link",
+     "where is the link"
+    ],
+    "hi": [
+     "SMS कब आएगा",
+     "लिंक नहीं आया"
+    ],
+    "hinglish": [
+     "SMS kab aayega",
+     "link nahi aaya"
+    ]
+   },
+   "source": "anthropic.com / claude.ai public pages",
+   "teach": false,
+   "topic_path": "billing"
+  },
+  {
+   "answer": {
+    "en": "Never share an OTP or card details with anyone, including this call; your own bank may send an OTP on the payment page to approve the payment.",
+    "hi": "OTP या कार्ड की जानकारी किसी को न बताएँ, इस कॉल पर भी नहीं; पेमेंट पेज पर आपका अपना बैंक पेमेंट मंज़ूर करने के लिए OTP भेज सकता है।",
+    "hinglish": "OTP ya card details kisi ko na batayein, is call par bhi nahi; payment page par aapka apna bank payment approve karne ke liye OTP bhej sakta hai."
+   },
+   "confidence": 1.0,
+   "facts": {},
+   "id": "cp-otp",
+   "interests": [],
+   "offerings": [],
+   "provenance": "public",
+   "question_variants": {
+    "en": [
+     "do I share the OTP",
+     "will you ask for OTP",
+     "card details on the call"
+    ],
+    "hi": [
+     "OTP बताना है",
+     "कॉल पर कार्ड की जानकारी"
+    ],
+    "hinglish": [
+     "OTP batana hai kya",
+     "call par card details"
+    ]
+   },
+   "source": "anthropic.com / claude.ai public pages",
+   "teach": false,
+   "topic_path": "billing"
+  },
+  {
+   "answer": {
+    "en": "I cannot confirm what is allowed for second accounts, so I cannot promise that; the offer is for new Pro subscriptions.",
+    "hi": "दूसरे अकाउंट के बारे में क्या मान्य है ये मैं पक्का नहीं बता सकता, इसलिए वादा नहीं कर सकता; ऑफर नए Pro सब्सक्रिप्शन के लिए है।",
+    "hinglish": "Doosre account ke baare mein kya allowed hai ye main pakka nahi bata sakta, isliye promise nahi kar sakta; offer naye Pro subscriptions ke liye hai."
+   },
+   "confidence": 1.0,
+   "facts": {},
+   "id": "cp-second-account",
+   "interests": [],
+   "offerings": [],
+   "provenance": "public",
+   "question_variants": {
+    "en": [
+     "can I make another account to get the offer",
+     "use a new email",
+     "cancel and sign up again"
+    ],
+    "hi": [
+     "नया अकाउंट बनाकर ऑफर ले सकता हूँ",
+     "कैंसल करके दोबारा"
+    ],
+    "hinglish": [
+     "naya account banakar offer le sakta hoon",
+     "cancel karke dobara"
+    ]
+   },
+   "source": "anthropic.com / claude.ai public pages",
+   "teach": false,
+   "topic_path": "billing"
+  },
+  {
+   "answer": {
+    "en": "Anthropic may use chats to improve its models only if you allow it; you choose this in your privacy settings, and the full policy is at anthropic.com/privacy.",
+    "hi": "Anthropic आपकी चैट मॉडल सुधारने में तभी इस्तेमाल कर सकता है जब आप इजाज़त दें; ये आप अपनी प्राइवेसी सेटिंग्स में चुनते हैं, और पूरी नीति anthropic.com/privacy पर है।",
+    "hinglish": "Anthropic aapki chats models sudharne mein tabhi use kar sakta hai jab aap ijazat dein; ye aap apni privacy settings mein chunte hain, aur poori policy anthropic.com/privacy par hai."
+   },
+   "confidence": 1.0,
+   "facts": {},
+   "id": "cp-privacy",
+   "interests": [
+    "privacy"
+   ],
+   "offerings": [],
+   "provenance": "public",
+   "question_variants": {
+    "en": [
+     "will you use my data to train",
+     "is my data private",
+     "privacy policy"
+    ],
+    "hi": [
+     "क्या मेरा डेटा ट्रेनिंग में इस्तेमाल होगा",
+     "प्राइवेसी"
+    ],
+    "hinglish": [
+     "mera data training mein use hoga kya",
+     "privacy policy"
+    ]
+   },
+   "source": "anthropic.com / claude.ai public pages",
+   "teach": false,
+   "topic_path": "privacy-trust"
+  },
+  {
+   "answer": {
+    "en": "Anthropic is a real AI safety and research company, founded in 2021 and based in San Francisco, that makes Claude; the official site is anthropic.com.",
+    "hi": "Anthropic एक असली AI सेफ्टी और रिसर्च कंपनी है, जो 2021 में बनी और सैन फ्रांसिस्को में है, और Claude बनाती है; आधिकारिक साइट anthropic.com है।",
+    "hinglish": "Anthropic ek asli AI safety aur research company hai, jo 2021 mein bani aur San Francisco mein hai, aur Claude banati hai; official site anthropic.com hai."
+   },
+   "confidence": 1.0,
+   "facts": {},
+   "id": "cp-real",
+   "interests": [
+    "privacy"
+   ],
+   "offerings": [],
+   "provenance": "public",
+   "question_variants": {
+    "en": [
+     "is this real",
+     "is it a scam",
+     "who is Anthropic",
+     "can I trust it"
+    ],
+    "hi": [
+     "क्या ये असली है",
+     "स्कैम तो नहीं",
+     "Anthropic कौन है"
+    ],
+    "hinglish": [
+     "kya ye asli hai",
+     "scam toh nahi",
+     "Anthropic kaun hai"
+    ]
+   },
+   "source": "anthropic.com / claude.ai public pages",
+   "teach": false,
+   "topic_path": "privacy-trust"
+  },
+  {
+   "answer": {
+    "en": "I do not have details of where the list came from; I can remove your number if you would prefer no calls.",
+    "hi": "मेरे पास लिस्ट के स्रोत की जानकारी नहीं है; आप चाहें तो मैं आपका नंबर हटवा सकता हूँ।",
+    "hinglish": "Mere paas list ke source ki jaankari nahi hai; aap chahein toh main aapka number hatwa sakta hoon."
+   },
+   "confidence": 1.0,
+   "facts": {},
+   "id": "cp-number-source",
+   "interests": [],
+   "offerings": [],
+   "provenance": "public",
+   "question_variants": {
+    "en": [
+     "where did you get my number",
+     "why are you calling"
+    ],
+    "hi": [
+     "मेरा नंबर कहाँ से मिला",
+     "क्यों कॉल किया"
+    ],
+    "hinglish": [
+     "mera number kahan se mila",
+     "kyun call kiya"
+    ]
+   },
+   "source": "anthropic.com / claude.ai public pages",
+   "teach": false,
+   "topic_path": "privacy-trust"
+  },
+  {
+   "answer": {
+    "en": "No, it cannot create images or videos; it can read and understand images, PDFs and files you upload.",
+    "hi": "नहीं, ये इमेज या वीडियो नहीं बना सकता; आपके अपलोड किए इमेज, PDF और फ़ाइलें पढ़ और समझ सकता है।",
+    "hinglish": "Nahi, ye images ya videos nahi bana sakta; aapke upload kiye images, PDFs aur files padh aur samajh sakta hai."
+   },
+   "confidence": 1.0,
+   "facts": {},
+   "id": "cp-no-images",
+   "interests": [],
+   "offerings": [],
+   "provenance": "public",
+   "question_variants": {
+    "en": [
+     "can it make images",
+     "generate videos",
+     "draw pictures"
+    ],
+    "hi": [
+     "इमेज बना सकता है",
+     "वीडियो"
+    ],
+    "hinglish": [
+     "images bana sakta hai",
+     "videos",
+     "pictures draw"
+    ]
+   },
+   "source": "anthropic.com / claude.ai public pages",
+   "teach": false,
+   "topic_path": "limits"
+  },
+  {
+   "answer": {
+    "en": "No, it needs the internet; there is no offline mode.",
+    "hi": "नहीं, इंटरनेट चाहिए; ऑफलाइन मोड नहीं है।",
+    "hinglish": "Nahi, internet chahiye; offline mode nahi hai."
+   },
+   "confidence": 1.0,
+   "facts": {},
+   "id": "cp-offline",
+   "interests": [],
+   "offerings": [],
+   "provenance": "public",
+   "question_variants": {
+    "en": [
+     "does it work offline",
+     "without internet"
+    ],
+    "hi": [
+     "बिना इंटरनेट चलता है"
+    ],
+    "hinglish": [
+     "bina internet chalta hai kya"
+    ]
+   },
+   "source": "anthropic.com / claude.ai public pages",
+   "teach": false,
+   "topic_path": "limits"
+  },
+  {
+   "answer": {
+    "en": "No, it cannot make bookings, payments or phone calls for you.",
+    "hi": "नहीं, ये आपके लिए बुकिंग, पेमेंट या फोन कॉल नहीं कर सकता।",
+    "hinglish": "Nahi, ye aapke liye bookings, payments ya phone calls nahi kar sakta."
+   },
+   "confidence": 1.0,
+   "facts": {},
+   "id": "cp-cannot-act",
+   "interests": [],
+   "offerings": [],
+   "provenance": "public",
+   "question_variants": {
+    "en": [
+     "can it make bookings",
+     "make calls for me",
+     "pay bills"
+    ],
+    "hi": [
+     "बुकिंग कर सकता है",
+     "मेरे लिए कॉल"
+    ],
+    "hinglish": [
+     "bookings kar sakta hai",
+     "mere liye calls"
+    ]
+   },
+   "source": "anthropic.com / claude.ai public pages",
+   "teach": false,
+   "topic_path": "limits"
+  }
+ ],
+ "interests": [
+  {
+   "discovery": {
+    "en": [
+     "What would you code with it: work projects or learning?"
+    ],
+    "hi": [
+     "आप इससे क्या कोड करेंगे: काम के प्रोजेक्ट या सीखना?"
+    ],
+    "hinglish": [
+     "Aap isse kya code karenge: work projects ya learning?"
+    ]
+   },
+   "id": "coding",
+   "keywords": [
+    "coding",
+    "code",
+    "programming",
+    "developer",
+    "debug",
+    "debugging",
+    "dsa",
+    "python",
+    "javascript",
+    "software",
+    "कोडिंग",
+    "प्रोग्रामिंग",
+    "डेवलपर"
+   ],
+   "label": {
+    "en": "Coding",
+    "hi": "कोडिंग",
+    "hinglish": "Coding"
+   },
+   "related": []
+  },
+  {
+   "discovery": {
+    "en": [
+     "What do you write most: emails, reports or something creative?"
+    ],
+    "hi": [
+     "आप सबसे ज़्यादा क्या लिखते हैं: ईमेल, रिपोर्ट या कुछ क्रिएटिव?"
+    ],
+    "hinglish": [
+     "Aap sabse zyada kya likhte hain: emails, reports ya kuch creative?"
+    ]
+   },
+   "id": "writing",
+   "keywords": [
+    "writing",
+    "write",
+    "essay",
+    "report",
+    "email",
+    "blog",
+    "content",
+    "assignment",
+    "edit",
+    "editing",
+    "letter",
+    "लिखना",
+    "रिपोर्ट",
+    "असाइनमेंट",
+    "ईमेल"
+   ],
+   "label": {
+    "en": "Writing",
+    "hi": "लिखना",
+    "hinglish": "Writing"
+   },
+   "related": []
+  },
+  {
+   "discovery": {
+    "en": [
+     "Is it for studies or exam preparation?"
+    ],
+    "hi": [
+     "क्या ये पढ़ाई या परीक्षा की तैयारी के लिए है?"
+    ],
+    "hinglish": [
+     "Kya ye padhai ya exam preparation ke liye hai?"
+    ]
+   },
+   "id": "study",
+   "keywords": [
+    "student",
+    "study",
+    "homework",
+    "exam",
+    "college",
+    "school",
+    "learn",
+    "learning",
+    "research",
+    "पढ़ाई",
+    "स्टूडेंट",
+    "परीक्षा",
+    "होमवर्क"
+   ],
+   "label": {
+    "en": "Study",
+    "hi": "पढ़ाई",
+    "hinglish": "Study"
+   },
+   "related": [
+    "writing"
+   ]
+  },
+  {
+   "discovery": {
+    "en": [
+     "What kind of work do you want it to help with in your business?"
+    ],
+    "hi": [
+     "आपके बिज़नेस में ये किस काम में मदद करे?"
+    ],
+    "hinglish": [
+     "Aapke business mein ye kis kaam mein madad kare?"
+    ]
+   },
+   "id": "business",
+   "keywords": [
+    "shop",
+    "business",
+    "dukan",
+    "दुकान",
+    "gst",
+    "bill",
+    "tally",
+    "udhaari",
+    "customers",
+    "whatsapp",
+    "invoice",
+    "बिज़नेस",
+    "दुकानदार"
+   ],
+   "label": {
+    "en": "Small business",
+    "hi": "छोटा बिज़नेस",
+    "hinglish": "Small business"
+   },
+   "related": []
+  },
+  {
+   "discovery": {
+    "en": [],
+    "hi": [],
+    "hinglish": []
+   },
+   "id": "research",
+   "keywords": [
+    "research",
+    "analysis",
+    "analyse",
+    "analyze",
+    "documents",
+    "pdf",
+    "summarise",
+    "summarize",
+    "data",
+    "long documents",
+    "रिसर्च",
+    "विश्लेषण"
+   ],
+   "label": {
+    "en": "Research",
+    "hi": "रिसर्च",
+    "hinglish": "Research"
+   },
+   "related": [
+    "writing"
+   ]
+  },
+  {
+   "discovery": {
+    "en": [],
+    "hi": [],
+    "hinglish": []
+   },
+   "id": "budget",
+   "keywords": [
+    "price",
+    "cost",
+    "expensive",
+    "cheap",
+    "costly",
+    "afford",
+    "discount",
+    "mehenga",
+    "महंगा",
+    "कीमत",
+    "सस्ता",
+    "free plan"
+   ],
+   "label": {
+    "en": "Price",
+    "hi": "कीमत",
+    "hinglish": "Price"
+   },
+   "related": []
+  },
+  {
+   "discovery": {
+    "en": [],
+    "hi": [],
+    "hinglish": []
+   },
+   "id": "team",
+   "keywords": [
+    "team",
+    "colleagues",
+    "company",
+    "office",
+    "group",
+    "employees",
+    "friends",
+    "share account",
+    "टीम",
+    "कंपनी"
+   ],
+   "label": {
+    "en": "Team use",
+    "hi": "टीम के लिए",
+    "hinglish": "Team use"
+   },
+   "related": []
+  },
+  {
+   "discovery": {
+    "en": [],
+    "hi": [],
+    "hinglish": []
+   },
+   "id": "privacy",
+   "keywords": [
+    "privacy",
+    "data",
+    "safe",
+    "secure",
+    "train",
+    "confidential",
+    "private",
+    "प्राइवेसी",
+    "डेटा"
+   ],
+   "label": {
+    "en": "Privacy",
+    "hi": "प्राइवेसी",
+    "hinglish": "Privacy"
+   },
+   "related": []
+  },
+  {
+   "discovery": {
+    "en": [],
+    "hi": [],
+    "hinglish": []
+   },
+   "id": "compare",
+   "keywords": [
+    "chatgpt",
+    "gemini",
+    "copilot",
+    "other ai",
+    "better than",
+    "compare",
+    "difference",
+    "alternative",
+    "तुलना"
+   ],
+   "label": {
+    "en": "Comparing assistants",
+    "hi": "तुलना",
+    "hinglish": "Comparing"
+   },
+   "related": []
+  }
+ ],
+ "offerings": [
+  {
+   "floor_inr": null,
+   "id": "yearly-billing",
+   "included": false,
+   "min_fit": 1.5,
+   "name": {
+    "en": "Yearly billing",
+    "hi": "सालाना बिलिंग",
+    "hinglish": "Yearly billing"
+   },
+   "pitch": {
+    "en": [
+     "yearly billing works out cheaper per month than monthly",
+     "this $8 offer is only for the monthly plan, and the yearly plan has no extra offer"
+    ],
+    "hi": [
+     "सालाना बिलिंग में महीने के हिसाब से कम पड़ता है",
+     "ये $8 वाला ऑफर सिर्फ़ मंथली प्लान पर है, और सालाना प्लान पर अलग ऑफर नहीं है"
+    ],
+    "hinglish": [
+     "yearly billing mein mahine ke hisaab se kam padta hai",
+     "ye $8 wala offer sirf monthly plan par hai, aur yearly plan par alag offer nahi hai"
+    ]
+   },
+   "price_inr": null,
+   "price_label": {
+    "en": "about $200 a year, around $17 a month",
+    "hi": "लगभग $200 साल का, यानी करीब $17 महीना",
+    "hinglish": "lagbhag $200 saal ka, yaani kareeb $17 mahina"
+   },
+   "provenance": "public",
+   "upsell_from": [
+    "billing"
+   ],
+   "who_suits": [
+    "budget"
+   ]
+  },
+  {
+   "floor_inr": null,
+   "id": "team-plan",
+   "included": false,
+   "min_fit": 1.0,
+   "name": {
+    "en": "Team plan",
+    "hi": "टीम प्लान",
+    "hinglish": "Team plan"
+   },
+   "pitch": {
+    "en": [
+     "a Pro subscription is for one person, and groups use the separate Team plan",
+     "Team plan prices are on the Anthropic website"
+    ],
+    "hi": [
+     "Pro सब्सक्रिप्शन एक व्यक्ति के लिए है, और ग्रुप के लिए अलग Team प्लान है",
+     "Team प्लान की कीमतें Anthropic की वेबसाइट पर हैं"
+    ],
+    "hinglish": [
+     "Pro subscription ek vyakti ke liye hai, aur groups ke liye alag Team plan hai",
+     "Team plan ki prices Anthropic ki website par hain"
+    ]
+   },
+   "price_inr": null,
+   "price_label": null,
+   "provenance": "public",
+   "upsell_from": [
+    "plans"
+   ],
+   "who_suits": [
+    "team"
+   ]
+  }
+ ],
+ "product_id": "claude-pro",
+ "root_overview": {
+  "en": "Claude is an AI assistant made by Anthropic for writing, coding, research and analysis; Claude Pro is the paid individual plan with much more usage than the free plan.",
+  "hi": "Claude Anthropic का बनाया AI असिस्टेंट है, जो लिखने, कोडिंग, रिसर्च और विश्लेषण में मदद करता है; Claude Pro पेड इंडिविजुअल प्लान है जिसमें फ्री प्लान से कहीं ज़्यादा इस्तेमाल मिलता है।",
+  "hinglish": "Claude Anthropic ka banaya AI assistant hai, jo likhne, coding, research aur analysis mein madad karta hai; Claude Pro paid individual plan hai jisme free plan se kahin zyada usage milta hai."
+ },
+ "tenant": "default",
+ "topics": [
+  {
+   "interests": [
+    "coding",
+    "writing"
+   ],
+   "overview": {
+    "en": "Claude is an AI assistant by Anthropic that you type or talk to.",
+    "hi": "Claude Anthropic का AI असिस्टेंट है जिससे आप टाइप या बात करके काम करवा सकते हैं।",
+    "hinglish": "Claude Anthropic ka AI assistant hai jisse aap type ya baat karke kaam karwa sakte hain."
+   },
+   "path": "product",
+   "title": {
+    "en": "What Claude is",
+    "hi": "Claude क्या है",
+    "hinglish": "Claude kya hai"
+   }
+  },
+  {
+   "interests": [
+    "budget"
+   ],
+   "overview": {
+    "en": "Pro is the paid individual plan; this call is about the monthly offer.",
+    "hi": "Pro पेड इंडिविजुअल प्लान है; इस कॉल का ऑफर मंथली प्लान के लिए है।",
+    "hinglish": "Pro paid individual plan hai; is call ka offer monthly plan ke liye hai."
+   },
+   "path": "plans",
+   "title": {
+    "en": "Plans and pricing",
+    "hi": "प्लान और कीमत",
+    "hinglish": "Plans aur price"
+   }
+  },
+  {
+   "interests": [
+    "research"
+   ],
+   "overview": {
+    "en": "Pro has much more usage than free, counted in sessions that reset every five hours.",
+    "hi": "Pro में फ्री से कहीं ज़्यादा इस्तेमाल है, जो हर पाँच घंटे में रीसेट होने वाले सेशन में गिना जाता है।",
+    "hinglish": "Pro mein free se kahin zyada usage hai, jo har paanch ghante mein reset hone wale sessions mein ginta hai."
+   },
+   "path": "usage",
+   "title": {
+    "en": "Usage and models",
+    "hi": "इस्तेमाल और मॉडल",
+    "hinglish": "Usage aur models"
+   }
+  },
+  {
+   "interests": [
+    "coding",
+    "writing",
+    "study",
+    "business"
+   ],
+   "overview": {
+    "en": "Claude helps with code, writing, documents, study and small-business tasks.",
+    "hi": "Claude कोड, लिखने, दस्तावेज़, पढ़ाई और छोटे बिज़नेस के कामों में मदद करता है।",
+    "hinglish": "Claude code, likhne, documents, padhai aur chhote business ke kaamon mein madad karta hai."
+   },
+   "path": "work",
+   "title": {
+    "en": "Coding, writing and study",
+    "hi": "कोडिंग, लिखना और पढ़ाई",
+    "hinglish": "Coding, writing aur study"
+   }
+  },
+  {
+   "interests": [
+    "budget"
+   ],
+   "overview": {
+    "en": "The offer is for the first 3 months; it then renews at the regular price until you cancel.",
+    "hi": "ऑफर पहले 3 महीने के लिए है; उसके बाद आपके कैंसल करने तक सामान्य कीमत पर रिन्यू होता है।",
+    "hinglish": "Offer pehle 3 mahine ke liye hai; uske baad aapke cancel karne tak normal price par renew hota hai."
+   },
+   "path": "billing",
+   "title": {
+    "en": "Billing and cancelling",
+    "hi": "बिलिंग और कैंसल",
+    "hinglish": "Billing aur cancel"
+   }
+  },
+  {
+   "interests": [
+    "privacy"
+   ],
+   "overview": {
+    "en": "Anthropic is a real AI safety company; privacy choices are in your settings.",
+    "hi": "Anthropic एक असली AI सेफ्टी कंपनी है; प्राइवेसी विकल्प आपकी सेटिंग्स में हैं।",
+    "hinglish": "Anthropic ek asli AI safety company hai; privacy options aapki settings mein hain."
+   },
+   "path": "privacy-trust",
+   "title": {
+    "en": "Privacy and trust",
+    "hi": "प्राइवेसी और भरोसा",
+    "hinglish": "Privacy aur trust"
+   }
+  },
+  {
+   "interests": [],
+   "overview": {
+    "en": "Claude does not make images or videos, needs the internet, and cannot book or pay for you.",
+    "hi": "Claude इमेज या वीडियो नहीं बनाता, इंटरनेट चाहिए, और आपके लिए बुकिंग या पेमेंट नहीं कर सकता।",
+    "hinglish": "Claude image ya video nahi banata, internet chahiye, aur aapke liye booking ya payment nahi kar sakta."
+   },
+   "path": "limits",
+   "title": {
+    "en": "What it cannot do",
+    "hi": "क्या नहीं कर सकता",
+    "hinglish": "Kya nahi kar sakta"
+   }
+  }
+ ]
+}
