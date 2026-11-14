@@ -6,6 +6,7 @@ Deterministic and documented. One of nine needs (first matching row wins, fixed 
   ---  -----------  --------------------------------------------------------------------------------
    0   be_heard     crisis words (the safety plan speaks; the need is recorded for the move policy)
    1   closure      goodbye / "that's all" / thanks right after the link went out / hang-up wishes
+   2a  connection   lost a job / no money / tired (sad words, no question): warm and human, nothing to sell
    2   autonomy     no, not interested, stop, don't call, later, call me back, "I don't want it"
    3   be_heard     frustration >= 0.60, or a complaint about the agent (repeating, voice, rushing,
                     not listening), or swearing
@@ -90,6 +91,13 @@ GO_ON = re.compile(r"\b(go ahead|go on|tell me|yes|yeah|sure|please|continue|tel
                    r"भेजिए|ले लूंगा|सब्सक्राइब|subscribe|bhej|batao|bataiye|boliye|kar do", _I)
 
 
+from ..decision.honest import SAD  # noqa: E402  hard times: lost job, no money, tired (warm, no selling)
+# "not now" is not "never": a soft no gets one gentle check (a better time?) before the call is closed
+SOFT_NO = re.compile(r"\b(abhi|now|later|some other time|another time)\b|अभी|baad (mein|me)|बाद (में|मे)", re.I)
+FIRM_NO = re.compile(r"not interested|don.?t call|do not call|stop calling|never call|dobara call|call mat|remove my|number hata|bilkul nahi|बिल्कुल नहीं|"
+                     r"कभी नहीं|मत करो|मत करना|bakwas|बकवास|harass|नंबर हटा|फोन मत|फ़ोन मत", re.I)
+
+
 def _tokens(text: str) -> list[str]:
     return re.findall(r"[\wऀ-ॿ]+", text.lower())
 
@@ -148,6 +156,8 @@ def signals(inp: NeedInput) -> dict[str, bool]:
         "asking": bool(ASKING.search(t)) or inp.question_topic not in ("none", ""),
         "busy": bool(BUSY.search(t)),
         "personal": bool(PERSONAL.search(t)) or inp.heard("personal", "small_talk"),
+        "sad": bool(SAD.search(t)),
+        "soft_no": bool(SOFT_NO.search(t)) and not FIRM_NO.search(t),
         "sale": bool(SALE.search(t)),
         "garbled": garbled(t),
         "go_on": bool(GO_ON.search(t)) or inp.intent in ("affirm", "tell_more", "benefits", "price"),
@@ -171,6 +181,8 @@ def table_need(inp: NeedInput) -> NeedResult:
         return NeedResult("be_heard", "0:crisis", flags=f)
     if f["bye"] and not (f["asking"] and not CLOSE.search(inp.text)) or (inp.has_link and f["short"] and not f["asking"] and (f["thanks"] or f["weak_yes"] or f["bye"])):
         return NeedResult("closure", "1:closure", flags=f)
+    if f["sad"] and not f["asking"] and not FIRM_NO.search(inp.text):  # lost a job / no money / tired: warm and human, nothing to sell
+        return NeedResult("connection", "2:sad", flags=f)
     if f["no"] or f["later"]:
         return NeedResult("autonomy", "2:autonomy", flags=f)
     if f["complaint"] or g("frustration") >= 0.60:

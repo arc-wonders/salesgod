@@ -87,6 +87,7 @@
     ],
     "answer": "Thanks for using Claude! This offer is for new Pro subscriptions; if you already pay for Pro, your plan stays as it is",
     "answer_hi": "Claude इस्तेमाल करने के लिए शुक्रिया! ये ऑफर नए Pro सब्सक्रिप्शन के लिए है; अगर आप पहले से Pro लेते हैं, तो आपका प्लान वैसा ही रहेगा",
+    "answer_hinglish": "Claude use karne ke liye shukriya! Ye offer naye Pro subscriptions ke liye hai; agar aap pehle se Pro lete hain, to aapka plan waisa hi rahega",
     "not_eligible": true
    },
    {
@@ -111,6 +112,7 @@
     ],
     "answer": "Fair question. It's a genuine intro discount for the first 3 months; you pay only through a secure link, and can cancel any time",
     "answer_hi": "अच्छा सवाल है। ये पहले तीन महीने का असली intro डिस्काउंट है, पेमेंट सिर्फ़ सुरक्षित लिंक से होता है, और आप कभी भी cancel कर सकते हैं",
+    "answer_hinglish": "Achha sawal hai. Ye pehle teen mahine ka asli intro discount hai, payment sirf secure link se hota hai, aur aap kabhi bhi cancel kar sakte hain",
     "not_eligible": false
    },
    {
@@ -131,6 +133,7 @@
     ],
     "answer": "I'll send a secure payment link by SMS to this number; you open it and pay on the official page with the methods shown there, usually a card; nothing is taken on this call",
     "answer_hi": "मैं इसी नंबर पर SMS से एक सुरक्षित पेमेंट लिंक भेजूँगा, उसे खोलकर ऑफिशियल पेज पर वहाँ दिखाए गए तरीके से, आमतौर पर कार्ड से, पेमेंट होता है; इस कॉल पर कुछ नहीं लिया जाता",
+    "answer_hinglish": "Main isi number par SMS se ek secure payment link bhejunga, use kholkar official page par wahan dikhaye gaye tareeke se, aamtaur par card se, payment hota hai; is call par kuch nahi liya jaata",
     "not_eligible": false
    },
    {
@@ -147,6 +150,7 @@
     ],
     "answer": "Only if you allow it: your privacy settings have an option that controls whether your chats are used to improve the models, and you can switch it off any time",
     "answer_hi": "सिर्फ़ तब, जब आप इजाज़त दें: आपकी privacy settings में एक option है जिससे तय होता है कि आपकी chats मॉडल सुधारने में इस्तेमाल हों या नहीं, और आप उसे कभी भी बंद कर सकते हैं",
+    "answer_hinglish": "Sirf tab, jab aap ijazat dein: aapki privacy settings mein ek option hai jisse tay hota hai ki aapki chats model sudharne mein use hon ya nahi, aur aap use kabhi bhi band kar sakte hain",
     "not_eligible": false
    },
    {
@@ -159,6 +163,7 @@
     ],
     "answer": "You can cancel any time in your claude.ai settings, under billing; you keep access until the end of the month you've paid for, and nothing more is charged",
     "answer_hi": "आप कभी भी claude.ai की settings में billing से cancel कर सकते हैं; जिस महीने का पैसा दिया है उसके आख़िर तक इस्तेमाल चलता रहेगा, और आगे कुछ नहीं कटेगा",
+    "answer_hinglish": "Aap kabhi bhi claude.ai ki settings mein billing se cancel kar sakte hain; jis mahine ka paisa diya hai uske aakhir tak use chalta rahega, aur aage kuch nahi katega",
     "not_eligible": false
    },
    {
@@ -168,6 +173,7 @@
     ],
     "answer": "There's no separate student discount; this offer is the same for everyone, and it's already 60% off for the first 3 months",
     "answer_hi": "अलग से student discount नहीं है; ये ऑफर सबके लिए एक जैसा है, और पहले 3 महीने पहले से 60% off है",
+    "answer_hinglish": "Alag se student discount nahi hai; ye offer sabke liye ek jaisa hai, aur pehle 3 mahine pehle se 60% off hai",
     "not_eligible": false
    },
    {
@@ -180,6 +186,7 @@
     ],
     "answer": "It understands and replies in Hindi and many other languages",
     "answer_hi": "ये हिंदी समेत कई भाषाएँ समझता है और उनमें जवाब देता है",
+    "answer_hinglish": "Ye Hindi samet kai bhashayein samajhta hai aur unmein jawab deta hai",
     "not_eligible": false
    },
    {
@@ -191,6 +198,54 @@
     ],
     "answer": "There is a free plan, but Pro gives much more usage and the best models",
     "answer_hi": "फ्री प्लान भी है, पर Pro में कहीं ज़्यादा इस्तेमाल और सबसे अच्छे मॉडल मिलते हैं",
+    "answer_hinglish": "Free plan bhi hai, par Pro mein kahin zyada usage aur sabse achhe models milte hain",
+    "not_eligible": false
+   },
+   {
+    "keywords": [
+     "upi",
+     "यूपीआई",
+     "यू पी आई",
+     "gpay",
+     "phonepe",
+     "paytm",
+     "netbanking",
+     "net banking",
+     "payment method",
+     "payment methods"
+    ],
+    "answer": "The payment page shows which payment methods work; a card works, but I can't promise UPI or any other method",
+    "answer_hi": "पेमेंट पेज पर दिखेगा कि कौन-से तरीके चलते हैं; कार्ड चलता है, पर UPI या किसी और तरीके का मैं वादा नहीं कर सकता",
+    "answer_hinglish": "Payment page par dikhega ki kaun se tareeke chalte hain; card chalta hai, par UPI ya kisi aur tareeke ka main vaada nahi kar sakta",
+    "not_eligible": false
+   },
+   {
+    "keywords": [
+     "refund",
+     "रिफंड",
+     "रिफण्ड",
+     "money back",
+     "paise wapas",
+     "पैसे वापस",
+     "पैसा वापस",
+     "paisa wapas"
+    ],
+    "answer": "Refunds follow the policy on the website; I don't have the exact terms with me",
+    "answer_hi": "रिफंड वेबसाइट की पॉलिसी के हिसाब से होता है; उसकी सही शर्तें मेरे पास नहीं हैं",
+    "answer_hinglish": "Refund website ki policy ke hisaab se hota hai; uski sahi sharten mere paas nahi hain",
+    "not_eligible": false
+   },
+   {
+    "keywords": [
+     "re:(chatgpt|gemini|copilot|gpt).{0,40}(better|vs|versus|compar|differen|alag|अलग|फर्क|फ़र्क|बेहतर|switch|kyun|क्यों)",
+     "re:(better|vs|versus|compar|differen|alag|अलग|फर्क|फ़र्क|बेहतर|switch).{0,40}(chatgpt|gemini|copilot|gpt)",
+     "plus se",
+     "kyun switch",
+     "क्यों switch"
+    ],
+    "answer": "Many people use Claude alongside other assistants such as ChatGPT; people often pick Claude for careful writing, working with long documents and coding help. I can't say it is better for everyone, that depends on what you do",
+    "answer_hi": "बहुत से लोग Claude को ChatGPT जैसे दूसरे असिस्टेंट्स के साथ भी इस्तेमाल करते हैं; लोग अक्सर careful writing, लंबे documents और coding की मदद के लिए Claude चुनते हैं। मैं ये नहीं कह सकता कि ये सबके लिए बेहतर है, ये आपके काम पर निर्भर करता है",
+    "answer_hinglish": "Bahut se log Claude ko ChatGPT jaise dusre assistants ke saath bhi use karte hain; log aksar careful writing, lambe documents aur coding ki madad ke liye Claude chunte hain. Main ye nahi keh sakta ki ye sabke liye behtar hai, ye aapke kaam par nirbhar karta hai",
     "not_eligible": false
    }
   ],
@@ -233,7 +288,25 @@
    "hinglish": "Aap ise zyadatar kis kaam ke liye use karenge?"
   },
   "tenant": "default",
-  "use_playbook": true
+  "use_playbook": true,
+  "benefits_hi": [
+   "फ्री प्लान से कहीं ज़्यादा इस्तेमाल",
+   "सबसे अच्छे Claude मॉडल्स का एक्सेस",
+   "Projects, जिनमें आप अपने documents और chats एक जगह रख सकते हैं"
+  ],
+  "benefits_hinglish": [
+   "free plan se kahin zyada usage",
+   "sabse capable Claude models ka access",
+   "Projects, jisme aap apne documents aur chats ek jagah rakh sakte hain"
+  ],
+  "agent_gender": "male",
+  "info_source": {
+   "en": "it will be shown on the payment page or the official website",
+   "hi": "वो पेमेंट पेज या ऑफिशियल वेबसाइट पर दिख जाएगा",
+   "hinglish": "wo payment page ya official website par dikh jaayega"
+  },
+  "cancel_any_time": null,
+  "official_site": "claude.ai"
  },
  "fitzone-gym": {
   "id": "fitzone-gym",
@@ -252,7 +325,7 @@
   ],
   "call_to_action": "send you the joining link on SMS",
   "pitch_hi": "FitZone एक जिम है जहाँ ट्रेनर, योगा और ज़ुम्बा क्लासेस मिलती हैं, और ये सुबह पाँच से रात ग्यारह बजे तक खुला रहता है।",
-  "pitch_hinglish": "Claude Pro ek AI assistant hai jo likhne, coding aur research mein madad karta hai, aur isme free plan se kahin zyada usage milta hai.",
+  "pitch_hinglish": "FitZone ek gym hai jahan trainer, yoga aur zumba classes milti hain, aur ye subah paanch baje se raat gyaarah baje tak khula rehta hai.",
   "pitch_en": "FitZone is a gym with trainers and yoga and zumba classes, open from 5 in the morning to 11 at night.",
   "knowledge": "FitZone is a neighbourhood gym chain (demo product). Membership includes gym floor access, cardio and weights, group classes (yoga, zumba, HIIT), one free personal trainer session per week, lockers and showers. Members can freeze the membership for up to 15 days. There is no joining fee in this offer. Equipment: cardio machines (treadmills, cycles, cross-trainers), free weights (dumbbells, barbells, plates), benches for bench press, a squat rack, cable machines and leg press. Personal training beyond the one free session a week is charged separately; the exact rate is shown at the front desk (never invent a price). Joining: open the link sent by SMS or walk into the nearest branch; the trainer does a free fitness assessment on day one.",
   "topic_words": [
@@ -293,7 +366,8 @@
     ],
     "answer": "We have branches across the city; the SMS will show the one nearest you",
     "answer_hi": "हमारी कई ब्रांच हैं, SMS में आपके सबसे पास वाली ब्रांच का पता आ जाएगा",
-    "not_eligible": false
+    "not_eligible": false,
+    "answer_hinglish": "Hamari kai branches hain, SMS mein aapke sabse paas wali branch ka pata aa jaayega"
    },
    {
     "keywords": [
@@ -305,7 +379,8 @@
     ],
     "answer": "You can freeze the membership for up to 15 days",
     "answer_hi": "आप मेंबरशिप पंद्रह दिन तक रोक सकते हैं",
-    "not_eligible": false
+    "not_eligible": false,
+    "answer_hinglish": "Aap membership pandrah din tak rok sakte hain"
    },
    {
     "keywords": [
@@ -317,7 +392,8 @@
     ],
     "answer": "There is no joining fee in this offer",
     "answer_hi": "इस ऑफर में कोई जॉइनिंग फीस नहीं है",
-    "not_eligible": false
+    "not_eligible": false,
+    "answer_hinglish": "Is offer mein koi joining fee nahi hai"
    },
    {
     "keywords": [
@@ -332,7 +408,8 @@
     ],
     "answer": "Fair question. It is our launch offer for this week, you pay only at the gym or through the official link, nothing is charged on this call",
     "answer_hi": "अच्छा सवाल है। ये इस हफ्ते का लॉन्च ऑफर है, पेमेंट सिर्फ़ जिम पर या ऑफिशियल लिंक से होता है, इस कॉल पर कुछ नहीं कटता",
-    "not_eligible": false
+    "not_eligible": false,
+    "answer_hinglish": "Achha sawal hai. Ye is hafte ka launch offer hai, payment sirf gym par ya official link se hota hai, is call par kuch nahi katta"
    }
   ],
   "max_reoffers": 1,
@@ -341,9 +418,9 @@
   "price_note": "",
   "rupee_terms": {},
   "renewal_note": {
-   "en": "The offer price is for the first 3 months; after that it's ₹6,000 for 3 months, and you can cancel any time.",
-   "hi": "Offer वाली कीमत पहले 3 महीने की है; उसके बाद 3 महीने के ₹6,000 लगेंगे, और कभी भी cancel कर सकते हैं।",
-   "hinglish": "Offer wali keemat pehle 3 mahine ki hai; uske baad 3 mahine ke ₹6,000 lagenge, aur kabhi bhi cancel kar sakte hain."
+   "en": "The offer price is for the first 3 months; after that it's ₹6,000 for 3 months.",
+   "hi": "Offer वाली कीमत पहले 3 महीने की है; उसके बाद 3 महीने के ₹6,000 लगेंगे।",
+   "hinglish": "Offer wali keemat pehle 3 mahine ki hai; uske baad 3 mahine ke ₹6,000 lagenge."
   },
   "annual_note": {},
   "allowed_numbers": [],
@@ -365,6 +442,24 @@
    "hinglish": "Aapka fitness goal kya hai: weight kam karna, muscle banana, ya bas fit rehna?"
   },
   "tenant": "default",
-  "use_playbook": true
+  "use_playbook": true,
+  "benefits_hi": [
+   "हर हफ़्ते एक फ्री पर्सनल ट्रेनर सेशन",
+   "योगा और ज़ुम्बा जैसी अनलिमिटेड ग्रुप क्लासेस",
+   "सुबह 5 बजे से रात 11 बजे तक खुला रहता है"
+  ],
+  "benefits_hinglish": [
+   "har hafte ek free personal trainer session",
+   "yoga aur zumba jaisi unlimited group classes",
+   "subah 5 baje se raat 11 baje tak khula rehta hai"
+  ],
+  "agent_gender": "male",
+  "official_site": "",
+  "cancel_any_time": null,
+  "info_source": {
+   "en": "the gym team at the nearest branch can tell you",
+   "hi": "नज़दीकी ब्रांच पर जिम की टीम आपको बता सकती है",
+   "hinglish": "nazdeeki branch par gym ki team aapko bata sakti hai"
+  }
  }
 }

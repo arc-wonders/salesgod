@@ -143,7 +143,8 @@ def test_trainer_price_asked_four_times_never_gets_membership_price_or_repeats()
         rs = asyncio.run(talk(make(flag), ["हाँ जी बताइए", "personal trainer session कितने का होगा", "पर इसमें personal trainer session कितने का होगा?",
                                          "ये तो जिन की है पर ट्रेनर कितने का है", "ये तो जिनकी है पर ट्रेनर कितने का है"]))
         texts = [r.text for r in rs[1:]]
-        assert "₹2,999" not in texts[0] and "free personal trainer" in texts[0]
+        # (was: "free personal trainer" in the Hindi reply = the English catalog fragment pasted into a Hindi call)
+        assert "₹2,999" not in texts[0] and "पर्सनल ट्रेनर" in texts[0] and "free personal trainer" not in texts[0]
         assert len(set(texts)) == len(texts)
     os.environ["ACIE_PSYCHE"] = ""
 

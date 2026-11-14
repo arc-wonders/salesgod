@@ -47,6 +47,16 @@ _ABOUT_IT = re.compile(r"(karta|karti|kar sakta|kar sakti|sakta|sakti|samajhta|s
 _REPEATABLE = frozenset({"pitch", "price", "answer", "faq", "not_understood", "off_topic", "clarify", "hello", "reoffer", "recover",
                          "small_talk", "personal", "goodbye", "link_sent", "open_question", "price_floor", "acknowledge"})
 
+# the discovery question ("what do you use it for / what is your goal?") and the goal words that answer it
+_DISC_Q = re.compile(r"\b(what|which)\b.{0,40}\b(use|using|goal|work|study|need|looking for|spend)\b|\b(goal|use it for|mainly use)\b|"
+                     r"किस (काम|चीज़|चीज)|आपका (main )?(goal|लक्ष्य)|इस्तेमाल करेंगे|\bkis (kaam|cheez)\b|aapka (main )?goal|use karenge|काम या पढ़ाई|kaam ya padhai|"
+                     r"लक्ष्य", re.I)
+_GOAL_WORDS = re.compile(r"muscle|bulk|मसल|बॉडी|body ?build|weight ?(loss|lose)|lose weight|वज़न|वजन|fat loss|stay fit|fitness|fit rehna|फिट रहना|"
+                         r"coding|code|कोडिंग|writing|study|padhai|पढ़ाई|resume|assignment|report", re.I)
+
+_FILLER = {"haan", "han", "ha", "ji", "ok", "okay", "yes", "yeah", "hmm", "hm", "acha", "achha", "accha", "theek", "thik", "hai", "hello", "हाँ", "हां",
+           "जी", "ओके", "ठीक", "है", "हम्म", "अच्छा", "हेलो", "bolo", "बोलो", "bataiye", "बताइए", "please", "sure", "nahi", "नहीं", "no"}
+
 SentenceSink = Callable[[str], Awaitable[None] | None]
 
 
@@ -127,7 +137,8 @@ class ACIEPipeline:
         return MoveContext(need=need, lang=lang, product=getattr(dom, "p", None), ledger=ledger, text=text,
                            turn_index=session.turn_index, frustration=state.frustration, engagement=state.engagement,
                            decided=session.context.decision, has_link=session.context.has("payment_link"),
-                           refused=session.context.decision in ("declined", "later"))
+                           refused=session.context.decision in ("declined", "later"),
+                           hold=session.dialog.get("sad_hold") == "1")
 
     def _psyche_move(self, turn: TurnInput, session: SessionState, state: HumanState, intent: str, strat,
                      ledger: SaidLedger, lang: str):
@@ -148,7 +159,7 @@ class ACIEPipeline:
     def _no_repeat(self, plan, expr, session: SessionState, ledger: SaidLedger, state: HumanState, intent: str):
         """Plain bug fix, always on: a deterministic reply that is a near copy (ratio > 0.6) of an earlier whole
         reply is replaced by something that helps (live calls: the same price line four times, "link sent" twice)."""
-        if os.getenv("ACIE_REPEAT_GUARD", "1") == "0" or getattr(self.decision.domain, "name", "") != "product_sales" or plan.intent not in _REPEATABLE or plan.intent in ("opening", "language_switch") or not ledger.replies:
+        if os.getenv("ACIE_REPEAT_GUARD", "1") == "0" or getattr(self.decision.domain, "name", "") != "product_sales" or plan.intent not in _REPEATABLE or plan.intent in ("opening", "language_switch") or plan.reference or not ledger.replies:
             return plan
         template_only = not plan.llm_allowed or isinstance(self.backend, TemplateBackend)
         if not template_only:
@@ -166,13 +177,56 @@ class ACIEPipeline:
         need = estimate_need(NeedInput(text=session.dialog.get("last_customer", ""), state=state_dims(state)), use_model=False)
         mv = repeat_move(self._move_context(session, need, ledger, lang, state, session.dialog.get("last_customer", "")), plan.intent)
         session.dialog["_repeat_guard"] = str(int(session.dialog.get("_repeat_guard", "0")) + 1)
-        intent_out = "goodbye" if mv.end_call else "clarify" if mv.name in ("ask_repeat", "offer_stop", "simplify", "ask_unclear") else "nothing_new"
+        if mv.end_call:
+            intent_out = "goodbye"
+        elif mv.name.split(":")[0] in ("answer_fact", "answer_unknown", "answer_health", "no_detail"):
+            intent_out = "answer"  # the caller asked again: it is answered, not "that's all I have"
+        elif mv.name in ("ask_repeat", "offer_stop", "simplify", "ask_unclear"):
+            intent_out = "clarify"
+        else:
+            intent_out = "nothing_new"
         session.dialog["_pm"] = mv.to_json()
         return plan.model_copy(update={"intent": intent_out, "llm_allowed": False, "end_call": mv.end_call or plan.end_call and plan.intent in ("goodbye", "declined"),
                                        "decision": "psyche_move", "fallback": dict(mv.text), "lead": None, "facts": {},
                                        "objective": mv.note or "Say something new"})
 
+    # ------------------------------------------------------------------ what the caller already told us (never re-ask it)
+
+    @staticmethod
+    def _track_need(session: SessionState, text: str) -> None:
+        """The discovery question was asked and they answered (or said their goal on their own): remember it, so it is never
+        asked again ("muscle" was asked for three more times in the persona test)."""
+        d = session.dialog
+        if d.get("need_known"):
+            return
+        said_goal = bool(_GOAL_WORDS.search(text))
+        toks = re.findall(r"[\w\u0900-\u097f]+", text.lower())
+        filler = not toks or all(t in _FILLER for t in toks)
+        if said_goal or (d.get("need_asked") == "1" and not filler and not is_question(text) and len(toks) <= 12):
+            d["need_known"] = text.strip()[:80]
+
+    @staticmethod
+    def _note_asked(session: SessionState, agent_text: str) -> None:
+        if any(_DISC_Q.search(x) for x in re.split(r"(?<=[.!?।])\s+", agent_text) if x.rstrip().endswith("?")):
+            session.dialog["need_asked"] = "1"
+
+    @staticmethod
+    def _drop_repeated_questions(reply: list[str], ledger: SaidLedger, session: SessionState) -> list[str]:
+        """Questions the reply asks that the call already asked, or that the caller already answered (the discovery
+        question once their need is known), are dropped. Only ever the question: the answer stays."""
+        known = bool(session.dialog.get("need_known"))
+        keep: list[str] = []
+        for sent in reply:
+            q = sent.rstrip().endswith("?")
+            n = re.sub(r"[\s.,!?;:\"'()\-।]+", " ", sent.lower()).strip()
+            again = q and any(difflib.SequenceMatcher(None, n, a).ratio() > 0.6 for a in ledger.asks)
+            if q and (again or (known and _DISC_Q.search(sent))) and (keep or len(reply) > 1):
+                continue
+            keep.append(sent)
+        return keep or reply
+
     def _learn_said(self, ledger: SaidLedger, session: SessionState, plan, move, text: str) -> None:
+        self._note_asked(session, text)
         ledger.add_text(text)
         ledger.add_intent(plan.intent)
         raw = session.dialog.pop("_pm", None)
@@ -231,10 +285,12 @@ class ACIEPipeline:
         # the emotion table (acie/psyche/emotion_policy.py): one deterministic row per turn from the 14 state dims.
         # The crisis row is always active (it is the old distress override, now a row); the others need ACIE_PSYCHE=1
         strat = emotion_policy.decide(state, turn.text, turn.voice, flagged=bool(session.dialog.get("safety_flag")))
+        session.dialog["_row"] = strat.row  # the domain reads it (a sad caller pauses the selling in both configs)
         if psyche.enabled() and strat.row != "crisis":
             expr = emotion_policy.apply_to_expression(expr, strat)
         mark("adapt")
         ledger = SaidLedger.load(session.dialog)
+        self._track_need(session, turn.text)
         move = None
 
         if strat.row == "crisis":  # sticky: once in crisis, never back to business
@@ -397,6 +453,11 @@ class ACIEPipeline:
                         reply = fresh
                     else:
                         validator.used_fallback = True
+            if plan.llm_allowed and not validator.used_fallback and reply:
+                kept = self._drop_repeated_questions(reply, ledger, session)
+                if kept != reply:
+                    validator.add_issue("dropped a question the call already asked or answered", "question_repeated")
+                    reply = kept
             # any problem anywhere in the reply -> speak only the safe template
             await emit([validator.fill(render_fallback(plan, expr))] if validator.used_fallback else reply)
         else:

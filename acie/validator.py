@@ -39,6 +39,12 @@ _OFFER_PAD = re.compile(
     r"|(?<=\{offer\})( for the first (3|three) months| (पहले )?(3|तीन) महीन(े|ों) (के लिए|तक))", re.IGNORECASE)
 
 
+# "अगर आप इस हफ़्ते join करते हैं तो {offer}": the offer phrase already says "if you join this week" (persona test: said twice in one sentence)
+_THIS_WEEK_PAD = re.compile(
+    r"(अगर आप |यदि आप |if you |agar aap )?(इस (हफ्ते|हफ़्ते|सप्ताह)|this week|is hafte) ?(join|जॉइन|जुड़ते|जुड़ें|जुड़ने|karte|करते|करें|karein)( करते| करने| karte| karne)?( हैं| hain| पर| par)?,? ?(तो |to |then )?(?=\{offer\})",
+    re.IGNORECASE)
+
+
 # problem text (as returned by _check) -> machine-readable code; first matching prefix wins
 _CODES = (("invented placeholder", "invented_slot"), ("price repeated", "price_repeated"),
           ("offer phrase repeated", "offer_repeated"), ("offer phrase padded", "offer_padded"),
@@ -122,6 +128,7 @@ class StreamingValidator:
             # U+FFFD: a Devanagari character split across stream chunks ("बता�ऊँ")
             s = _CURRENCY_BEFORE_SLOT.sub("", _EMOJI.sub("", _MARKDOWN.sub("", s))).replace("\ufffd", "").strip()
             s = _OFFER_PAD.sub("", s)  # "पहले 3 महीने में {offer}" -> "{offer}" (the phrase already says it)
+            s = _THIS_WEEK_PAD.sub("", s)
             if not s:
                 continue
             problem = self._check(s)
@@ -188,6 +195,8 @@ class StreamingValidator:
             return "wrong language: no Devanagari in a Hindi reply"
         if lang == "hinglish" and len(_DEVA.findall(bare)) > 0.6 * max(1, len(re.sub(r"\s", "", bare))):
             return "wrong language: Devanagari in a Hinglish reply"  # a Devanagari word or two is fine
+        if lang in ("hi", "hinglish") and len(_LATIN_WORD.findall(bare)) >= 4 and not _DEVA.search(bare) and detect_language(bare) == "en":
+            return "wrong language: an English sentence in a Hindi/Hinglish reply"
         for pack in self.rule_packs:
             why = pack.check(s, self.plan, self.expr)
             if why:

@@ -18,6 +18,7 @@ import json
 import re
 from dataclasses import asdict, dataclass, field
 
+from ..decision import honest
 from .ledger import SaidLedger
 from .needs import NeedResult
 
@@ -155,6 +156,9 @@ NO_DETAIL = [
       "वो जानकारी मेरे पास नहीं है; ऑफिशियल वेबसाइट पर मिल जाएगी। और कुछ है जो मैं बता सकूँ?",
       "Wo jaankari mere paas nahi hai; official website par mil jaayegi. Aur kuch hai jo main bata sakoon?"),
 ]
+SOFT_CHECK = T("No problem at all. Would another time suit you better, or shall I just leave it?",
+               "कोई बात नहीं। क्या किसी और समय बात करना ठीक रहेगा, या मैं यहीं छोड़ दूँ?",
+               "Koi baat nahi. Kya kisi aur time baat karna theek rahega, ya main yahin chhod doon?")
 SWITCH_EN = ["Sorry about that, I'll speak English from now on. What would you like to know?"]
 SWITCH_HI = ["माफ़ कीजिए, अब मैं हिंदी में बात करूँगा। आप क्या जानना चाहेंगे?"]
 GENTLE_OFFER = T("If you'd like it, I can send the link by SMS; only if you want it.",
@@ -163,7 +167,8 @@ GENTLE_OFFER = T("If you'd like it, I can send the link by SMS; only if you want
 
 _PRICE_Q = re.compile(r"price|cost|how much|kitn|कितन|कीमत|दाम|पैसे|rupe|रुपए|रुपये|discount|offer|ऑफर|छूट|expensive|महंगा|mehenga|cheap|सस्ता", re.I)
 _HOW_Q = re.compile(r"how (to|do|can) (i )?(pay|buy|join|subscribe|take)|कैसे (खरीद|पेमेंट|ले|जॉइन|join)|link|लिंक|payment|पेमेंट|join", re.I)
-_WHAT_Q = re.compile(r"what (is|does|do)|what.?s (in|inside)|features?|benefits?|क्या (है|होता|मिलता)|फीचर|कौन कौन|क्या क्या|machines?|मचीन|मशीन|classes|क्लास|tell me about", re.I)
+_WHAT_Q = re.compile(r"what (does|do) (it|this|that)\b.{0,20}(do|include|have|offer|give)|what do i get|what.?s (in|inside|included)|features?|benefits?|"
+                     r"क्या क्या|क्या (मिलता|मिलेगा|करता)|फीचर|कौन कौन|tell me about|kya kya|kya (milta|milega|karta)|इसमें क्या|isme kya", re.I)
 
 
 # ---------------------------------------------------------------- catalog from the Product
@@ -171,38 +176,72 @@ _WHAT_Q = re.compile(r"what (is|does|do)|what.?s (in|inside)|features?|benefits?
 class Item:
     slot: str
     kind: str                 # fact | benefit | faq
-    text: dict[str, str]
+    text: dict[str, str]      # only the languages the product really has text for ("en" always); never an English paste
     keywords: list[str] = field(default_factory=list)
+    rx: list[str] = field(default_factory=list)  # regex keywords ("re:" entries of an FAQ)
+
+    def line(self, lang: str) -> str | None:
+        return self.text.get(lang)
 
 
 def _esc(s: str) -> str:
     return s.replace("{", "(").replace("}", ")")
 
 
+_STOP = {"every", "like", "with", "your", "plus", "much", "more", "than", "free", "plan", "access", "most", "that", "this", "from", "have", "week",
+         "open", "unlimited", "session", "personal", "organise", "documents", "chats"}
+
+
+def _derived_words(b: str, p) -> set[str]:
+    """Words a caller would use for this benefit: its own content words, plus time words when it states opening hours."""
+    own = {w.lower() for w in re.findall(r"\w+", f"{p.product_name} {p.seller_name}")}
+    out = {w for w in re.findall(r"[a-z]{5,}", b.lower()) if w not in _STOP and w not in own}
+    if re.search(r"\b\d+ ?(am|pm)\b|\bopen\b|hours", b, re.I):
+        out |= {"timing", "timings", "hours", "टाइमिंग", "समय", "kab tak", "कब तक खुल", "khula", "खुला", "open", "opening"}
+    return out
+
+
 def build_catalog(p) -> list[Item]:
-    """Content the agent may say, in the order `information` uses it. Built only from Product fields."""
+    """Content the agent may say, in the order `information` uses it. Built only from Product fields. A language with no
+    text for an item is simply absent from `Item.text`: the move policy then lets the LLM paraphrase the English fact
+    instead of pasting English into a Hindi or Hinglish reply."""
     name, one = _esc(p.product_name), _esc(p.one_liner)
     items = [Item("what", "fact", T(_esc(p.pitch_en or f"{name} is {one}."), _esc(p.pitch_hi or p.pitch_en or f"{name} is {one}."),
-                                    _esc(p.pitch_hinglish or p.pitch_hi or p.pitch_en or f"{name} is {one}.")))]
+                                    _esc(p.pitch_hinglish or p.pitch_hi or p.pitch_en or f"{name} is {one}.")),
+                  ["membership", "मेंबरशिप", "what is", "kya hota", "क्या होता", "fitzone", "फिटज़ोन", "फिट-ज़ोन", "फिट ज़ोन", "फिटजोन"])]
+    words = item_words(p)
+    ben_hi, ben_hl = list(getattr(p, "benefits_hi", []) or []), list(getattr(p, "benefits_hinglish", []) or [])
     for i, b in enumerate(p.benefits):
-        b = _esc(b)
-        items.append(Item(f"benefit_{i + 1}", "benefit",
-                          T(f"One thing you get: {b}.", f"एक चीज़ जो मिलती है: {b}।", f"Ek cheez jo milti hai: {b}.")))
+        be = _esc(b)
+        text = {"en": f"One thing you get: {be}."}
+        if i < len(ben_hi) and ben_hi[i].strip():
+            text["hi"] = f"एक चीज़ जो मिलती है: {_esc(ben_hi[i])}।"
+        if i < len(ben_hl) and ben_hl[i].strip():
+            text["hinglish"] = f"Ek cheez jo milti hai: {_esc(ben_hl[i])}."
+        kws = sorted({w for w, bb in words.items() if bb == b} | _derived_words(b, p))
+        items.append(Item(f"benefit_{i + 1}", "benefit", text, kws))
     d, o, ov, op = _esc(p.discount), _esc(p.offer_price), _esc(p.offer_validity), _esc(p.original_price)
     items.append(Item("offer", "fact", T(f"The offer is {d}: {o} {ov}, normally {op}.",
                                          f"ऑफर है {d}: {o} {ov}, वैसे {op}।",
                                          f"Offer hai {d}: {o} {ov}, waise {op}."),
-                      ["price", "cost", "how much", "kitn", "कितन", "कीमत", "दाम", "रुपए", "रुपये", "discount", "छूट", "offer", "ऑफर", "expensive", "महंगा"]))
-    items.append(Item("cancel", "fact", T("You can cancel any time.", "आप कभी भी cancel कर सकते हैं।", "Aap kabhi bhi cancel kar sakte hain."),
-                      ["cancel", "कैंसल", "refund", "रिफंड", "stop paying"]))
+                      ["price", "cost", "how much", "kitn", "कितन", "कीमत", "दाम", "रुपए", "रुपये", "रुपया", "rupee", "rupaye", "dollar", "डॉलर", "discount",
+                       "छूट", "offer", "ऑफर", "expensive", "महंगा", "months", "महीने", "mahine", "3 month", "after that", "uske baad", "उसके बाद"]))
+    if honest.can_cancel(p):
+        items.append(Item("cancel", "fact", T("You can cancel any time.", "आप कभी भी cancel कर सकते हैं।", "Aap kabhi bhi cancel kar sakte hain."),
+                          ["cancel", "कैंसल", "stop paying"]))
     items.append(Item("how", "fact", T(f"Nothing is charged on this call; if you want it, a secure link comes by SMS to this number.",
                                        "इस कॉल पर कुछ नहीं कटता; आप चाहें तो इसी नंबर पर SMS से एक सुरक्षित लिंक आ जाएगा।",
                                        "Is call par kuch nahi katta; aap chahein to isi number par SMS se ek surakshit link aa jaayega."),
                       ["pay", "link", "लिंक", "payment", "पेमेंट", "join", "buy", "खरीद", "kaise"]))
     for k, f in enumerate(p.faqs):
         if f.answer and not f.not_eligible:
-            items.append(Item(f"faq_{k}", "faq", T(_esc(f.answer) + ".", _esc(f.answer_hi or f.answer) + "।", _esc(f.answer) + "."),
-                              [x.lower() for x in f.keywords if not x.startswith("re:")]))
+            text = {"en": _esc(f.answer) + "."}
+            if f.answer_hi:
+                text["hi"] = _esc(f.answer_hi) + "।"
+            if getattr(f, "answer_hinglish", ""):
+                text["hinglish"] = _esc(f.answer_hinglish) + "."
+            items.append(Item(f"faq_{k}", "faq", text, [x.lower() for x in f.keywords if not x.startswith("re:")],
+                              [x[3:] for x in f.keywords if x.startswith("re:")]))
     return items
 
 
@@ -219,6 +258,7 @@ class MoveContext:
     decided: str = "undecided"     # call context decision
     has_link: bool = False
     refused: bool = False          # said no / later / stop earlier in this call
+    hold: bool = False             # sad / money trouble earlier in the call: selling is paused until they re-open it
 
 
 def _fill(s: str, p) -> str:
@@ -242,9 +282,13 @@ def _mk(name: str, mc: MoveContext, text: dict[str, str] | None, **kw) -> Move |
 
 
 def _exhausted(mc: MoveContext, why: str) -> Move:
-    """Nothing new to say: be honest, then keep listening (ask what else / offer a person or a callback), then a
-    short listening cue. NEVER ends the call: only the caller's own goodbye, no or stop does (closure/autonomy)."""
+    """Nothing new to say. For a NON-question: be honest, then keep listening (ask what else / offer a person or a
+    callback), then a short listening cue; it never ends the call (only the caller's own goodbye, no or stop does).
+    For a QUESTION it is never used: a question always gets an answer (the fact in other words, or an honest "I don't
+    have that detail"), and "shall I let you go?" is never the reply to one."""
     L, p, lang = mc.ledger, mc.product, mc.lang
+    if honest.is_question(mc.text) and p is not None:
+        return answer_again(mc, why)
     for name, bank in (("nothing_new", NOTHING_NEW), ("keep_listening", KEEP_LISTENING)):
         m = _mk(name, mc, _rotate(bank, L, name, p, lang), brief=True, note=why)
         if m is not None:
@@ -259,13 +303,99 @@ def _exhausted(mc: MoveContext, why: str) -> Move:
 def _info_items(mc: MoveContext, kinds=("fact", "benefit", "faq")) -> list[Item]:
     if mc.product is None:
         return []
-    return [i for i in build_catalog(mc.product) if i.kind in kinds and not mc.ledger.has_slot(i.slot)
-            and not mc.ledger.repeats(i.text.get(mc.lang) or i.text["en"])]
+    return [i for i in build_catalog(mc.product) if i.kind in kinds and mc.lang in i.text and not mc.ledger.has_slot(i.slot)
+            and not mc.ledger.repeats(i.text[mc.lang])]
 
 
 def _matches(item: Item, text: str) -> bool:
     low = text.lower()
-    return any(k.lower() in low for k in item.keywords if k.strip())
+    return any(k.lower() in low for k in item.keywords if k.strip()) or any(re.search(r, low) for r in item.rx)
+
+
+def _by_lang_one(d: dict[str, str]) -> dict[str, str]:
+    return dict(d)
+
+
+def _resolvable(mc: MoveContext) -> bool:
+    """The question names something the facts cover (a catalog item, a price) or a known gap: it can be answered now."""
+    p, t = mc.product, mc.text
+    if honest.find_topics(p, t) or honest.health_question(t):
+        return True
+    return any(_matches(i, t) for i in build_catalog(p)) or bool(_PRICE_Q.search(t) or _WHAT_IS.search(t))
+
+
+def _by_lang(fn) -> dict[str, list[str]]:
+    return {l: fn(l) for l in LANGS}
+
+
+def _say(mc: MoveContext, name: str, variants: dict[str, list[str]], slot: str | None = None, note: str = "") -> Move:
+    """One honest/answering move from per-language variant lists. The variant is chosen by how many times THIS answer was
+    already given (the ledger counts moves named "<name>:<slot>"), so asking the same thing again gives the next wording and
+    a fact restated for a caller who asked again is never held back as a "repeat". After the last, the last again."""
+    L, lang = mc.ledger, mc.lang
+    key = f"{name}:{slot}" if slot else name
+    mine = variants.get(lang) or variants["en"]
+    idx = min(L.count_move(key), len(mine) - 1)
+    text = {l: v[min(idx, len(v) - 1)] for l, v in variants.items() if v}
+    return Move(name=key, need=mc.need.need, text=text, slot=slot, brief=mc.frustration >= 0.4 or mc.need.need in ("clarity", "space"),
+                note=note or "Answer what they asked; if it is not in the facts say so honestly; never offer to end the call.")
+
+
+def _unknown(mc: MoveContext, topic=None) -> Move:
+    p = mc.product
+    topics = honest.find_topics(p, mc.text) if topic is not None else []
+    if topic is not None and len(topics) > 1 and topics[0].id == topic.id:
+        n = min(mc.ledger.count_move(f"answer_unknown:topic:{topic.id}"), 2)
+        return Move(name=f"answer_unknown:topic:{topic.id}", need=mc.need.need, slot="topic:" + topic.id, brief=True,
+                    text={l: honest.unknown_combo(p, l, topics, n) for l in LANGS},
+                    note="Say honestly you do not have those details; do not guess.")
+    return _say(mc, "no_detail" if topic is None else "answer_unknown", _by_lang(lambda l: honest.unknown_variants(p, l, topic)),
+                slot="topic:" + (topic.id if topic is not None else "generic"),
+                note="Say honestly you do not have that detail and where they will find it; do not guess.")
+
+
+def _restate(it: Item, p, lang: str) -> list[str]:
+    """The same fact in other shapes (never the first wording): for a re-asked question."""
+    if it.slot == "offer":
+        return honest.price_variants(p, lang)
+    base = it.text.get(lang) or ""
+    if it.kind == "benefit" and base:
+        core = base.split(":", 1)[-1].strip(" .।")
+        return {"en": [f"{honest.cap(core)} is part of it.", f"It includes {core}."],
+                "hi": [f"{core} इसमें शामिल है।", f"इसमें {core} भी मिलता है।"],
+                "hinglish": [f"{honest.cap(core)} isme shamil hai.", f"Isme {core} bhi milta hai."]}[lang]
+    lead = {"en": ["Once more, in short: ", "To say it again: "], "hi": ["छोटे में फिर से: ", "दोबारा बता देता हूँ: "],
+            "hinglish": ["Chhote mein phir se: ", "Dobara bata deta hoon: "]}[lang]
+    return [l + base for l in lead] if base else []
+
+
+def answer_again(mc: MoveContext, why: str = "") -> Move:
+    """The caller asked (again) and the fresh facts are used up: answer anyway. Order: a topic the facts do not cover ->
+    the honest line (a different one each time); a catalog item already said -> the same fact in other words, finally
+    "that's all I have on this, <where to look>"; nothing matched -> the honest generic line. Never a listening cue."""
+    t, p, L, lang = mc.text, mc.product, mc.ledger, mc.lang
+    topics = honest.find_topics(p, t)
+    if topics and (topics[0].beats_faq or not honest.covered_by_faq(p, t)):
+        return _unknown(mc, topics[0])
+    ip = item_price_answer(p, t, lang)
+    if ip is not None:
+        bl = {l: item_price_answer(p, t, l)[0] if l == "en" else _benefit_in(p, item_price_answer(p, t, "en")[0], l) for l in LANGS}
+        again = {"en": f"So it is included: {bl['en']}. There is no separate charge for it.",
+                 "hi": f"तो वो शामिल है: {bl['hi']}। उसका अलग से कोई चार्ज नहीं है।",
+                 "hinglish": f"Toh wo shamil hai: {bl['hinglish']}. Uska alag se koi charge nahi hai."}
+        variants = {l: [again[l]] + honest.end_variants(p, l) for l in LANGS}
+        return _say(mc, "answer_fact", variants, slot="item_price", note="They asked again: answer again; do not offer to end the call.")
+    if honest.NEGOTIATE.search(t):
+        return _say(mc, "answer_fact", _by_lang(lambda l: honest.negotiate_variants(p, l)), slot="negotiate", note="Price is fixed; say so again in other words.")
+    cat = build_catalog(p)
+    cands = [i for i in cat if _matches(i, t)] or ([i for i in cat if i.slot == "offer"] if _PRICE_Q.search(t) else [])
+    cands = [i for i in cands if mc.lang in i.text]
+    if cands:
+        it = cands[0]
+        variants = {l: (_restate(it, p, l) if it.text.get(l) or it.slot == "offer" else []) + honest.end_variants(p, l) for l in LANGS}
+        return _say(mc, "answer_fact", variants, slot=it.slot,
+                    note="They asked again: say the same fact in different, simpler words; do not offer to end the call.")
+    return _unknown(mc)
 
 
 def _do_be_heard(mc: MoveContext) -> Move:
@@ -298,7 +428,7 @@ def _do_clarity(mc: MoveContext) -> Move:
                 continue
             it = facts[0]
             intro = T("Let me say it more simply. ", "इसे और आसान शब्दों में बताता हूँ। ", "Ise aur aasan shabdon mein batata hoon. ")
-            text = {l: intro[l] + it.text[l] for l in LANGS}
+            text = {l: intro[l] + it.text[l] for l in LANGS if l in it.text}
             mv = Move(name=name, need="clarity", text=text, slot=it.slot, brief=True,
                       note="Rephrase in simpler everyday words with a different example; never repeat the earlier wording.")
             return mv
@@ -335,55 +465,101 @@ def item_words(p) -> dict[str, str]:
     return out
 
 
+def _benefit_in(p, b: str, lang: str) -> str:
+    """The benefit's wording in the caller's language (benefits_hi / benefits_hinglish), else None-ish ''."""
+    try:
+        i = list(p.benefits).index(b)
+    except ValueError:
+        return ""
+    lst = {"hi": getattr(p, "benefits_hi", []), "hinglish": getattr(p, "benefits_hinglish", [])}.get(lang)
+    return (lst[i] if lst and i < len(lst) else "") or ""
+
+
 def item_price_answer(p, text: str, lang: str) -> tuple[str, str] | None:
     """A price question that names something already described ("personal trainer कितने का?") is answered from
-    the product facts (it is included), not with the membership price. Returns (benefit, text) or None."""
+    the product facts (it is included), not with the membership price. Returns (benefit, text) or None. The benefit is
+    spoken in the caller's language; with no translation the answer is skipped for that language (the LLM paraphrases)."""
     if p is None or not _PRICE_WORDS.search(text):
         return None
     low = text.lower()
     for w, b in sorted(item_words(p).items()):
         if re.search(r"(?<![\w\u0900-\u097f])" + re.escape(w), low):
-            b = _esc(b)
-            t = T(f"{b}: that part is included in the offer, with no separate price. For anything beyond it I don't have a rate; the official website has it.",
-                  f"{b}: ये हिस्सा ऑफर में शामिल है, इसकी अलग कीमत नहीं है। इससे ज़्यादा के लिए मेरे पास कोई रेट नहीं है; ऑफिशियल वेबसाइट पर मिल जाएगा।",
-                  f"{b}: ye hissa offer mein shamil hai, iski alag keemat nahi hai. Isse zyada ke liye mere paas koi rate nahi hai; official website par mil jaayega.")
-            return b, t[lang] if lang in t else t["en"]
+            bl = _esc(b) if lang == "en" else _esc(_benefit_in(p, b, lang))
+            if not bl:
+                return None
+            S = honest.source(p, lang)
+            t = {"en": f"{honest.cap(bl)}: that part is included in the offer, with no separate price. For anything beyond it I don't have a rate; {S}.",
+                 "hi": f"{bl}: ये हिस्सा ऑफर में शामिल है, इसकी अलग कीमत नहीं है। इससे ज़्यादा के लिए मेरे पास कोई रेट नहीं है; {S}।",
+                 "hinglish": f"{honest.cap(bl)}: ye hissa offer mein shamil hai, iski alag keemat nahi hai. Isse zyada ke liye mere paas koi rate nahi hai; {S}."}
+            return _esc(b), t[lang] if lang in t else t["en"]
     return None
 
 
+_WHAT_IS = re.compile(r"what (is|are) (a |an |the )?(membership|fitzone|claude|this|it)|(membership|मेंबरशिप|fitzone|फिट.?ज़ोन|फिट.?जोन|claude|क्लॉड)\W+(\w+\W+){0,2}(kya|क्या)\W+(hota|hai|होता|है|hoti|होती)|"
+                      r"(kya|क्या) (hota|होता) (hai|है)", re.I)
+_DIFF = re.compile(r"\b(different|difference|better than|versus|vs|compare|comparison|why should i|why switch)\b|अलग क्या|क्या अलग|फर्क|फ़र्क|बेहतर|तुलना|"
+                   r"alag kya|kya alag|kya fark|fark kya|behtar|cult\.?fit|gold.?s gym|competitor|switch", re.I)
+
+
 def _do_answer(mc: MoveContext) -> Move:
-    t, L = mc.text, mc.ledger
-    if mc.product is None:
-        return _exhausted(mc, "no catalog")
-    ip = item_price_answer(mc.product, t, mc.lang)
+    """Answer the question that was asked: from the catalog when it matches, else the honest "I don't have that" line.
+    The reply is always in the caller's language (a language with no text for an item is not pasted in English)."""
+    t, L, p, lang = mc.text, mc.ledger, mc.product, mc.lang
+    if p is None:
+        return _unknown(mc)
+    if honest.health_question(t):
+        return _say(mc, "answer_health", _by_lang(lambda l: honest.health_variants(p, l)), slot="health",
+                    note="Never promise what is safe for a health condition; send them to their doctor; no selling.")
+    ip = item_price_answer(p, t, lang)
     if ip is not None:
         slot = "item:" + re.sub(r"\W+", "_", ip[0].lower())[:30]
-        full = {l: item_price_answer(mc.product, t, l)[1] for l in LANGS}
-        if not L.has_slot(slot) and not L.repeats(full.get(mc.lang) or full["en"]):
+        full = {l: item_price_answer(p, t, l)[1] for l in LANGS}
+        if not L.has_slot(slot) and not L.repeats(full.get(lang) or full["en"]):
             return Move(name="answer_fact", need="answer", text=full, slot=slot, brief=True,
                         note="Answer what they asked about this included item from the facts; no selling question.")
-        return _exhausted(mc, "already answered this item question")
-    cat = [i for i in build_catalog(mc.product)]
-    cands = [i for i in cat if _matches(i, t)]
+        return answer_again(mc, "already answered this item question")
+    topics = honest.find_topics(p, t)
+    if topics and (topics[0].beats_faq or not honest.covered_by_faq(p, t)):
+        return _unknown(mc, topics[0])
+    if re.search(r"kab tak|कब तक|how long|valid", t, re.I) and re.search(r"offer|ऑफर|discount|डिस्काउंट|price|कीमत", t, re.I) and not honest.covered_by_faq(p, t):
+        return _say(mc, "answer_fact", _by_lang(lambda l: honest.offer_end_variants(p, l)), slot="offer_end",
+                    note="Say how long the offer price lasts from the facts, and honestly that no end date is known.")
+    cat = [i for i in build_catalog(p)]
+    cands = sorted([i for i in cat if _matches(i, t)], key=lambda i: 0 if i.kind == "faq" else 1)  # an approved FAQ beats a generic fact
     if not cands:
-        if _WHAT_Q.search(t):
-            cands = [i for i in cat if i.kind == "benefit"] or cat[:1]
+        if _WHAT_IS.search(t):
+            cands = [i for i in cat if i.slot == "what"]
+        elif _DIFF.search(t):
+            cands = []
+            fresh_b = [i for i in cat if i.kind == "benefit" and lang in i.text and not L.has_slot(i.slot) and not L.repeats(i.text[lang])]
+            if fresh_b:
+                lead = {"en": "I don't know their plans well enough to compare honestly. Here, ",
+                        "hi": "मुझे उनके प्लान ठीक से नहीं पता, इसलिए ईमानदारी से तुलना नहीं कर सकता। यहाँ, ",
+                        "hinglish": "Mujhe unke plan theek se nahi pata, isliye imaandaari se comparison nahi kar sakta. Yahan, "}[lang]
+                it = fresh_b[0]
+                body = it.text[lang]
+                body = body[0].lower() + body[1:] if lang != "hi" else body
+                return Move(name="answer_fact", need="answer", text={lang: lead + body}, slot=it.slot, brief=True,
+                            note="Do not run the other company down and do not claim to be better; say what this offer includes.")
+        elif _WHAT_Q.search(t):
+            cands = [i for i in cat if i.kind == "benefit" and lang in i.text] or cat[:1]
         elif _PRICE_Q.search(t):
             cands = [i for i in cat if i.slot == "offer"]
         elif _HOW_Q.search(t):
             cands = [i for i in cat if i.slot == "how"]
-    fresh = [i for i in cands if not L.has_slot(i.slot) and not L.repeats(i.text.get(mc.lang) or i.text["en"])]
+    have = [i for i in cands if lang in i.text]
+    fresh = [i for i in have if not L.has_slot(i.slot) and not L.repeats(i.text[lang])]
     if fresh:
         it = fresh[0]
         return Move(name="answer_fact", need="answer", text=it.text, slot=it.slot, brief=mc.frustration >= 0.4,
                     note="Answer the question first and fully from the product facts; do not add a selling question.")
-    if cands:  # they asked about something we already said: honest, not a copy
-        return _exhausted(mc, "already answered this")
-    m = _mk("no_detail", mc, _rotate(NO_DETAIL, L, "no_detail", mc.product, mc.lang), brief=True,
+    if cands and not have:  # the fact exists but has no text in this language: the LLM paraphrases it (never pasted in English)
+        return _unknown(mc)
+    if cands:  # they asked about something we already said: the same fact in other words, never a copy, never a cue
+        return answer_again(mc, "already answered this")
+    m = _mk("no_detail", mc, _rotate(NO_DETAIL, L, "no_detail", p, lang), brief=True,
             note="Say honestly you do not have that detail; the official website has it.")
-    if m:
-        return m
-    return _exhausted(mc, "no further detail")
+    return m or _unknown(mc)
 
 
 def _do_information(mc: MoveContext) -> Move:
@@ -395,9 +571,9 @@ def _do_information(mc: MoveContext) -> Move:
     text = dict(it.text)
     sells = False
     interest = (mc.need.flags.get("go_on") or mc.need.flags.get("sale")) and mc.engagement >= 0.4
-    if (interest and L.offers == 0 and not L.refused and not mc.refused and mc.decided == "undecided" and not mc.has_link
+    if (interest and not mc.hold and L.offers == 0 and not L.refused and not mc.refused and mc.decided == "undecided" and not mc.has_link
             and L.has_slot("offer") and L.has_slot(it.slot) is False and it.slot != "offer"):
-        text = {l: it.text[l] + " " + GENTLE_OFFER[l] for l in LANGS}
+        text = {l: it.text[l] + " " + GENTLE_OFFER[l] for l in LANGS if l in it.text}
         sells = True
     return Move(name="inform", need="information", text=text, slot=it.slot, sells=sells,
                 note="Give the next useful fact in one or two short sentences; only one gentle offer per call.")
@@ -417,6 +593,12 @@ def choose_move(mc: MoveContext) -> Move:
     if need == "closure":
         return _simple("close", CLOSE, mc, need, end_call=True, note="Close politely.")
     if need == "autonomy":
+        f = mc.need.flags
+        if (f.get("soft_no") and not mc.ledger.refused and mc.ledger.count_move("soft_check") == 0 and not mc.refused
+                and not mc.has_link and mc.decided == "undecided"):
+            # "not now" is not "never": one gentle check (a better time?), then the next no closes
+            return Move(name="soft_check", need=need, text=_by_lang_one(SOFT_CHECK), brief=True,
+                        note="They said not now: one gentle check about a better time; no pitch, no price.")
         mc.ledger.refused = True
         return _simple("respect_close", RESPECT, mc, need, end_call=True,
                        note="Respect the no or the later; close politely; never offer again.")
@@ -432,12 +614,19 @@ def choose_move(mc: MoveContext) -> Move:
                             note="Give honest facts, no pressure, no selling question.")
         return _simple("reassure", REASSURE, mc, need, note="Give honest facts, no pressure, no selling question.")
     if need == "clarity":
+        if (honest.is_question(mc.text) and len(mc.text.split()) >= 4 and mc.product is not None
+                and not mc.need.flags.get("lang_trouble") and not mc.need.flags.get("garbled") and _resolvable(mc)):
+            return _do_answer(mc)  # "कीमत बताओ बेटा, सीधे सीधे" is a question with a known answer, not a reason to ask "which part?"
         return _do_clarity(mc)
     if need == "answer":
         return _do_answer(mc)
     if need == "space":
         return _simple("offer_stop", SPACE, mc, need, note="Be brief and offer to stop or call back.")
     if need == "connection":
+        if mc.need.flags.get("sad") or mc.hold:
+            first = mc.ledger.count_move("connect") == 0
+            return _say(mc, "connect", _by_lang(lambda l: honest.empathy_variants(mc.product, l, first)),
+                        note="They are going through a hard time: warm, short, human; no selling, no price, no link; offer another time.")
         return _simple("connect", CONNECT, mc, need, note="Reply like a warm human in one short line; no selling.")
     return _do_information(mc)
 
@@ -448,6 +637,8 @@ def repeat_move(mc: MoveContext, intent: str) -> Move:
     else the honest "that's all I have"."""
     if intent in ("goodbye", "declined"):  # the caller's own goodbye / no: the only repeat that may close the call
         return _simple("close", CLOSE, mc, "closure", end_call=True, note="Close politely; do not repeat.")
+    if honest.is_question(mc.text) and mc.product is not None:  # a question, asked again: answer it in other words
+        return answer_again(mc, "the reply would have repeated an earlier one")
     if intent in ("not_understood", "clarify", "hello", "off_topic"):
         mc.need.flags["garbled"] = True
         return _do_clarity(mc)

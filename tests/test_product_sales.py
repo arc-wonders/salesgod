@@ -179,6 +179,8 @@ async def test_opt_out_ends_call_but_later_and_again_are_not_opt_out():
         out, last, _ = await run(["हाँ बोलिए", line])
         assert out[-1] == "opt_out" and last.plan.end_call, line
     out, _, _ = await run(["abhi call mat karo baad mein karna"])
+    assert out[-1] == "callback_time"  # (was "callback": a hang-up with no time; now it asks when to call back)
+    out, _, _ = await run(["abhi call mat karo baad mein karna", "kal shaam 6 baje"])
     assert out[-1] == "callback"
     out, _, _ = await run(["फिर से कॉल? कौन है?"])
     assert out[-1] != "opt_out"
@@ -210,6 +212,8 @@ async def test_put_the_phone_down_is_a_goodbye():
 
 async def test_callback_and_human():
     out, last, _ = await run(["abhi busy hoon baad mein call karo"])
+    assert out[-1] == "callback_time" and not last.plan.end_call  # (was a hang-up with no time; now asks when)
+    out, last, _ = await run(["abhi busy hoon baad mein call karo", "kal shaam 6 baje"])
     assert out[-1] == "callback" and last.plan.end_call
     out, last, _ = await run(["mujhe kisi insaan se baat karni hai"])
     assert out[-1] == "human_agent"

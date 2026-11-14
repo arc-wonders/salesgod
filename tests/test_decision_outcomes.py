@@ -32,7 +32,8 @@ async def test_goodbye_after_sale_keeps_accepted():
 
 
 async def test_later_callback():
-    _, last, pipe, _, _ = await run(["abhi busy hoon baad mein call karo"])
+    # (was one turn: "call me later" ended the call with no time; now the agent asks when, the second turn closes)
+    _, last, pipe, _, _ = await run(["abhi busy hoon baad mein call karo", "kal shaam 6 baje"])
     c = led(pipe)
     assert (c.decision, c.outcome) == ("later", "later") and c.has("callback_later") and last.plan.end_call
 
