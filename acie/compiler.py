@@ -107,7 +107,12 @@ TONE_RULES = {
 def _tone_style(plan: TurnPlan, expr: ExpressionParams) -> str:
     """The register lines. Empty when no tone is set, so today's prompt is unchanged."""
     t = (getattr(plan, "tone_level", "") or getattr(expr, "tone", "") or "").lower()
-    return TONE_RULES.get(t, "")
+    line = TONE_RULES.get(t, "")
+    if line:  # naming and number style, in every register
+        line += ("- Names and numbers: refer to the company or a place by the seller's name (say 'the FitZone front desk', never 'front desk of FitZone membership'); "
+                 "never repeat a noun twice in a row ('membership membership'); write amounts as digits with the rupee sign (₹33), never in words. "
+                 "After an address word like 'Ji,' or 'Bhai,' continue in lower case.\n")
+    return line
 
 
 def _clean(text, limit: int) -> str:
