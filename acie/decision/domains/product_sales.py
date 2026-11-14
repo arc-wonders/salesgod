@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import os
 import re
 
@@ -766,6 +767,18 @@ class ProductSalesDomain:
     # ------------------------------------------------------------------ entry
 
     async def plan(self, intent: str, turn: TurnInput, session: SessionState) -> TurnPlan:
+        """Never fails a turn: any exception in the planning code is logged and the caller hears a safe 'say it again' line."""
+        try:
+            return await self._plan_unsafe(intent, turn, session)
+        except Exception:  # noqa: BLE001 - a silent line on a live call is worse than a generic one
+            logging.getLogger("acie.decision").exception("plan() failed; using the safe fallback (intent=%s)", intent)
+            return TurnPlan(intent="clarify", llm_allowed=False, decision="safe fallback after an internal error",
+                            objective="Ask them to say it again",
+                            fallback=_tpl("One second, sorry. Could you say that again?",
+                                          "जी, एक सेकंड… क्या आप दोबारा बताएँगे?",
+                                          "Ji, ek second… kya aap dobara bataenge?"))
+
+    async def _plan_unsafe(self, intent: str, turn: TurnInput, session: SessionState) -> TurnPlan:
         d = session.dialog
         d.pop("pb_node_turn", None)
         d.pop("pb_title_turn", None)
@@ -1130,13 +1143,13 @@ class ProductSalesDomain:
             return hq
 
         # ---------------- a price question about something the offer includes ("trainer कितने का?"): from the facts
-        from ...psyche.moves import item_price_answer
-        ip = item_price_answer(p, text, lang)
+        from ...psyche.moves import item_price_all
+        ip = item_price_all(p, text)
         if ip is not None and mv is None and ctx is not None and not ctx.has("payment_link"):
             d["pending"] = "close" if "offer_price" in ctx.quoted else "pitch"
             return TurnPlan(intent="answer", llm_allowed=False, decision="answer from the facts",
                             objective="Say the item is included; do not quote the membership price again",
-                            fallback=_tpl(*(item_price_answer(p, text, l)[1] for l in ("en", "hi", "hinglish"))))
+                            fallback=_tpl(ip[1]["en"], ip[1]["hi"], ip[1]["hinglish"]))
 
         # ---------------- psyche (ACIE_PSYCHE=1): the move that serves the caller's need, never a repeat
         if mv is not None and mv.name.split(":")[0] != "no_detail":
