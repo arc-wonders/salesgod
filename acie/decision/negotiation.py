@@ -55,6 +55,15 @@ _BUDGET = re.compile(r"budget|afford|bajet|बजट|tight|tangi|तंगी|pa
 _VALUE = re.compile(r"worth|value for money|paisa vasool|पैसा वसूल|itna (paisa|mehenga|महंगा)|इतना (पैसा|महंगा)|mehenga|mehnga|महंगा|expensive|too much|"
                     r"zyada hai|jyada hai|ज़्यादा है|ज्यादा है|costly|pricey|over ?priced", _I)
 _HAGGLE = re.compile(honest.NEGOTIATE.pattern + "|" + NEGOTIATE_MORE + r"|still (too )?(high|much|expensive)|(ab|abhi|phir|fir) bhi (mehenga|zyada|jyada|kam)|aur kam|और कम|bargain|negotiat|how much (lower|less|cheaper)|(price|rate|keemat|कीमत) (lower|kam|कम)|more lower|\\blower\\b.{0,12}\\b(price|rate)\\b|(any|more|further|extra|koi|aur) (more |further |extra )?(discount|छूट|डिस्काउंट)|(give|do|de|dedo) (me )?(a |the |some )?(discount|छूट|डिस्काउंट)|best price|final price|last price|aakhri (rate|price)|आखिरी (रेट|प्राइस)|thoda (aur )?(kam|sasta)", _I)
+# English / Hinglish price pushes that carry no number: "give me a good discount", "any offers going?", "can you do better", "leaving my current gym"
+_PUSH_MORE = re.compile(r"discount|डिस्काउंट|छूट|\b(any|some|those|these|other|better|good|special|joining|new member|loyalty) (offers?|deals?)\b|\boffers? (going|available|for me|on)\b|"
+                        r"about (those |the |any )?(discount )?offers|tell me about (those |the |any )?(discount )?offers|\bdeals?\b|\bdo better\b|\bbetter (price|rate|deal)\b|"
+                        r"\b(lower|less|cheaper|reduce|reduced)\b|\bbest price\b|too (costly|expensive|much|high)|\bcostly\b|pricey|"
+                        r"\b(switch(ing)?|moving|shifting|leaving|left|quit(ting)?) (from |away from )?(my |the |our )?(current |old |other )?(gym|cult|club|membership)|"
+                        r"leaving (my |the )?(current |old )?gym|(chhod|chod|छोड़) (raha|rahi|diya|dia)|dusra gym|doosra gym|(achha|accha|acha|better|best|kam|sahi|thoda) (rate|price|keemat|daam)|rate do\\b|\bso (i )?need (a )?(discount|deal|offer)|kuch (offer|discount)|koi (offer|discount)|offer hai kya|discount milega", _I)
+_PER_DAY_Q = re.compile(r"(per|a|each|every|ek|roz|rozana)\s*(day|din)\b|\broz(ana)? (ke|ka|ki)\b|\bdaily\b|\bper day\b|din ka\b|रोज़|रोज", _I)
+_NOT_A_PRICE_DAYS = re.compile(r"\b(baje|o.?clock|am|pm|sessions?)\b", _I)
+_PER_DAY_PAY = re.compile(r"pay|payment|instal|monthly|full|rather|instead|lump|ek saath|bajaye|jagah|seedha|\bjust\b|only|sirf|bas", _I)
 _NUM = re.compile(r"\d[\d,]*")
 _NOT_A_PRICE = re.compile(r"\b(?:days?|din|months?|mahine|weeks?|hafte|sessions?|minutes?|baje|bje|o.?clock|am|pm)\b", _I)
 
@@ -62,6 +71,8 @@ _NOT_A_PRICE = re.compile(r"\b(?:days?|din|months?|mahine|weeks?|hafte|sessions?
 def detect(text: str) -> str | None:
     """The negotiation type for this line, or None when it is not price talk."""
     t = text.lower()
+    if _PER_DAY_Q.search(t) and _PER_DAY_PAY.search(t) and re.search(r"\d", t) and not _NOT_A_PRICE_DAYS.search(t):
+        return "per_day"
     for name, rx in (("discount_group", _GROUP), ("free_trial", _TRIAL), ("counter_offer", _COUNTER)):
         if rx.search(t):
             return name
@@ -69,7 +80,7 @@ def detect(text: str) -> str | None:
         return "counter_offer"
     if _COMP_NAME.search(t) and _COMP_PRICE.search(t):
         return "competitor"
-    for name, rx in (("budget", _BUDGET), ("value_doubt", _VALUE), ("haggle", _HAGGLE)):
+    for name, rx in (("budget", _BUDGET), ("value_doubt", _VALUE), ("haggle", _HAGGLE), ("haggle", _PUSH_MORE)):
         if rx.search(t):
             return name
     return None
@@ -212,6 +223,17 @@ def _compare_reply(p, st: NegState, tone: str = "mid") -> NegReply:
         for l in LANGS:
             parts[l] = _join(parts[l], COMPARE[l].format(b1=clean(b[l])))
     return NegReply("negotiation", parts, st, note="Honest comparison answer only: no floor line, no concession; the price is not on the table.")
+
+
+def _per_day_reply(p, st: NegState, tone: str) -> NegReply:
+    """"Can I just pay 33 rupees a day?": no. One payment covers the whole period; the per-day figure is only the maths. No concession."""
+    st.last = "per_day"
+    tone = clean_tone(tone)
+    cur = st.price or p.economics.list_price
+    days = p.economics.list_price / per_day(p.economics) if per_day(p.economics) else 0
+    d = cur / days if days else 0
+    t = _say(nb.PER_DAY_Q, tone, st, "pdq", p=_fmt(p, cur), d=_fmt(p, d), u=p.economics.unit or "the plan")
+    return NegReply("negotiation", t, st, toned=True, note="One payment for the whole period; per day is just the maths. No concession.")
 
 
 def _benefit(p, lang: str, i: int = 0) -> str:
@@ -487,6 +509,10 @@ def step(p, text: str, st: NegState, need_known: str = "", faq_line=None, commit
         return None
     st = NegState(**asdict(st))
     st.rounds += 1
+    if kind == "per_day":
+        return _per_day_reply(p, st, tone) if ladder_enabled(p) else None
+    if kind == "discount_group" and ladder_enabled(p):
+        kind = "haggle"  # a student / friend / switching discount ask is a price push: value + one ladder step, never a canned fact
     if kind == "competitor" and not explicit_push(text):
         return _compare_reply(p, st, tone)
     if kind == "counter_offer" and _COMP_NAME.search(text) and honest.is_question(text) and not _PUSH.search(text):

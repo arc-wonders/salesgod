@@ -1067,7 +1067,7 @@ class ProductSalesDomain:
 
         # ---------------- "yes" to a negotiated price: lock it in the terms, then the usual confirmation (terms + link) with the agreed price
         if d.get("pending") == "neg_close" and not _is_question(text) and (self._yes(text, intent, d) or _clean_yes(text) or intent == "affirm") \
-                and not _FIRM_NO.search(text) and (negotiation.detect(text) != "counter_offer" or self._names_offered_price(text, d)):
+                and not _FIRM_NO.search(text) and not _THINKING.search(text) and (negotiation.detect(text) != "counter_offer" or self._names_offered_price(text, d)):
             self._apply_neg_offer(d)
             if d.get("terms_confirmed") == "1" and (_BUY.search(text) or d.get("requested_link") == "1"):
                 return self._link_plan(d, lang)  # they already heard the terms and asked for the link: the agreed price goes out, no second confirmation
@@ -1078,6 +1078,12 @@ class ProductSalesDomain:
         # ---------------- a counter-offer ("2,500 mein de do") is price talk, never a yes to the link: the negotiation flow answers it
         if negotiation.detect(text) == "counter_offer" and not self._names_offered_price(text, d) and (neg0 := self._negotiate_step(text, d, ctx, lang)) is not None:
             return neg0
+
+        # ---------------- a discount / better-rate ask ("thoda sasta kar do", "discount chahiye", "can you do better") is price talk, never a yes
+        if negotiation.detect(text) in ("haggle", "per_day") and not honest.SEND_REQ.search(text) and not _FIRM_NO.search(text) \
+                and (negotiation.explicit_push(text) or negotiation.detect(text) == "per_day" or _is_question(text) or negotiation.detect(text) == "haggle") \
+                and not self._names_offered_price(text, d) and (neg1 := self._negotiate_step(text, d, ctx, lang)) is not None:
+            return neg1
 
         # ---------------- policy: consent and closing
         u_ = self._nlu(d)
