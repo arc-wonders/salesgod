@@ -300,6 +300,37 @@ def find_node(nodes: list[dict], nid: str) -> dict | None:
     return None
 
 
+def _subtree_ids(n: dict) -> set[str]:
+    return {n["id"]} | all_node_ids(n.get("children", []))
+
+
+def replace_node(nodes: list[dict], raw: dict, notes: list[str]) -> bool:
+    """Swap in a corrected version of an existing node (same id, found at any depth). Keeps its children when the correction has none.
+    An invalid correction leaves the old node."""
+    nid = kebab(raw.get("id"))
+    for i, n in enumerate(nodes):
+        if n["id"] == nid:
+            taken = all_node_ids(nodes) - _subtree_ids(n)
+            new = clean_node({**raw, "children": raw.get("children") or n.get("children", [])}, taken, notes)
+            if new:
+                nodes[i] = new
+                return True
+            return False
+        if replace_node(n.setdefault("children", []), raw, notes):
+            return True
+    return False
+
+
+def drop_node(nodes: list[dict], nid: str) -> bool:
+    for i, n in enumerate(nodes):
+        if n["id"] == nid:
+            del nodes[i]
+            return True
+        if drop_node(n.get("children", []), nid):
+            return True
+    return False
+
+
 def clean_ladder(raws: list[dict]) -> list[dict]:
     out, seen = [], set()
     for i, r in enumerate(raws or []):

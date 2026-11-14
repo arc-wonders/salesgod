@@ -84,8 +84,10 @@ class Economics(BaseModel):
 class Criteria(BaseModel):
     """What a version must satisfy. Every number is shown in the UI and saved with the version."""
     model_config = ConfigDict(extra="forbid")
-    min_topics: int = Field(15, ge=1)                 # top-level topics
-    max_topics: int = Field(30, ge=1)
+    min_topics: int = Field(5, ge=1)                  # top-level topics
+    max_topics: int = Field(20, ge=1)
+    min_total_topics: int = Field(15, ge=1)           # all topics, subtopics included
+    max_total_topics: int = Field(40, ge=1)
     min_entries: int = Field(150, ge=1)               # Q&A entries
     min_offerings: int = Field(5, ge=0)
     max_offerings: int = Field(10, ge=0)
@@ -100,7 +102,7 @@ class Criteria(BaseModel):
 
     @model_validator(mode="after")
     def _ranges(self):
-        if self.min_topics > self.max_topics or self.min_offerings > self.max_offerings or self.min_situations > self.max_situations:
+        if self.min_topics > self.max_topics or self.min_total_topics > self.max_total_topics or self.min_offerings > self.max_offerings or self.min_situations > self.max_situations:
             raise ValueError("a minimum is above its maximum")
         return self
 
@@ -191,7 +193,7 @@ def resolve(spec: Spec) -> Effective:
     if real:
         notes.append("real-brand rule: only public-knowledge facts, provenance 'public', no synthetic detail; every claim is marked for review")
         # public facts are limited: asking for 150 Q&A would force invention, so the quantity targets relax (and say so)
-        crit = crit.model_copy(update={"min_topics": min(crit.min_topics, 5), "min_entries": min(crit.min_entries, 30),
+        crit = crit.model_copy(update={"min_topics": min(crit.min_topics, 5), "min_total_topics": min(crit.min_total_topics, 5), "min_entries": min(crit.min_entries, 30),
                                        "min_offerings": 0, "min_situations": min(crit.min_situations, 10)})
         notes.append("quantity criteria relaxed for a real brand: topics >= 5, Q&A >= 30, offerings >= 0, situations >= 10")
     return Effective(product_id=spec.pid, real_brand=real, brand_match=match, allow_synthetic=not real,

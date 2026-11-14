@@ -30,7 +30,7 @@ Quantity checks only warn; the others block Publish. Defaults:
 
 | check | rule | blocks Publish |
 |---|---|---|
-| topics | 15-30 top-level topics (subtopics unlimited) | no |
+| topics | 5-20 top-level topics and 15-40 topics in all (subtopics included) | no |
 | entries | at least 150 Q&A entries | no |
 | offerings | 5-10 | no |
 | situations | 14-20 top-level playbook situations | no |
@@ -57,7 +57,7 @@ hit a number. The effective criteria are saved with the version. A real-brand pr
 2. **info_tree**: `kb_plan` (topics, interest tags, offerings), then `kb_entries` per group of topics (concurrent, merged in a fixed order). Provenance is forced from the spec, never trusted from the model; price below floor is raised to the floor; prices only as slots.
 3. **decision_tree**: `playbook` (situations, with labels filtered to the ones the picker knows) and `ladder` (discovery rungs + offering fit rules). Interest clusters are derived deterministically (connected components of the tags' `related` graph).
 4. **negotiation**: only with a floor (explicit, or cost + margin) and not for a real brand. Price steps below the floor or at/above the price are dropped; perks come from the operator's allowed list when given. With no floor nothing is suggested: the generator never invents a floor.
-5. **validate**: deterministic fixes (trim extras, drop empty subtopics, unused tags, banned FAQs / pitch lines), then up to `max_repair_rounds` (3) repair rounds: the failing checks' error text goes back to the model for only the failing items (`kb_fix`, more `kb_entries`, `playbook`, `ladder`, ...). Entries still non-compliant after the rounds are removed, never shipped.
+5. **validate**: deterministic fixes (trim extras, drop empty subtopics, unused tags, banned FAQs / pitch lines), then up to `max_repair_rounds` (3) repair rounds. Each failing location goes to a targeted regeneration of just that item, with the problem named (`problems` in the payload): entry -> `kb_fix`; topic / offering -> `kb_plan` `fix_text`; playbook node (any depth) -> `playbook` `fix_nodes`; ladder rung -> `ladder` `fix_text`; profile field / FAQ -> `profile`. Shortfalls: too few entries / offerings / situations are topped up; too few topics in all adds **subtopics** under the existing top-level topics (`kb_plan` `subtopics`) plus entries for them, never new unrelated top-level topics. A round that leaves the failures exactly as they were stops the loop (no identical rounds). **Last resort:** an optional item (entry, situation, ladder rung, FAQ) that still fails a blocking check after the rounds is removed and listed in `report.dropped` and the repair history (`round: "final"`), so one bad item never blocks a publish; if more than ~10% of entries (20% of situations) fail, that is a systemic problem and stays blocking. Entries that stay banned are removed, never shipped.
 6. **save**: `data/voice/productgen/<tenant>/<product_id>/v<N>.json` (spec, criteria, bundle, report, repair history) + `v<N>.diff.json`. A version with a failed blocking check is `needs_review` and cannot be published.
 
 ## Publish
@@ -108,3 +108,11 @@ cd /opt/salesgod/app && set -a && . /opt/salesgod/.env && set +a
 python -m scripts.productgen.run --name "ZenBrew Coffee Subscription" --list 1200 --offer 999 --unit "per month" --floor 600
 # review in the page: https://<voice host>/productgen?product=default/zenbrew-coffee-subscription ; add --publish to write it live
 ```
+
+## Repairing an existing version
+`--repair-version N` runs only the validate-and-repair stage on saved version N (no regeneration) and saves N+1. On the server:
+```
+cd /opt/salesgod/app && set -a && . /opt/salesgod/.env && set +a
+python -m scripts.productgen.run --repair-version 1 --product-id zenbrew-coffee-subscription --tenant default   # add --publish to write it live when publishable
+```
+A version saved with the old topic default (15-30 top-level) is re-checked with the new 5-20 / 15-40 criteria.
