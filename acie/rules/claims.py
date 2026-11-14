@@ -25,6 +25,12 @@ _CANCEL = re.compile(r"cancel (any ?time|whenever|kabhi bhi)|(कभी भी|k
 _LIMITED = re.compile(r"limited[- ](time|period|offer)|सीमित (समय|अवधि)|कुछ ही दिन|only for a few days|ऑफर (खत्म|ख़त्म) हो", _I)
 
 
+_MEMORY = re.compile(r"(we|हमारे पास|hamare paas|humare paas).{0,40}(your (details|record|information|data)|आपकी (डिटेल|जानकारी|details)|aapki (details|jaankari))|"
+                     r"(in|हमारे) (our|system|सिस्टम)|(previous|earlier|पिछली|pehle ki|last) (inquiry|enquiry|call|query|बातचीत|पूछताछ)|"
+                     r"(you|आपने) (called|inquired|enquired|asked|filled|visited).{0,20}(before|earlier|last time|पहले|pichli)|"
+                     r"your (previous|earlier|last) (visit|inquiry|enquiry|call|booking|membership)|आपकी (पिछली|पहले की) (विज़िट|पूछताछ|कॉल|बुकिंग)|hamare system mein", _I)
+
+
 class ClaimsPack:
     name = "claims"
 
@@ -37,6 +43,8 @@ class ClaimsPack:
         if _CANCEL.search(sentence) and not re.search(r"cancel", plan.context or "", _I) and not any(
                 re.search(r"cancel", f.value or "", _I) for f in plan.facts.values()):
             return "cancellation claim that is not in the product facts"
+        if _MEMORY.search(sentence):
+            return "invented memory of the customer (no CRM, previous inquiry or saved details exist; never claim them)"
         if _LIMITED.search(sentence):
             return "limited-time claim without an end date in the facts"
         return None

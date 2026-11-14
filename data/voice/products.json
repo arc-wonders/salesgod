@@ -743,6 +743,60 @@
      "hinglish": "Agar aapke zariye koi dost judta hai, to aap dono ko ek extra free personal trainer session milta hai."
     }
    }
+  },
+  "economics": {
+   "currency": "₹",
+   "unit": "3 months",
+   "list_price": 2999,
+   "cost": 2000,
+   "min_margin_pct": 20,
+   "price_terms": {
+    "en": "{price} for 3 months if you join this week, then ₹6,000 for 3 months",
+    "hi": "इस हफ़्ते join करने पर 3 महीने के {price}, उसके बाद 3 महीने के ₹6,000",
+    "hinglish": "is hafte join karne par 3 mahine ke {price}, uske baad 3 mahine ke ₹6,000"
+   },
+   "ladder": [
+    {
+     "kind": "perk",
+     "id": "extra_week",
+     "text": {
+      "en": "I'll add one extra week of membership free.",
+      "hi": "मैं एक हफ़्ते की मेंबरशिप फ्री जोड़ देता हूँ।",
+      "hinglish": "Main ek hafte ki membership free jod deta hoon."
+     },
+     "short": {
+      "en": "plus one extra week free",
+      "hi": "और एक हफ़्ता फ्री",
+      "hinglish": "aur ek hafta free"
+     }
+    },
+    {
+     "kind": "perk",
+     "id": "pt_sessions",
+     "text": {
+      "en": "I'll add two extra free personal trainer sessions.",
+      "hi": "मैं दो एक्स्ट्रा फ्री पर्सनल ट्रेनर सेशन जोड़ देता हूँ।",
+      "hinglish": "Main do extra free personal trainer session jod deta hoon."
+     },
+     "short": {
+      "en": "plus two extra free trainer sessions",
+      "hi": "और दो एक्स्ट्रा फ्री ट्रेनर सेशन",
+      "hinglish": "aur do extra free trainer session"
+     }
+    },
+    {
+     "kind": "price",
+     "price": 2800
+    },
+    {
+     "kind": "price",
+     "price": 2700
+    },
+    {
+     "kind": "price",
+     "price": 2650
+    }
+   ]
   }
  }
 }

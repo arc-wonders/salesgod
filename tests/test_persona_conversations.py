@@ -19,6 +19,8 @@ from acie.validator import StreamingValidator
 
 PRODS = {k: Product.model_validate(v) for k, v in json.load(open("data/voice/products.json")).items()}
 GYM, CLAUDE = PRODS["fitzone-gym"], PRODS["claude-pro"]
+from acie.decision.domains.product_sales import Economics  # noqa: E402
+GYM_LEVERS = GYM.model_copy(update={"economics": Economics()})  # the lever flow (no profit ladder configured): floor once, levers, warm accept
 LET_GO = re.compile(r"let you go|जाने दूँ|jaane doon|मैं सुन रहा|main sun raha|aur kya jaanna|और क्या जानना|और कुछ पूछना हो", re.I)
 
 
@@ -302,14 +304,14 @@ def test_negotiation_types_are_detected_with_fixed_patterns():
         assert negotiation.detect(line) == kind, line
 
 
-def _neg(lines, prod=GYM, psyche=False):
+def _neg(lines, prod=GYM_LEVERS, psyche=False):
     out, _, sess = talk(["haan bolo", "kitne ka hai"] + lines, prod, psyche)
     return out[2:], sess
 
 
 @BOTH
 def test_haggle_floor_once_then_levers_in_fixed_order_then_warm_accept(psyche):
-    out, sess = _neg(["kam karo na", "phir bhi kam karo", "bahut mehenga hai", "nahi yaar, abhi bhi zyada hai", "still too much"], GYM, psyche)
+    out, sess = _neg(["kam karo na", "phir bhi kam karo", "bahut mehenga hai", "nahi yaar, abhi bhi zyada hai", "still too much"], GYM_LEVERS, psyche)
     intents = [i for i, _, _ in out]
     assert intents[0] == "price_floor" and "₹2,999" in out[0][1] and out[0][1].count("kam nahi kar sakta") == 1
     levers = json.loads(sess.dialog["_neg"])["levers"]
@@ -335,7 +337,7 @@ def test_no_levers_configured_means_floor_then_warm_accept_and_nothing_invented(
 
 @pytest.mark.parametrize("line,lang_marker", [("1000 mein do", "nahi kar sakta"), ("500 कम करो", "कम नहीं कर सकता"), ("give it for ₹1000", "can't go lower")])
 def test_counter_offer_below_the_floor_is_answered_kindly_in_each_language(line, lang_marker):
-    out, _ = _neg([line], GYM)
+    out, _ = _neg([line], GYM_LEVERS)
     if lang_marker == "can't go lower":
         out, _, _ = talk(["yes tell me", "how much is it", line], PRODS["claude-pro"].model_copy(update={}))
         out = out[2:]
@@ -350,15 +352,15 @@ def test_floor_text_exists_in_all_three_languages():
 
 
 def test_competitor_is_compared_honestly_never_disparaged():
-    r = negotiation.step(GYM, "Cult mein 1999 mein milta hai, sasta hai", negotiation.NegState(), "", None)
+    r = negotiation.step(GYM_LEVERS, "Cult mein 1999 mein milta hai, sasta hai", negotiation.NegState(), "", None)
     assert r.intent == "price_floor" and "can't speak for their plan" in r.text["en"] and "worse" not in r.text["en"].lower()
     assert r.state.reason == "comparing"
 
 
 def test_budget_trouble_without_hardship_is_not_a_hard_sell_and_hardship_pauses_everything():
-    r = negotiation.step(GYM, "budget tight hai", negotiation.NegState(), "", None)
-    assert "budget" in r.text["en"].lower() and r.state.reason == "budget"
-    out, _, sess = talk(["haan bolo", "kitne ka hai", "mere paas paise nahi hai, job chali gayi"], GYM)
+    r = negotiation.step(GYM_LEVERS, "budget tight hai", negotiation.NegState(), "", None)
+    assert r.state.reason == "budget"
+    out, _, sess = talk(["haan bolo", "kitne ka hai", "mere paas paise nahi hai, job chali gayi"], GYM_LEVERS)
     assert sess.dialog.get("sad_hold") == "1" and out[-1][0] == "personal" and "_neg" not in sess.dialog
 
 
@@ -380,8 +382,8 @@ def test_free_trial_uses_the_trial_pass_lever_or_the_free_plan_never_an_invented
 
 
 def test_negotiation_is_deterministic_and_state_is_in_the_ledger():
-    a = _neg(["kam karo na", "phir bhi kam karo", "ab bhi mehenga hai"], GYM)
-    b = _neg(["kam karo na", "phir bhi kam karo", "ab bhi mehenga hai"], GYM)
+    a = _neg(["kam karo na", "phir bhi kam karo", "ab bhi mehenga hai"], GYM_LEVERS)
+    b = _neg(["kam karo na", "phir bhi kam karo", "ab bhi mehenga hai"], GYM_LEVERS)
     assert [t for _, t, _ in a[0]] == [t for _, t, _ in b[0]] and a[1].dialog["_neg"] == b[1].dialog["_neg"]
     st = negotiation.NegState.load(a[1].dialog)
     assert st.floor >= 1 and st.rounds == 3 and st.levers
@@ -441,3 +443,79 @@ def test_grandson_can_pay_is_answered_from_common_sense_not_the_stock_line():
     for psyche in (False, True):
         out, _, _ = talk(["haan", "मेरा पोता पैसे दे सकता है क्या?"], GYM, psyche)
         assert "कोई भी" in out[-1][1] or "koi bhi" in out[-1][1]
+
+
+# ---------------------------------------------------------------- close in profit (owner update 2)
+def test_economics_floor_and_ladder_live_in_the_gym_config_and_stay_above_the_floor():
+    eco = GYM.economics
+    assert eco.list_price == 2999 and eco.profit_floor == 2400.0
+    prices = [s.price for s in eco.ladder if s.kind == "price"]
+    assert prices == sorted(prices, reverse=True) and min(prices) >= eco.profit_floor
+    assert [s.kind for s in eco.ladder][:2] == ["perk", "perk"]          # value before cash
+    assert not CLAUDE.economics.ladder and CLAUDE.economics.list_price == 0  # no concessions for another company's price
+
+
+def test_haggle_walks_the_ladder_in_order_and_a_yes_locks_the_price_above_the_floor():
+    out, _, sess = talk(["haan bolo", "kitne ka hai", "thoda kam karo", "kam karo na", "aur kam", "ab bhi mehenga hai"], GYM)
+    texts = [t for _, t, _ in out[2:]]
+    assert "₹2,999" in texts[0] and "₹2,800" not in texts[0]          # first push: value, anchor at list
+    assert "hafte ki membership" in texts[1] and "personal trainer" in texts[2] and "₹2,800" in texts[3]
+    assert len(set(texts)) == len(texts) and all("₹2,000" not in t for t in texts)
+    out, _, sess = talk(["haan bolo", "kitne ka hai", "thoda kam karo", "kam karo na", "aur kam", "ab bhi mehenga hai", "haan theek hai, kar do"], GYM)
+    assert out[-1][0] == "confirm_close" and "₹2,800" in out[-1][1]
+    assert float(sess.dialog["closed_price"]) >= float(sess.dialog["profit_floor"]) == 2400.0
+
+
+@pytest.mark.parametrize("line", ["2500 mein de do", "₹2,500 pe done?", "2500 में दे दो"])
+def test_counter_at_or_above_the_floor_is_accepted_at_once(line):
+    out, _, sess = talk(["haan bolo", "kitne ka hai", line, "haan"], GYM)
+    assert "2,500" in out[2][1] and out[3][0] == "confirm_close" and "₹2,500" in out[3][1]
+    assert float(sess.dialog["closed_price"]) == 2500.0 and float(sess.dialog["margin_pct"]) == 20.0
+
+
+def test_counter_below_the_floor_gets_a_perk_not_a_price_below_the_floor():
+    out, _, sess = talk(["haan bolo", "kitne ka hai", "1000 mein do"], GYM)
+    assert "jod deta" in out[2][1] and "₹1,000" not in out[2][1] and "₹2,999" in out[2][1]
+    from acie.decision import negotiation
+    st = negotiation.NegState()
+    prices = []
+    for _ in range(8):
+        r = negotiation.step(GYM, "1000 mein do", st, "", None)
+        st = r.state
+        prices += [r.offer["price"]] if r.offer else []
+    assert min(prices) >= GYM.economics.profit_floor
+
+
+def test_firm_no_after_the_floor_is_a_warm_close_and_no_more_asks():
+    out, _, _ = talk(["haan bolo", "kitne ka hai", "kam karo", "kam karo", "kam karo", "kam karo", "kam karo", "kam karo", "kam karo", "nahi chahiye, bas"], GYM)
+    assert out[-1][2] and "?" not in out[-1][1]
+
+
+def test_ladder_replies_in_hindi_and_english_and_deterministic():
+    from acie.decision import negotiation
+    st = negotiation.NegState()
+    a = [negotiation.step(GYM, "कम करो", st, "", None)]
+    r1 = negotiation.step(GYM, "कम करो", negotiation.NegState(), "", None)
+    r2 = negotiation.step(GYM, "कम करो", negotiation.NegState(), "", None)
+    assert r1.text == r2.text and "₹2,999" in r1.text["hi"] and "₹2,999" in r1.text["en"]
+    r = negotiation.step(GYM, "2600 mein do", negotiation.NegState(), "", None)
+    assert "₹2,600" in r.text["en"] and "₹2,600" in r.text["hi"] and "₹2,600" in r.text["hinglish"]
+
+
+def test_sale_credit_scales_with_margin_and_is_zero_in_hardship_or_below_floor():
+    from acie.feedback import FeedbackEngine
+    from acie.schemas import SessionState
+    fe = FeedbackEngine()
+    def sess(price, **extra):
+        s = SessionState(session_id="s", customer_id="c")
+        s.context.promised.append("payment_link")
+        s.dialog.update(closed_price=str(price), list_price="2999", profit_floor="2400", **extra)
+        return s
+    assert fe.sale_credit(sess(2999)) == 1.0 and fe.sale_credit(sess(2400)) == 0.3
+    assert 0.3 < fe.sale_credit(sess(2700)) < 1.0
+    assert fe.sale_credit(sess(2300)) == 0.0 and fe.sale_credit(sess(2999, sad_hold="1")) == 0.0 and fe.sale_credit(sess(2999, safety_flag="1")) == 0.0
+
+
+def test_no_invented_memory_of_the_customer():
+    assert _packs(["claims"], "We have your details in our system from your previous inquiry.", lang="en")
+    assert _packs(["claims"], "हमारे पास आपकी जानकारी पहले से है।", lang="hi")

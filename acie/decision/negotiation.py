@@ -41,7 +41,7 @@ LEVER_ORDER = ("trial_pass", "cheaper_plan", "annual_saving", "referral")
 _GROUP = re.compile(r"(student|स्टूडेंट|छात्र|friend|दोस्त|group|ग्रुप|bulk|family|फैमिली|senior|सीनियर|couple|corporate|referral|refer).{0,40}(discount|डिस्काउंट|छूट|offer|ऑफर|off\b|cheaper|सस्ता|sasta|कम|kam|milega|मिलेगा)|"
                     r"(discount|डिस्काउंट|छूट|offer|ऑफर|cheaper|सस्ता|sasta|कम|kam).{0,40}(student|स्टूडेंट|छात्र|friend|दोस्त|group|ग्रुप|bulk|family|फैमिली|senior|सीनियर|couple|corporate)", _I)
 _TRIAL = re.compile(r"free trial|trial|ट्रायल|demo|try (it )?(first|for free|free)|pehle try|पहले (try|ट्राई)|free (mein|me|में) (try|use)|free pass|guest pass", _I)
-_COUNTER = re.compile(r"\d[\d,]*\s*(rupe\w*|rs\.?|₹|dollars?|\$|bucks)?\s*(kam|कम|off|less|discount)\b|"
+_COUNTER = re.compile(r"(?:₹|rs\.?|rupees?)\s*\d[\d,]{2,}|\b\d[\d,]{2,}\s*(?:pe|par|tak|mein|me|में)\s*(?:ho|chalega|done|final|kar|de)|\b\d[\d,]{2,}\s*(?:rupe\w*|rs)\b|\d[\d,]*\s*(rupe\w*|rs\.?|₹|dollars?|\$|bucks)?\s*(kam|कम|off|less|discount)\b|"
                       r"(₹|rs\.?|\$)\s*\d[\d,]*\s*(mein|me|में|for|tak|तक)?\s*(do|de|dedo|दो|दे|chahiye|चाहिए)?|\d[\d,]*\s*(rupe\w*|rs|₹|dollars?)?\s*(mein|me|में|for|tak|तक)\s*(do|de|dedo|दो|दे|chahiye|चाहिए|milega|मिलेगा|ho jayega|हो जाएगा)|"
                       r"(give|do|de|दो|दे)\s*(it|me)?\s*(for|at|in)?\s*(₹|rs\.?|\$)?\s*\d[\d,]*", _I)
 _COMP_NAME = re.compile(r"cult|gold.?s|anytime fitness|competitor|chatgpt|gpt|gemini|copilot|other (gym|app|plan)|dusr[ae] (gym|app|jagah)|doosre|दूसरे|कहीं और|kahin aur|elsewhere|वहाँ|wahan", _I)
@@ -49,7 +49,7 @@ _COMP_PRICE = re.compile(r"cheap|sasta|सस्ता|सस्ती|price|dol
 _BUDGET = re.compile(r"budget|afford|bajet|बजट|tight|tangi|तंगी|paise (kam|nahi|nhi)|पैसे (कम|नहीं)|expensive for me|mere liye (mehenga|महंगा)|मेरे लिए (महंगा|ज़्यादा|ज्यादा)", _I)
 _VALUE = re.compile(r"worth|value for money|paisa vasool|पैसा वसूल|itna (paisa|mehenga|महंगा)|इतना (पैसा|महंगा)|mehenga|mehnga|महंगा|expensive|too much|"
                     r"zyada hai|jyada hai|ज़्यादा है|ज्यादा है|costly|pricey|over ?priced", _I)
-_HAGGLE = re.compile(honest.NEGOTIATE.pattern + "|" + NEGOTIATE_MORE + r"|bargain|negotiat|best price|final price|last price|aakhri (rate|price)|आखिरी (रेट|प्राइस)|thoda (aur )?(kam|sasta)", _I)
+_HAGGLE = re.compile(honest.NEGOTIATE.pattern + "|" + NEGOTIATE_MORE + r"|still (too )?(high|much|expensive)|(ab|abhi|phir|fir) bhi (mehenga|zyada|jyada|kam)|aur kam|और कम|bargain|negotiat|best price|final price|last price|aakhri (rate|price)|आखिरी (रेट|प्राइस)|thoda (aur )?(kam|sasta)", _I)
 _NUM = re.compile(r"\d[\d,]*")
 
 
@@ -81,6 +81,10 @@ class NegState:
     rounds: int = 0
     closed: bool = False                              # accepted warmly: never push again
     last: str = ""
+    pushes: int = 0                                   # price pushes seen (the first one only reframes value: anchor at list)
+    ladder_i: int = 0                                 # next economics.ladder step to offer
+    price: float = 0.0                                # the price currently on the table (0 = list)
+    final_said: bool = False                          # the final price was stated (once)
 
     @classmethod
     def load(cls, dialog: dict) -> "NegState":
@@ -100,6 +104,7 @@ class NegReply:
     state: NegState
     end_call: bool = False
     note: str = ""
+    offer: dict | None = None   # {"price": n, "perk": id}: a closing ask is pending on this
 
 
 def _t(en: str, hi: str, hl: str) -> dict[str, str]:
@@ -178,6 +183,81 @@ def _join(*parts: str) -> str:
     return " ".join(x for x in parts if x)
 
 
+def _fmt(p, n: float) -> str:
+    cur = getattr(p.economics, "currency", "₹") or "₹"
+    return f"{cur}{int(round(n)):,}"
+
+
+def _ladder_reply(p, kind: str, text: str, st: NegState, need_known: str) -> NegReply | None:
+    """Close-in-profit bargaining (economics in the product config): anchor at list, reframe value on the first push, then concede
+    one ladder step per push (value perks before cash, shrinking price steps), accept a counter at or above the profit floor at once,
+    meet a counter below the floor with a perk or the next step, state the final price once, then walk away warmly. Every price
+    on the table is at or above the profit floor; every concession is followed by one closing ask and tied to a commitment."""
+    eco = p.economics
+    floor = eco.profit_floor
+    st = NegState(**asdict(st))
+    cur = st.price or eco.list_price
+    steps = [x for x in eco.ladder if not (x.kind == "price" and (x.price < floor or x.price >= cur))]
+    ask = lambda price: _t(f"Shall I lock {_fmt(p, price)} for you and send the link?", f"क्या मैं {_fmt(p, price)} पक्का कर दूँ और लिंक भेज दूँ?",
+                           f"Kya main {_fmt(p, price)} pakka kar doon aur link bhej doon?")
+    st.pushes += 1
+    parts = {l: ACK.get(kind, ACK["haggle"])[l] for l in LANGS}
+    def say(*banks):
+        return {l: _join(*(b[l] for b in banks)) for l in LANGS}
+    # a counter-offer at or above the floor: accepted at once
+    target = None
+    if kind == "counter_offer":
+        n = counter_number(text)
+        if n is not None:
+            target = float(max(0, cur - n)) if re.search(r"kam|कम|off|less", text, _I) and n < cur else float(n)
+    if target is not None and target >= floor:
+        price = min(target, cur)
+        st.price, st.final_said = price, True
+        return NegReply("negotiation", say(_t(f"Done, {_fmt(p, price)} it is, that works for me.", f"ठीक है, {_fmt(p, price)} पक्का, ये मेरे लिए चलेगा।",
+                                              f"Done, {_fmt(p, price)} pakka, ye mere liye chalega."), ask(price)), st, offer={"price": price}, note="Accepted at once; one closing ask.")
+    if st.closed:
+        return NegReply("negotiation", CLOSE_WARM[1], st)
+    if st.pushes == 1 and target is None:  # anchor at list: value first, no concession yet
+        b = {l: _benefit(p, l) for l in LANGS}
+        bank = lang_bank_value(b, need_known)
+        return NegReply("negotiation", say(ACK.get(kind, ACK["haggle"]), bank, _t(f"Would {_fmt(p, cur)} work for you if I add that, or what number do you have in mind?",
+                        f"अगर मैं ये जोड़ दूँ तो क्या {_fmt(p, cur)} ठीक रहेगा, या आपके मन में कितना है?", f"Agar main ye jod doon to kya {_fmt(p, cur)} theek rahega, ya aapke mann mein kitna hai?")), st,
+                        note="Anchor at list; let them name a number; no concession yet.")
+    if st.ladder_i < len(steps):
+        stp = steps[st.ladder_i]
+        st.ladder_i += 1
+        if stp.kind == "perk":
+            line = {l: stp.text.get(l, "") for l in LANGS}
+            if all(line.values()):
+                return NegReply("negotiation", say(_t("Let me add something instead of cutting the price.", "कीमत घटाने की जगह मैं कुछ जोड़ देता हूँ।", "Keemat ghatane ki jagah main kuch jod deta hoon."),
+                                                  line, ask(cur)), st, offer={"price": cur, "perk": stp.id}, note="A perk instead of a price cut, then a closing ask.")
+        else:
+            st.price = stp.price
+            last = st.ladder_i >= len(steps)
+            lines = _t(f"For you I can do {_fmt(p, stp.price)}, if we finalise it now.", f"आपके लिए मैं {_fmt(p, stp.price)} कर सकता हूँ, अगर अभी तय हो जाए।",
+                       f"Aapke liye main {_fmt(p, stp.price)} kar sakta hoon, agar abhi tay ho jaye.")
+            if last:
+                st.final_said = True
+                lines = _t(f"This is my final price, {_fmt(p, stp.price)}, I can't go below it; but it is a fair one and I'd be glad to have you.",
+                           f"ये मेरी आख़िरी कीमत है, {_fmt(p, stp.price)}, इससे नीचे नहीं जा सकता; पर ये ठीक कीमत है और आपका स्वागत है।",
+                           f"Ye meri aakhri keemat hai, {_fmt(p, stp.price)}, isse neeche nahi ja sakta; par ye theek keemat hai aur aapka swagat hai.")
+            return NegReply("price_floor" if last else "negotiation", say(lines, ask(stp.price)), st, offer={"price": stp.price}, note="One concession, one closing ask.")
+    if not st.final_said:
+        st.final_said = True
+        return NegReply("price_floor", say(_t(f"{_fmt(p, cur)} is already the lowest I can go.", f"{_fmt(p, cur)} मेरी सबसे कम कीमत है।", f"{_fmt(p, cur)} meri sabse kam keemat hai."), ask(cur)),
+                        st, offer={"price": cur}, note="Floor stated once, warmly.")
+    st.closed = True
+    return NegReply("negotiation", CLOSE_WARM[0], st, note="Final no: warm goodbye, callback offered.")
+
+
+def lang_bank_value(b: dict, need_known: str) -> dict:
+    if not all(b.values()):
+        return {l: "" for l in LANGS}
+    clean = lambda v: str(v).replace("{", "(").replace("}", ")")
+    bank = VALUE
+    return {l: bank[l].format(b1=clean(b[l])) for l in LANGS}
+
+
 def step(p, text: str, st: NegState, need_known: str = "", faq_line=None) -> NegReply | None:
     """One negotiation turn. Returns the reply for all three languages and the new state, or None when this is not price talk.
     `faq_line(lang)` gives the operator's approved FAQ answer for the question, when there is one."""
@@ -186,6 +266,9 @@ def step(p, text: str, st: NegState, need_known: str = "", faq_line=None) -> Neg
         return None
     st = NegState(**asdict(st))
     st.rounds += 1
+    if getattr(p, "economics", None) is not None and p.economics.list_price > 0 and p.economics.ladder \
+            and kind in ("haggle", "value_doubt", "budget", "counter_offer", "competitor"):
+        return _ladder_reply(p, kind, text, st, need_known)
     if st.closed and kind in ("competitor", "discount_group", "free_trial"):
         return None  # a question again after walking away: the conversation answers it (never pushed)
     if st.closed:  # they already walked away once: never push, just stay kind

@@ -927,6 +927,14 @@ class ProductSalesDomain:
         if (rep_ := self._repeat_request_step(text, d, ctx, lang)) is not None:
             return rep_
 
+        # ---------------- "yes" to a negotiated price: lock it in the terms, then the usual confirmation (terms + link) with the agreed price
+        if d.get("pending") == "neg_close" and not _is_question(text) and (self._yes(text, intent, d) or _clean_yes(text) or intent == "affirm") \
+                and not _FIRM_NO.search(text):
+            self._apply_neg_offer(d)
+            d["pending"] = "confirm"
+            d["requested_link"] = "0"
+            return self._confirm_plan(lang, d)
+
         # ---------------- a counter-offer ("2,500 mein de do") is price talk, never a yes to the link: the negotiation flow answers it
         if negotiation.detect(text) == "counter_offer" and (neg0 := self._negotiate_step(text, d, ctx, lang)) is not None:
             return neg0
@@ -1474,10 +1482,37 @@ class ProductSalesDomain:
         if r is None:
             return None
         r.state.save(d)
-        d["pending"] = "close"
+        d["pending"] = "neg_close" if r.offer else "close"
+        if r.offer:
+            d["neg_offer"] = json.dumps(r.offer)
         return TurnPlan(intent=r.intent, llm_allowed=False, decision="negotiation: " + r.state.last, end_call=False, fallback=r.text,
                         facts={"offer": Fact(value=self._terms(lang), description="the offer as one phrase", must_mention=False)},
                         objective=r.note or "Answer the price talk honestly; no pressure, no invented discount")
+
+    def _apply_neg_offer(self, d: dict) -> None:
+        """The caller said yes to a concession: the agreed price goes into the terms, and into the ledger (closed price vs the profit floor)."""
+        try:
+            o = json.loads(d.get("neg_offer") or "{}")
+        except ValueError:
+            return
+        eco = self.p.economics
+        price = float(o.get("price") or eco.list_price or 0)
+        if eco.list_price and price < eco.profit_floor:
+            price = eco.profit_floor  # never below the floor, whatever was said
+        upd = {}
+        if eco.price_terms and price and price != eco.list_price:
+            upd["terms"] = {l: eco.price_terms[l].format(price=f"{eco.currency}{int(round(price)):,}") for l in eco.price_terms}
+        perk = next((x for x in eco.ladder if x.id == o.get("perk") and x.kind == "perk"), None)
+        if perk is not None:
+            base = upd.get("terms") or {l: honest.terms_text(self.p, l) for l in ("en", "hi", "hinglish")}
+            upd["terms"] = {l: base[l] + ", " + (perk.short.get(l) or perk.text.get(l, "")) for l in base}
+        if upd:
+            self.p = self.p.model_copy(update=upd)
+        if price:
+            d["closed_price"] = f"{price:.2f}"
+            d["list_price"] = f"{eco.list_price:.2f}"
+            d["profit_floor"] = f"{eco.profit_floor:.2f}"
+            d["margin_pct"] = f"{(price - eco.cost) / price * 100:.1f}" if eco.cost and price else ""
 
     def _repeat_request_step(self, text: str, d: dict, ctx, lang: str) -> TurnPlan | None:
         """"फिर से बोलिए / धीरे बोलो / say that again": the AGENT says the last thing again, shorter and slower, in plain words
