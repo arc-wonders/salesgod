@@ -111,7 +111,7 @@ def test_import_preview_then_commit_with_bad_rows_dupes_dnc(tmp_path):
     rows = c.get("/api/customers?project=acme", headers=H).json()["customers"]
     by = {r["phone"]: r for r in rows}
     assert set(by) == {"+919876543210", "+919123456780", "+919000000001"}
-    assert by["+919876543210"]["tags"] == ["hot", "vip"] and by["+919876543210"]["custom"]["budget"] == "5000"
+    assert by["+919876543210"]["tags"] == ["hot", "vip"] and by["+919876543210"]["custom"]["budget"] == 5000.0
     assert by["+919000000001"]["stage"] == "do_not_call" and by["+919000000001"]["consent"]["dnc"]
     # importing again: everything is a duplicate (skip), the DNC one stays DNC; update mode never touches DNC
     again = c.post("/api/customers/import", json={"project": "acme", "csv": CSV, "commit": True}, headers=H).json()
@@ -179,12 +179,12 @@ def test_calltypes_builtins_custom_duplicate(tmp_path):
     c, _, _ = make(tmp_path)
     project(c)
     ids = {x["id"] for x in c.get("/api/calltypes?project=acme", headers=H).json()["calltypes"]}
-    assert {"sales_pitch", "lead_qualification", "follow_up", "payment_reminder", "feedback_survey", "appointment_booking", "custom"} <= ids
+    assert {"sales_pitch", "lead_qualification", "follow_up", "payment_reminder", "feedback_survey", "appointment_booking"} <= ids
     d = c.post("/api/calltypes/follow_up/duplicate?project=acme", json={"name": "Link not paid"}, headers=H).json()["calltype"]
-    assert d["id"] == "link-not-paid" and d["project_id"] == "acme" and d["builtin"] is False
+    assert d["id"] == "link_not_paid" and d["project_id"] == "acme" and d["builtin"] is False
     assert c.put("/api/calltypes/sales_pitch", json={"name": "x"}, headers=H).status_code == 400
-    r = c.put("/api/calltypes/link-not-paid?project=acme", json={"objective": "Ask about the link", "steps": [{"id": "s1", "text": {"en": "Did you get it?"}, "answer_type": "yes_no"}]}, headers=H)
+    r = c.put("/api/calltypes/link_not_paid?project=acme", json={"objective": "Ask about the link", "steps": [{"id": "s1", "text": "Did you get it?", "answer_type": "yes_no"}]}, headers=H)
     assert r.json()["calltype"]["steps"][0]["answer_type"] == "yes_no"
-    assert "link-not-paid" in {x["id"] for x in c.get("/api/calltypes?project=acme", headers=H).json()["calltypes"]}
-    assert "link-not-paid" not in {x["id"] for x in c.get("/api/calltypes?project=other", headers=H).json()["calltypes"]}
-    assert c.delete("/api/calltypes/link-not-paid", headers=H).status_code == 200
+    assert "link_not_paid" in {x["id"] for x in c.get("/api/calltypes?project=acme", headers=H).json()["calltypes"]}
+    assert "link_not_paid" not in {x["id"] for x in c.get("/api/calltypes?project=other", headers=H).json()["calltypes"]}
+    assert c.delete("/api/calltypes/link_not_paid", headers=H).status_code == 200

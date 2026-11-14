@@ -92,8 +92,16 @@ def _row_to_customer(row: dict, mapping: dict[str, str], project: Project, defau
     c.tags = sorted(set(_split_tags(g("tags")) + default_tags))
     for f in project.fields:
         v = g(f"custom.{f.key}")
-        if v:
-            c.custom[f.key] = v
+        if not v:
+            continue
+        if f.type == "number":  # same typing as a hand-edited customer (api._check_custom)
+            try:
+                v = float(v.replace(",", ""))
+            except ValueError:
+                continue
+        elif f.type == "bool":
+            v = v.lower() in ("1", "true", "yes", "y")
+        c.custom[f.key] = v
     return c, ""
 
 

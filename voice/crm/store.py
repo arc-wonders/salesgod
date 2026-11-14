@@ -159,7 +159,14 @@ class JsonStore:
             atomic_write(self.data / "campaigns.json", [x.model_dump() for x in self.campaigns() if x.id != cid])
 
     def calltypes(self, project_id: str | None = None) -> list[CallType]:  # custom ones only; built-ins come from models
-        cs = [CallType(**v) for v in read_json(self.data / "calltypes.json", [])]
+        raw = read_json(self.data / "calltypes.json", [])
+        raw = raw.get("calltypes", []) if isinstance(raw, dict) else raw
+        cs = []
+        for v in raw:
+            try:
+                cs.append(CallType(**v))
+            except (ValueError, TypeError):  # a bad entry never takes the page down (acie.calltypes.load_custom skips it the same way)
+                continue
         return [c for c in cs if project_id is None or c.project_id == project_id]
 
     def put_calltype(self, c: CallType) -> None:

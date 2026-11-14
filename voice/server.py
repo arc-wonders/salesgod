@@ -404,6 +404,8 @@ def build_app() -> tuple[FastAPI, App]:
                           customer_name=str(body.get("customer_name", ""))[:40],
                           customer_age=_age(body.get("customer_age")))
         call.customer_id = f"sim-{call.call_id}"
+        call.call_type = str(body.get("call_type") or "")[:40]  # the wizard's test call runs the chosen call type
+        call.project_id = str(body.get("project_id") or "")[:40]
         pipe, _ = state.make_pipeline(call)
         sid = call.call_id
         ti = TurnInput(session_id=sid, customer_id=call.customer_id, text="")
@@ -761,7 +763,8 @@ def build_app() -> tuple[FastAPI, App]:
                           customer_name=customer_name[:40], customer_id=to)
         call.crm = {"project_id": link["project_id"], "crm_customer_id": link["customer_id"], "campaign_id": link["campaign_id"],
                     "call_type": link["call_type"]}
-        call.call_type = link["call_type"]  # read by make_pipeline when the CALLTYPES lane is merged
+        call.call_type = link["call_type"]  # read by make_pipeline (acie.calltypes.factory.build_domain)
+        call.project_id = link["project_id"]  # the call-type registry looks up this project's own call types
         state.calls[call.call_id] = call
         try:
             await plivo.dial(call)

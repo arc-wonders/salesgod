@@ -10,8 +10,9 @@ const STAGES = ['new', 'contacted', 'interested', 'qualified', 'demo_booked', 'n
 const STAGE_LABEL = { new: 'New', contacted: 'Contacted', interested: 'Interested', qualified: 'Qualified', demo_booked: 'Demo booked', negotiating: 'Negotiating', won: 'Won', lost: 'Lost', do_not_call: 'Do not call' };
 const STAGE_TONE = { new: '', contacted: 'blue', interested: 'blue', qualified: 'green', demo_booked: 'green', negotiating: 'amber', won: 'green', lost: 'red', do_not_call: 'red' };
 const ACTIONS = ['send_link', 'book_callback', 'book_demo', 'transfer_human', 'opt_out', 'send_sms', 'take_payment_link'];
-const ANSWER_TYPES = ['text', 'yes_no', 'number', 'choice', 'date', 'none'];
-const BUILTIN_CT = [['sales_pitch', 'Sales pitch'], ['lead_qualification', 'Lead qualification'], ['follow_up', 'Follow-up'], ['payment_reminder', 'Payment reminder'], ['feedback_survey', 'Feedback survey'], ['appointment_booking', 'Appointment booking'], ['custom', 'Custom']];
+const ANSWER_TYPES = ['text', 'yes_no', 'choice', 'number', 'money', 'date_time'];
+const PACKS = [['steps', 'Follows my steps'], ['lead_qualification', 'Lead qualification'], ['follow_up', 'Follow-up (continues the last call)'], ['sales_pitch', 'Sales pitch']];
+const BUILTIN_CT = [['sales_pitch', 'Sales pitch'], ['lead_qualification', 'Lead qualification'], ['follow_up', 'Follow-up'], ['payment_reminder', 'Payment reminder'], ['feedback_survey', 'Feedback survey'], ['appointment_booking', 'Appointment booking']];
 
 Object.assign(ICONS, {
   home: 'M3 11l9-8 9 8M5 10v10h5v-6h4v6h5V10',
@@ -67,6 +68,8 @@ async function saveObj(base, id, obj) {
 }
 const proj = () => S.tenants.find((t) => t.id === S.tenant) || { id: S.tenant, name: '—', color: '#888' };
 const isDnc = (c) => !!(c && ((c.consent && c.consent.dnc) || c.dnc || c.stage === 'do_not_call'));
+/* Chrome lists Asia/Calcutta, not Asia/Kolkata: always offer the current value and India's name first, so the select never falls back to the first zone */
+const tzList = (cur) => [...new Set([cur || 'Asia/Kolkata', 'Asia/Kolkata', ...(typeof Intl.supportedValuesOf === 'function' ? Intl.supportedValuesOf('timeZone') : ['UTC'])])];
 const hh = (n) => String(n).padStart(2, '0') + ':00';
 const hoursOf = (p) => (p && Array.isArray(p.call_hours) && p.call_hours.length === 2 ? p.call_hours : [10, 20]);
 const hourSel = (v, label, lo, hi) => h('select', { 'aria-label': label }, Array.from({ length: hi - lo + 1 }, (_, i) => lo + i).map((n) => h('option', { value: n, selected: n === v }, hh(n))));
@@ -320,7 +323,7 @@ function pageProducts(el) {
 }
 
 /* ------------------------------------------------------------ Call types */
-const blankCT = () => ({ id: '', name: '', objective: '', opening: {}, steps: [], allowed_actions: [], success_outcomes: [], closing: {}, tone: '', max_call_seconds: 360, selling_allowed: false, negotiation_allowed: false, compliance_lines: [] });
+const blankCT = () => ({ id: '', name: '', objective: '', pack: 'steps', languages: ['en', 'hi', 'hinglish'], opening: {}, steps: [], allowed_actions: [], success_outcomes: [], closing: {}, closing_declined: {}, tone: '', max_call_s: 300, selling_allowed: false, negotiation_allowed: false, compliance_lines: [] });
 async function pageCallTypes(el, ctx) {
   if (ctx.id) return ctEditorPage(el, ctx);
   el.replaceChildren(h('div', { class: 'pad' }, h('div', { class: 'empty' }, 'Loading…')));
@@ -347,10 +350,12 @@ async function ctEditorPage(el, ctx) {
   const ro = !!base.builtin, d = { ...blankCT(), ...clone(base) };
   setCrumb(d.name || 'New call type');
   const dis = ro ? true : null, I = (v, a) => h('input', { value: v ?? '', disabled: dis, ...(a || {}) });
-  const f = { name: I(d.name), objective: h('textarea', { rows: 2, disabled: dis }, d.objective || ''), tone: I(d.tone), max: I(d.max_call_seconds ?? '', { type: 'number', min: 30, step: 30 }) };
-  const opening = langBlock(d.opening, 2), closing = langBlock(d.closing, 2);
+  const f = { name: I(d.name), objective: h('textarea', { rows: 2, disabled: dis }, d.objective || ''), tone: I(d.tone), max: I(d.max_call_s ?? '', { type: 'number', min: 30, max: 3600, step: 30 }), pack: h('select', { disabled: dis, 'aria-label': 'How the call runs' }, PACKS.map(([k, n]) => h('option', { value: k, selected: k === (d.pack || 'steps') }, n))) };
+  const langSet = new Set(d.languages && d.languages.length ? d.languages : ['en', 'hi', 'hinglish']);
+  const langChips = h('div', { class: 'chips', role: 'group', 'aria-label': 'Languages' }, LANGS.map(([k, n]) => h('label', { class: 'chip' }, h('input', { type: 'checkbox', checked: langSet.has(k), disabled: dis, style: 'width:auto;height:auto', onchange: (e) => { e.target.checked ? langSet.add(k) : langSet.delete(k); } }), n)));
+  const opening = langBlock(d.opening, 2), closing = langBlock(d.closing, 2), closingNo = langBlock(d.closing_declined, 2);
   const outcomes = h('textarea', { rows: 2, disabled: dis, 'aria-label': 'Success outcomes', placeholder: 'one per line, e.g. demo_booked' }, (d.success_outcomes || []).join('\n'));
-  const comp = h('textarea', { rows: 2, disabled: dis, placeholder: 'lines the agent must say or never say' }, (d.compliance_lines || []).join('\n'));
+  const comp = h('textarea', { rows: 2, disabled: dis, placeholder: 'lines the agent must say or never say' }, (d.compliance_lines || []).map((x) => (typeof x === 'string' ? x : x.en || x.hinglish || Object.values(x)[0] || '')).join('\n'));
   const sell = h('input', { type: 'checkbox', checked: !!d.selling_allowed, disabled: dis, style: 'width:auto;height:auto' }), neg = h('input', { type: 'checkbox', checked: !!d.negotiation_allowed, disabled: dis, style: 'width:auto;height:auto' });
   const actions = new Set(d.allowed_actions || []);
   const actBox = h('div', { class: 'chips' }, [...new Set([...ACTIONS, ...actions])].map((a) => { const cb = h('input', { type: 'checkbox', checked: actions.has(a), disabled: dis, style: 'width:auto;height:auto', onchange: (e) => { e.target.checked ? actions.add(a) : actions.delete(a); } }); return h('label', { class: 'chip' }, cb, a.replaceAll('_', ' ')); }));
@@ -359,8 +364,12 @@ async function ctEditorPage(el, ctx) {
   function drawSteps() {
     stepsBox.replaceChildren(...d.steps.map((s, i) => {
       const txt = langBlock(s.text, 2), id = I(s.id, { class: 'mono', placeholder: 'step_' + (i + 1), oninput: (e) => { s.id = e.target.value.trim(); } });
-      const at = h('select', { disabled: dis, onchange: (e) => { s.answer_type = e.target.value; } }, ANSWER_TYPES.map((t) => h('option', { value: t, selected: (s.answer_type || 'text') === t }, t.replace('_', '/'))));
+      const at = h('select', { disabled: dis, onchange: (e) => { s.answer_type = e.target.value; drawCh(); } }, ANSWER_TYPES.map((t) => h('option', { value: t, selected: (s.answer_type || 'text') === t }, t.replace('_', '/'))));
       const req = h('input', { type: 'checkbox', checked: !!s.required, disabled: dis, style: 'width:auto;height:auto', onchange: (e) => { s.required = e.target.checked; } });
+      const kw = I((s.keywords || []).join(', '), { placeholder: 'words that answer it, comma separated', 'aria-label': 'Answer keywords', oninput: (e) => { s.keywords = csv(e.target.value); } });
+      const chBox = h('div', { class: 'choices' });
+      const drawCh = () => { chBox.replaceChildren(...(s.answer_type === 'choice' ? [h('div', { class: 'hint' }, 'Choices: an id and the words that pick it'), ...(s.choices = s.choices || []).map((c, ci) => h('div', { class: 'frow' }, I(c.id, { class: 'mono', placeholder: 'id', 'aria-label': 'Choice id', oninput: (e) => { c.id = e.target.value.trim(); } }), I((c.keywords || []).join(', '), { placeholder: 'keywords', 'aria-label': 'Choice keywords', oninput: (e) => { c.keywords = csv(e.target.value); } }), ro ? null : h('button', { type: 'button', class: 'btn ghost sm danger', 'aria-label': 'Remove choice', onclick: () => { s.choices.splice(ci, 1); drawCh(); } }, ic('trash', 'sm')))), ro ? null : h('button', { type: 'button', class: 'btn sm', onclick: () => { (s.choices = s.choices || []).push({ id: '', keywords: [] }); drawCh(); } }, ic('plus', 'sm'), 'Add choice')] : [])); };
+      drawCh();
       const sync = () => { s.text = txt.box.querySelectorAll('textarea').length ? txt.get() : {}; };
       txt.box.addEventListener('input', sync);
       const ai = ro ? null : h('details', { class: 'stepai' }, h('summary', {}, ic('spark', 'sm'), ' Add this step with AI'), aiBox({ kind: 'step', title: 'Write this step', placeholder: 'e.g. ask whether they can decide alone or need a partner', context: () => ({ project: S.tenant, calltype: { name: d.name, objective: d.objective }, step: s, index: i }),
@@ -375,21 +384,21 @@ async function ctEditorPage(el, ctx) {
           ro ? null : [h('button', { type: 'button', class: 'btn ghost sm', title: 'Move up', 'aria-label': 'Move step up', disabled: i === 0, onclick: () => { [d.steps[i - 1], d.steps[i]] = [d.steps[i], d.steps[i - 1]]; drawSteps(); } }, ic('up', 'sm')),
             h('button', { type: 'button', class: 'btn ghost sm', title: 'Move down', 'aria-label': 'Move step down', disabled: i === d.steps.length - 1, onclick: () => { [d.steps[i + 1], d.steps[i]] = [d.steps[i], d.steps[i + 1]]; drawSteps(); } }, ic('down', 'sm')),
             h('button', { type: 'button', class: 'btn ghost sm danger', title: 'Remove step', 'aria-label': 'Remove step', onclick: () => { d.steps.splice(i, 1); drawSteps(); } }, ic('trash', 'sm'))]),
-        txt.box, ai);
+        txt.box, kw, chBox, ai);
       if (ro) card.querySelectorAll('textarea').forEach((t) => { t.disabled = true; });
       return card;
     }));
     if (!d.steps.length) stepsBox.append(h('div', { class: 'hint', style: 'padding:8px 0' }, 'No steps yet: the call follows the objective freely.'));
   }
   drawSteps();
-  const collect = () => ({ ...d, name: f.name.value.trim(), objective: f.objective.value.trim(), tone: f.tone.value.trim(), max_call_seconds: num(f.max.value) || undefined, opening: opening.get(), closing: closing.get(), success_outcomes: lines(outcomes.value), compliance_lines: lines(comp.value),
-    selling_allowed: sell.checked, negotiation_allowed: sell.checked && neg.checked, allowed_actions: [...actions], steps: d.steps.map((s, i) => ({ ...s, id: stepId(s, i), text: s.text || {}, answer_type: s.answer_type || 'text', required: !!s.required })), project_id: S.tenant });
+  const collect = () => ({ ...d, name: f.name.value.trim(), objective: f.objective.value.trim(), tone: f.tone.value.trim(), max_call_s: num(f.max.value) || undefined, pack: f.pack.value, languages: LANGS.map(([k]) => k).filter((k) => langSet.has(k)), opening: opening.get(), closing: closing.get(), closing_declined: closingNo.get(), success_outcomes: lines(outcomes.value), compliance_lines: lines(comp.value).map((x) => ({ en: x, hi: x, hinglish: x })),
+    selling_allowed: sell.checked, negotiation_allowed: sell.checked && neg.checked, allowed_actions: [...actions], steps: d.steps.map((s, i) => ({ ...s, id: stepId(s, i), text: s.text || {}, answer_type: s.answer_type || 'text', required: !!s.required, keywords: s.keywords || [], choices: s.answer_type === 'choice' ? (s.choices || []).filter((c) => c.id) : [] })), project_id: S.tenant });
   const apply = (p) => {
-    if ('name' in p) f.name.value = p.name; if ('objective' in p) f.objective.value = p.objective; if ('tone' in p) f.tone.value = p.tone; if ('max_call_seconds' in p) f.max.value = p.max_call_seconds;
-    if (p.opening) opening.set(p.opening); if (p.closing) closing.set(p.closing); if (p.success_outcomes) outcomes.value = [].concat(p.success_outcomes).join('\n'); if (p.compliance_lines) comp.value = [].concat(p.compliance_lines).join('\n');
+    if ('name' in p) f.name.value = p.name; if ('objective' in p) f.objective.value = p.objective; if ('tone' in p) f.tone.value = p.tone; if ('max_call_s' in p) f.max.value = p.max_call_s; if (p.pack) f.pack.value = p.pack; if (p.closing_declined) closingNo.set(p.closing_declined);
+    if (p.opening) opening.set(p.opening); if (p.closing) closing.set(p.closing); if (p.success_outcomes) outcomes.value = [].concat(p.success_outcomes).join('\n'); if (p.compliance_lines) comp.value = [].concat(p.compliance_lines).map((x) => (typeof x === 'string' ? x : x.en || Object.values(x)[0] || '')).join('\n');
     if ('selling_allowed' in p) sell.checked = !!p.selling_allowed; if ('negotiation_allowed' in p) neg.checked = !!p.negotiation_allowed;
     if (p.allowed_actions) { p.allowed_actions.forEach((a) => actions.add(a)); [...actBox.querySelectorAll('input')].forEach((cb) => { cb.checked = actions.has(cb.parentNode.textContent.trim().replaceAll(' ', '_')); }); }
-    if (Array.isArray(p.steps)) { d.steps = p.steps.map((s) => ({ id: s.id || '', text: typeof s.text === 'string' ? { en: s.text } : s.text || {}, answer_type: s.answer_type || 'text', required: !!s.required })); drawSteps(); }
+    if (Array.isArray(p.steps)) { d.steps = p.steps.map((s) => ({ ...s, id: s.id || '', text: typeof s.text === 'string' ? { en: s.text } : s.text || {}, answer_type: s.answer_type || 'text', required: s.required !== false })); drawSteps(); }
   };
   const err = h('div', { class: 'err' });
   const save = async () => {
@@ -408,14 +417,14 @@ async function ctEditorPage(el, ctx) {
     head(isNew ? 'New call type' : d.name || 'Call type', ro ? 'This is a built-in call type. Duplicate it to change anything.' : 'Changes apply to the next call that uses it.', dupBtn,
       !isNew && !ro ? h('button', { class: 'btn danger', onclick: () => confirmBox('Delete this call type?', 'This cannot be undone. A call type that a campaign still uses cannot be deleted: change that campaign first.', 'Delete', async () => { const r = await tryApi(`/api/calltypes/${esc(d.id)}`, { method: 'DELETE' }); if (!r.ok) return notice(r.err); _cts = null; go('calltypes'); }, { danger: true }) }, ic('trash', 'sm'), 'Delete') : null,
       ro ? null : h('button', { class: 'btn pri', onclick: save }, ic('save', 'sm'), 'Save')),
-    ro ? null : aiBox({ kind: 'calltype', keys: ['name', 'objective', 'opening', 'steps', 'allowed_actions', 'success_outcomes', 'closing', 'tone', 'max_call_seconds', 'selling_allowed', 'negotiation_allowed', 'compliance_lines'], placeholder: 'e.g. a follow-up call for people who got the payment link but did not pay', context: () => ({ project: S.tenant, calltype: collect() }), current: collect, apply }),
+    ro ? null : aiBox({ kind: 'calltype', keys: ['name', 'objective', 'pack', 'opening', 'steps', 'allowed_actions', 'success_outcomes', 'closing', 'closing_declined', 'tone', 'max_call_s', 'selling_allowed', 'negotiation_allowed', 'compliance_lines'], placeholder: 'e.g. a follow-up call for people who got the payment link but did not pay', context: () => ({ project: S.tenant, calltype: collect() }), current: collect, apply }),
     ctx.q.get('ai') && isNew ? h('div', { class: 'hint', style: 'margin:-6px 0 14px' }, 'Describe the call above, press Draft with AI, apply it and adjust.') : null,
-    section('Purpose', fld('Name', f.name), fld('Objective: what counts as success', f.objective), h('div', { class: 'grid2' }, fld('Tone', f.tone), fld('Maximum call length (seconds)', f.max))),
+    section('Purpose', fld('Name', f.name), fld('Objective: what counts as success', f.objective), h('div', { class: 'grid2' }, fld('How the call runs', f.pack), fld('Languages (every line below needs text in each)', langChips)), h('div', { class: 'grid2' }, fld('Tone', f.tone), fld('Maximum call length (seconds)', f.max))),
     section('Opening line · per language', opening.box),
-    section('Steps and questions', h('p', { class: 'hint', style: 'margin:8px 0' }, 'Asked in this order. Drag a step by its handle (or use the arrows) to reorder. Answered questions are never asked again.'), stepsBox, ro ? null : h('button', { class: 'btn sm', style: 'margin-top:10px', onclick: () => { d.steps.push({ id: '', text: {}, answer_type: 'text', required: false }); drawSteps(); } }, ic('plus', 'sm'), 'Add step')),
+    section('Steps and questions', h('p', { class: 'hint', style: 'margin:8px 0' }, 'Asked in this order. Drag a step by its handle (or use the arrows) to reorder. Answered questions are never asked again.'), stepsBox, ro ? null : h('button', { class: 'btn sm', style: 'margin-top:10px', onclick: () => { d.steps.push({ id: '', text: {}, answer_type: 'text', required: true }); drawSteps(); } }, ic('plus', 'sm'), 'Add step')),
     section('What it may do', h('label', { class: 'lbl' }, 'Allowed actions'), actBox, h('label', { class: 'lbl' }, 'Outcomes that count as success'), outcomes,
       h('div', { class: 'row', style: 'gap:22px;margin-top:12px;flex-wrap:wrap' }, h('label', { class: 'chip' }, sell, 'selling allowed'), h('label', { class: 'chip' }, neg, 'negotiation allowed (needs selling)'))),
-    section('Closing lines · per language', closing.box), section('Compliance lines', comp), err,
+    section('Closing lines · per language', closing.box), section('If they say no or not now · per language', closingNo.box), section('Compliance lines', comp), err,
     h('div', { class: 'row', style: 'margin:8px 0 40px' }, ro ? null : h('button', { class: 'btn pri', onclick: save }, ic('save', 'sm'), 'Save'), h('a', { class: 'btn ghost', href: '#/calltypes' }, 'Back to call types'))));
 }
 
@@ -760,7 +769,7 @@ async function pageSettings(el, ctx) {
 }
 function projectTab(body, p, save) {
   const I = (v, a) => h('input', { value: v ?? '', ...(a || {}) });
-  const tzs = (typeof Intl.supportedValuesOf === 'function' ? Intl.supportedValuesOf('timeZone') : ['Asia/Kolkata', 'UTC']);
+  const tzs = tzList(p.timezone);
   const f = { name: I(p.name), color: I(p.color || '#4f7cff', { type: 'color', style: 'width:64px;padding:2px' }), tz: h('select', {}, tzs.map((z) => h('option', { value: z, selected: z === (p.timezone || 'Asia/Kolkata') }, z))), s: hourSel(hoursOf(p)[0], 'Calling hours start', 0, 23), e: hourSel(hoursOf(p)[1], 'Calling hours end', 1, 24), notes: h('textarea', { rows: 3 }, p.compliance_notes || '') };
   const langs = new Set(p.languages || ['en', 'hi', 'hinglish']);
   const webhook = `${location.origin}/api/leads/webhook/${esc(p.id)}${p.webhook_token ? '?token=' + esc(p.webhook_token) : ''}`;
@@ -794,7 +803,7 @@ async function pageOnboarding(el, ctx) {
 const sec2 = (t, d) => h('div', { class: 'dh' }, h('h3', {}, t), d ? h('p', {}, d) : null);
 function ob1(body, st, o) {
   const p = S.tenants.find((t) => t.id === st.projectId), b = { name: '', languages: ['en', 'hi', 'hinglish'], timezone: 'Asia/Kolkata', start: 10, end: 20, ...(p ? { name: p.name, languages: p.languages || ['en', 'hi', 'hinglish'], timezone: p.timezone || 'Asia/Kolkata', start: hoursOf(p)[0], end: hoursOf(p)[1] } : {}), ...(st.basics || {}) };
-  const tzs = typeof Intl.supportedValuesOf === 'function' ? Intl.supportedValuesOf('timeZone') : ['Asia/Kolkata', 'UTC'];
+  const tzs = tzList(b.timezone);
   const name = h('input', { value: b.name, placeholder: 'e.g. FitZone Gym', 'aria-label': 'Project name' }), tz = h('select', {}, tzs.map((z) => h('option', { value: z, selected: z === b.timezone }, z)));
   const s = hourSel(+b.start, 'Calling hours start', 0, 23), e = hourSel(+b.end, 'Calling hours end', 1, 24), langs = new Set(b.languages), err = h('div', { class: 'err' });
   body.append(sec2('1. Project basics', 'A project is one business or brand the agent calls for.'), h('div', { class: 'db' }, fld('Project name', name),
@@ -831,7 +840,7 @@ async function ob3(body, st, o) {
       h('b', {}, c.name || c.id), h('p', { class: 'hint', style: 'margin:6px 0' }, c.objective || (c.builtin ? 'Built in' : 'Custom')), h('button', { class: 'btn sm', onclick: (e) => { e.preventDefault(); go('calltypes', { id: c.id, query: { return: 'onboarding' } }); } }, c.builtin ? 'View steps' : 'Customise steps')))),
     h('div', { class: 'sec-lbl', style: 'margin:18px 0 6px' }, 'Or describe it'), draft),
     o.nav(!!st.calltypeId, () => o.next(4)));
-  draft.append(aiBox({ kind: 'calltype', keys: ['name', 'objective', 'opening', 'steps', 'allowed_actions', 'success_outcomes', 'closing', 'tone', 'max_call_seconds', 'selling_allowed', 'negotiation_allowed', 'compliance_lines'], placeholder: 'e.g. call people who got the payment link but did not pay, remind them kindly and offer help', context: () => ({ project: S.tenant, calltype: blankCT() }), current: blankCT,
+  draft.append(aiBox({ kind: 'calltype', keys: ['name', 'objective', 'pack', 'opening', 'steps', 'allowed_actions', 'success_outcomes', 'closing', 'closing_declined', 'tone', 'max_call_s', 'selling_allowed', 'negotiation_allowed', 'compliance_lines'], placeholder: 'e.g. call people who got the payment link but did not pay, remind them kindly and offer help', context: () => ({ project: S.tenant, calltype: blankCT() }), current: blankCT,
     apply: async (p) => { const ct = { ...blankCT(), ...p, project_id: S.tenant }; delete ct.id; ct.name = ct.name || 'Custom call'; ct.steps = (ct.steps || []).map((s, i) => ({ id: s.id || 'step_' + (i + 1), answer_type: 'text', required: false, ...s, text: typeof s.text === 'string' ? { en: s.text } : s.text || {} })); st.draftCT = ct; draft.append(h('div', { class: 'row', style: 'margin-top:10px' }, h('button', { class: 'btn pri', onclick: async () => { const r = await saveObj('/api/calltypes', '', st.draftCT); if (!r.ok) return notice(r.na ? 'Saving call types is not available yet.' : r.err); _cts = null; st.calltypeId = (r.data.calltype || r.data).id; delete st.draftCT; await obSave(st); o.draw(); } }, ic('save', 'sm'), 'Save as a new call type'), h('span', { class: 'hint' }, 'Review it first, or save and edit the steps afterwards.'))); } }));
 }
 function ob4(body, st, o) {

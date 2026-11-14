@@ -164,7 +164,10 @@ def ui_requests(src: str) -> set[tuple[str, str]]:
         lit = re.match(r"^[`'\"](/api/[^`'\"]*)[`'\"]", args[0] if args else "")
         if not lit:
             continue
-        path = re.sub(r"\$\{[^}]*\}", "{}", lit.group(1)).split("?")[0].rstrip("/")
+        path = re.sub(r"\$\{[^}]*\}", "{}", lit.group(1)).split("?")[0]
+        if re.match(r"^[`'\"][^`'\"?]*/[`'\"]\s*\+", args[0]):  # '/api/products/' + id
+            path += "{}"
+        path = path.rstrip("/")
         rest = " ".join(args[1:])
         if fn == "post":
             method = "PUT" if re.search(r"'PUT'", rest) else "DELETE" if "'DELETE'" in rest else "POST"
@@ -249,8 +252,10 @@ def test_operator_flow_against_the_real_backend(live):
     assert L.http.put("/api/products/acme-gym-pass", json=prod).status_code == 200
     (L.data / "dnc.json").write_text(json.dumps({"+919000090000": time.time()}))
     FakeLLM.replies = {
-        "assist_calltype": {"name": "Payment nudge", "objective": "Remind kindly about the pending payment", "steps": [{"id": "ask_link", "text": {"en": "Did you get the payment link?"}, "answer_type": "yes_no", "required": True}],
-                            "allowed_actions": ["send_link"], "success_outcomes": ["paid"], "selling_allowed": False, "negotiation_allowed": False, "closing": {"en": "Thank you, have a good day."}},
+        "assist_calltype": {"name": "Payment nudge", "objective": "Remind kindly about the pending payment", "pack": "steps", "opening": "Hi, this is Arjun, an AI assistant from Acme Gym. This call is recorded.",
+                            "steps": [{"id": "ask_link", "text": "Did you get the payment link?", "answer_type": "yes_no", "required": True, "keywords": ["link"]}],
+                            "allowed_actions": ["send_link"], "success_outcomes": ["paid"], "selling_allowed": False, "negotiation_allowed": False, "closing": "Thank you, have a good day.",
+                            "closing_declined": "No problem, have a good day."},
         "assist_campaign": {"name": "Weekend push", "call_type_id": "follow_up", "language": "en", "audience": {"stages": ["interested"], "tags": ["gym"]},
                             "schedule": {"window": [11, 18], "days": [5, 6], "max_parallel": 2, "pacing_seconds": 30, "retry": {"max_attempts": 2, "retry_after_minutes": 180}}},
     }
@@ -285,18 +290,32 @@ def test_operator_flow_against_the_real_backend(live):
             page.get_by_role("button", name="Duplicate").click()
             page.wait_for_selector("text=Lead qualification (copy)", state="attached")
             dup = [c for c in ui.get("/api/calltypes?project=acme-gym")["calltypes"] if c.get("project_id") == "acme-gym"]
-            assert len(dup) == 1 and dup[0]["id"] == "lead-qualification-copy" and dup[0]["selling_allowed"] is False and not dup[0]["builtin"]
+            assert len(dup) == 1 and dup[0]["id"] == "lead_qualification_copy" and dup[0]["selling_allowed"] is False and not dup[0]["builtin"]
             name = page.locator(".panel", has_text="Purpose").locator("input").first
             name.fill("Gym lead call")
+            n_steps = len(dup[0]["steps"])
+            assert n_steps >= 4 and dup[0]["pack"] == "lead_qualification"
+            first = page.locator(".stepcard").first
+            first.locator(".langs textarea").first.fill("What are you hoping to get from the gym?")  # edit a step's English line
             page.get_by_role("button", name="Add step").click()
-            page.locator(".stepcard .sc-h input.mono").fill("goal")
-            page.locator(".stepcard .langs textarea").first.fill("What is your fitness goal?")
-            page.locator(".stepcard select").select_option("choice")
-            page.locator(".stepcard").get_by_text("required").click()
+            added = page.locator(".stepcard").last
+            added.locator("input.mono").first.fill("goal")
+            added.locator(".langs textarea").nth(0).fill("What is your fitness goal?")
+            added.locator(".langs textarea").nth(1).fill("आपका फिटनेस लक्ष्य क्या है?")
+            added.locator(".langs textarea").nth(2).fill("Aapka fitness goal kya hai?")
+            added.locator("select").select_option("choice")
+            added.locator(".choices").get_by_role("button", name="Add choice").click()
+            added.locator(".choices input[aria-label='Choice id']").nth(0).fill("weight")
+            added.locator(".choices").get_by_role("button", name="Add choice").click()
+            added.locator(".choices input[aria-label='Choice id']").nth(1).fill("muscle")
+            added.get_by_label("Answer keywords").fill("goal, target")
             page.locator(".pad.narrow .df, .pad.narrow .row").get_by_role("button", name="Save").last.click()
             page.wait_for_selector("text=Gym lead call")
-            ct = next(c for c in ui.get("/api/calltypes?project=acme-gym")["calltypes"] if c["id"] == "lead-qualification-copy")
-            assert ct["name"] == "Gym lead call" and ct["steps"] == [{"id": "goal", "text": {"en": "What is your fitness goal?"}, "answer_type": "choice", "required": True}]
+            ct = next(c for c in ui.get("/api/calltypes?project=acme-gym")["calltypes"] if c["id"] == "lead_qualification_copy")
+            assert ct["name"] == "Gym lead call" and len(ct["steps"]) == n_steps + 1 and ct["steps"][0]["text"]["en"] == "What are you hoping to get from the gym?"
+            assert ct["steps"][0]["text"]["hi"] and ct["steps"][0]["id"] == "need"  # the other languages were kept
+            g = ct["steps"][-1]
+            assert g["id"] == "goal" and g["answer_type"] == "choice" and [c["id"] for c in g["choices"]] == ["weight", "muscle"] and g["keywords"] == ["goal", "target"] and g["text"]["hinglish"]
             ui.ok("call type duplicate + edit step")
             page.goto(f"{L.base}/#/onboarding")
             page.wait_for_selector("text=3. Call type")
@@ -317,11 +336,11 @@ def test_operator_flow_against_the_real_backend(live):
             assert "2 will be added" in txt and "1 duplicates (same phone) skipped" in txt and "1 on Do-not-call" in txt and "1 invalid" in txt and "Row 4: not a valid phone number" in txt
             assert ui.get("/api/customers?project=acme-gym")["total"] == 0  # a preview writes nothing
             page.get_by_role("button", name="Import now").click()
-            page.wait_for_selector("text=Imported 2 customers")
+            page.wait_for_selector("text=2 added in this setup")
             lst = ui.get("/api/customers?project=acme-gym")
             assert lst["total"] == 3
             by = {c["name"]: c for c in lst["customers"]}
-            assert by["Asha Rao"]["phone"] == "+919876543210" and by["Asha Rao"]["custom"]["budget"] == 3000 and by["Asha Rao"]["city"] == "Pune" and by["Asha Rao"]["source"] == "csv"
+            assert by["Asha Rao"]["phone"] == "+919876543210" and by["Asha Rao"]["custom"]["budget"] == 3000.0 and by["Asha Rao"]["city"] == "Pune" and by["Asha Rao"]["source"] == "csv"
             assert by["Dan Dnc"]["stage"] == "do_not_call" and by["Dan Dnc"]["consent"]["dnc"] is True
             ui.ok("csv import")
             ui.next()
@@ -332,7 +351,7 @@ def test_operator_flow_against_the_real_backend(live):
             camps = ui.get("/api/campaigns?project=acme-gym")["campaigns"]
             assert len(camps) == 1
             camp = camps[0]
-            assert (camp["product_id"], camp["call_type_id"], camp["status"], camp["dial_mode"]) == ("acme-gym-pass", "lead-qualification-copy", "draft", "manual")
+            assert (camp["product_id"], camp["call_type_id"], camp["status"], camp["dial_mode"]) == ("acme-gym-pass", "lead_qualification_copy", "draft", "manual")
             assert camp["schedule"]["window"] == [10, 20] and camp["schedule"]["days"] == [0, 1, 2, 3, 4, 5] and camp["schedule"]["retry"]["max_attempts"] == 3 and camp["tone_level"] == "mid"
             ui.ok("campaign")
 
@@ -340,7 +359,7 @@ def test_operator_flow_against_the_real_backend(live):
             page.wait_for_selector("text=6. Test call")
             page.get_by_role("button", name="Start test").click()
             page.wait_for_selector("text=Hello, this is Arjun from Acme Gym.")
-            assert L.sims["started"][0]["campaign"] == "acme-gym-pass" and L.sims["started"][0]["call_type"] == "lead-qualification-copy"
+            assert L.sims["started"][0]["campaign"] == "acme-gym-pass" and L.sims["started"][0]["call_type"] == "lead_qualification_copy"
             page.get_by_label("Customer message").fill("what is the price?")
             page.get_by_label("Customer message").press("Enter")
             page.wait_for_selector("text=the pass is 2,799 for the year")
@@ -350,7 +369,7 @@ def test_operator_flow_against_the_real_backend(live):
 
             # ---------------------------------------------------------- 7 go live, then the campaign queue view
             page.get_by_label("I have checked", exact=False).check() if False else page.locator("label.chip", has_text="I have checked").locator("input").check()
-            page.get_by_role("button", name="Go live").click()
+            page.locator(".obbody .btn.pri").filter(has_text="Go live").click()
             page.wait_for_selector("text=Queue: who is next")
             page.wait_for_selector(".tbl")
             assert ui.get("/api/campaigns/" + camp["id"])["campaign"]["status"] == "running"
@@ -377,11 +396,11 @@ def test_operator_flow_against_the_real_backend(live):
             page.get_by_role("button", name="Stages").click()
             page.wait_for_selector(".board")
             rahul = by["Rahul Mehta"]["id"]
-            page.locator(".kcard", has_text="Rahul Mehta").drag_to(page.locator("section.col", has=page.get_by_text("Contacted", exact=True)))
+            page.locator(".kcard", has_text="Rahul Mehta").drag_to(page.locator("section.col[aria-label=\"Contacted\"]"))
             page.wait_for_timeout(600)
             assert ui.get(f"/api/customers/{rahul}")["customer"]["stage"] == "contacted"
             assert any(e["type"] == "stage" and e["to"] == "contacted" for e in ui.get(f"/api/customers/{rahul}/timeline")["timeline"])
-            assert page.locator("section.col", has=page.get_by_text("Contacted", exact=True)).locator(".kcard", has_text="Rahul Mehta").count() == 1
+            assert page.locator("section.col[aria-label=\"Contacted\"]").locator(".kcard", has_text="Rahul Mehta").count() == 1
             dan = page.locator(".kcard", has_text="Dan Dnc")
             assert dan.get_attribute("draggable") == "false" and dan.locator("select").is_disabled()
             ui.ok("customers table + board")
@@ -391,14 +410,14 @@ def test_operator_flow_against_the_real_backend(live):
             ui.go(f"customers/{asha}")
             page.wait_for_selector("text=Timeline")
             assert "Added · csv" in page.inner_text(".tline")
-            assert "3000" in page.inner_text(".kv")  # custom field Budget
+            assert "3000" in page.inner_text(".cols3")  # custom field Budget
             page.get_by_role("button", name="Call now").click()
             page.locator(".modal, [role=dialog]").get_by_role("button", name="Place the call").click()
             page.wait_for_url(re.compile(r"#/calls/"))
             assert L.dialed == ["+919876543210"]
             call_id = page.url.rsplit("/", 1)[1]
             link = L.state.crm["store"].call_link(call_id)
-            assert link["customer_id"] == asha and link["call_type"] == "lead-qualification-copy" or link["customer_id"] == asha
+            assert link["customer_id"] == asha and link["call_type"] == "lead_qualification_copy" or link["customer_id"] == asha
             ui.ok("call now")
             # the call ends: the customer asked to be called back
             f = L.data / "calls" / f"{call_id}.json"
@@ -411,7 +430,7 @@ def test_operator_flow_against_the_real_backend(live):
             page.wait_for_selector("text=Timeline")
             tl = page.inner_text(".tline")
             assert "Call · " in tl and "callback" in tl and "Call started" in tl and "Open call and info map" in tl
-            assert "callback" in page.inner_text(".kv")
+            assert "callback" in page.inner_text(".cols3")
             cu = ui.get(f"/api/customers/{asha}")["customer"]
             assert cu["crm_customer_id" if False else "stage"] == "contacted" and cu["next_action"]["type"] == "callback" and cu["history"]["call_ids"] == [call_id]
             ui.ok("customer detail timeline")
@@ -458,7 +477,7 @@ def test_operator_flow_against_the_real_backend(live):
             L.state.cfg.max_parallel_calls = 8
             assert any(b.startswith("409 POST /api/campaigns/") for b in ui.bad)
             ui.bad.clear()
-            page.keyboard.press("Escape")
+            page.locator(".modal").get_by_role("button", name="Close").click()
 
             # ---------------------------------------------------------- Add with AI: draft -> apply -> save (call type)
             ui.go("calltypes/new")
@@ -476,8 +495,8 @@ def test_operator_flow_against_the_real_backend(live):
             page.locator(".pad.narrow .row").get_by_role("button", name="Save").last.click()
             page.wait_for_selector("text=Payment nudge")
             saved = next(c for c in ui.get("/api/calltypes?project=acme-gym")["calltypes"] if c["name"] == "Payment nudge")
-            assert saved["id"] == "payment-nudge" and saved["success_outcomes"] == ["paid"] and saved["allowed_actions"] == ["send_link"] and saved["selling_allowed"] is False
-            assert saved["steps"][0]["id"] == "ask_link" and saved["steps"][0]["answer_type"] == "yes_no" and saved["closing"] == {"en": "Thank you, have a good day."}
+            assert saved["id"] == "payment_nudge" and saved["success_outcomes"] == ["paid"] and saved["allowed_actions"] == ["send_link"] and saved["selling_allowed"] is False and saved["pack"] == "steps"
+            assert saved["steps"][0]["id"] == "ask_link" and saved["steps"][0]["answer_type"] == "yes_no" and saved["closing"]["en"] == "Thank you, have a good day." and saved["closing_declined"]["hi"]
             ui.ok("add with AI: call type")
 
             # ---------------------------------------------------------- Add with AI on a campaign form: the draft maps onto the real schedule shape
@@ -501,6 +520,7 @@ def test_operator_flow_against_the_real_backend(live):
             page.locator(".tbl tbody tr", has_text="No product").get_by_role("button", name="Start").click()
             page.locator(".modal, [role=dialog]").get_by_role("button", name="Start").click()
             page.wait_for_selector("text=pick a product for this campaign before starting it")
+            page.locator(".modal").get_by_role("button", name="Close").click()
             assert ui.get(f"/api/campaigns/{nop['id']}")["campaign"]["status"] == "draft"
             assert any(b.startswith("400 POST /api/campaigns/") for b in ui.bad)
             ui.bad.clear()
@@ -515,13 +535,15 @@ def test_operator_flow_against_the_real_backend(live):
             assert ui.get("/api/projects/acme-gym")["project"]["call_hours"] == [10, 19]
             ui.go("settings")
             page.wait_for_selector("text=Custom fields")
-            assert "Budget" in page.inner_text("body")
+            assert page.locator("input[aria-label=\"Field label\"]").first.input_value() == "Budget"
             ui.go("dashboard")
             page.wait_for_selector(".tiles")
             tiles = page.inner_text(".tiles")
             assert "3" in tiles
             ui.ok("settings + dashboard")
         finally:
+            if os.getenv("E2E_DEBUG"):
+                print("PAGE:", page.inner_text(".ai-out") if page.locator(".ai-out").count() else page.inner_text("body")[:800], ui.errors, ui.bad)
             if os.getenv("E2E_SHOT"):
                 page.screenshot(path=os.getenv("E2E_SHOT"))
             browser.close()
