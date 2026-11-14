@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>SalesGod Console</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;450;500;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -314,6 +314,25 @@ select.inline{width:auto}
 .neg-ed .nctl button:hover{background:hsl(var(--hover))}
 @media (max-width:1100px){.live.wide{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.live.wide>section:first-child{display:none}.live.wide>section:last-child{display:block}}
 @media (max-width:760px){.live.wide{grid-template-columns:1fr;overflow-y:auto;grid-auto-rows:minmax(320px,auto)}.live.wide>section{overflow:visible}.neg-ed .nstep{grid-template-columns:20px 70px minmax(0,1fr)}.neg-ed .nstep .nctl{grid-column:2/4}}
+
+/* phone: small-screen fixes (VM edit of 14 Nov; the bottom tab bar is replaced by the sidebar hamburger) */
+@media (max-width:760px){
+.topbar{gap:8px;height:50px;flex-basis:50px}
+.topbar a[href="/classic"]{display:none}
+.crumbs>span,.crumbs>i{display:none}
+.crumbs b{font-size:15px}
+input,select,textarea{font-size:16px!important}
+.grid2,.hero{grid-template-columns:1fr}
+.head{padding:16px 14px 12px}.head h1{font-size:19px}
+.item{grid-template-columns:minmax(0,1fr) 90px 30px;padding:8px 12px}
+.kv{grid-template-columns:78px minmax(0,1fr)}
+.dec .r2{grid-template-columns:repeat(2,1fr)}
+.turn{grid-template-columns:50px minmax(0,1fr);gap:8px}
+.tx{padding:14px 12px 30px}
+.modal{padding:10px 8px}
+.cards{grid-template-columns:1fr}
+.btn{min-height:34px}
+}
 </style>
 </head>
 <body>
