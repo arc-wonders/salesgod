@@ -25,6 +25,7 @@ from .. import constraints as cons
 from .. import garble
 from .. import honest
 from .. import negotiation
+from ...rules import tone as tone_rules
 from .. import nba
 from ..engine import KeywordIntentClassifier
 from ..hybrid import HybridIntentClassifier, load_turn_model
@@ -284,6 +285,7 @@ class Product(BaseModel):
     # templates are spoken word for word (fastest, most rigid).
     style: str = Field("natural", pattern="^(natural|scripted)$")
     tone: str = "warm, respectful and conversational, like a helpful person, never pushy"
+    tone_level: str = Field("mid", pattern="^(professional|mid|casual)$")  # the register: professional (Sir/formal), mid (friendly aap), casual (bhai/boss/yaar, short)
     # optional: the offer in the customer's currency, said only as an approximation
     price_note: str = ("about ₹700 a month for the first 3 months, then about ₹1,700 a month, at today's exchange rate; "
                        "the exact amount with taxes is shown on the payment page")
@@ -855,6 +857,7 @@ class ProductSalesDomain:
         d.pop("pb_title_turn", None)
         plan = await self._guarded_plan(intent, turn, session)
         plan = await self._answer_before_goodbye(plan, intent, turn, session)
+        self._apply_tone(plan, d, turn.text)
         u = self._nlu(d)
         if u is not None and u.objection != "none":
             d.setdefault("_objection", u.objection)
@@ -880,6 +883,16 @@ class ProductSalesDomain:
         d["last_customer"] = turn.text
         self._outcome(plan, session)
         return plan
+
+    def _apply_tone(self, plan: TurnPlan, d: dict, text: str) -> None:
+        """The reply's register (professional | mid | casual): a tone-aware negotiation reply already carries it; every other template reply gets the
+        address lead; an LLM reply gets the register as a style line (acie/compiler.py) and the respectful_register pack reads it."""
+        tone = tone_rules.effective_tone(getattr(self.p, "tone_level", "mid"), d, text, self.customer.age if self.customer else self.customer_age)
+        plan.tone_level = tone
+        toned = d.pop("_toned", None) == "1"
+        if toned or plan.intent in tone_rules.SKIP_INTENTS or d.get("sad_hold") == "1" or not plan.fallback:
+            return
+        plan.fallback = tone_rules.restyle(plan.fallback, tone)
 
     # ------------------------------------------------------------------ business API, constraints, next best action
 
@@ -1051,7 +1064,7 @@ class ProductSalesDomain:
 
         # ---------------- "yes" to a negotiated price: lock it in the terms, then the usual confirmation (terms + link) with the agreed price
         if d.get("pending") == "neg_close" and not _is_question(text) and (self._yes(text, intent, d) or _clean_yes(text) or intent == "affirm") \
-                and not _FIRM_NO.search(text):
+                and not _FIRM_NO.search(text) and (negotiation.detect(text) != "counter_offer" or self._names_offered_price(text, d)):
             self._apply_neg_offer(d)
             if d.get("terms_confirmed") == "1" and (_BUY.search(text) or d.get("requested_link") == "1"):
                 return self._link_plan(d, lang)  # they already heard the terms and asked for the link: the agreed price goes out, no second confirmation
@@ -1740,17 +1753,19 @@ class ProductSalesDomain:
             return None
         if self._names_offered_price(text, d) and not (_is_question(text) is False and negotiation.explicit_push(text) and not honest.SEND_REQ.search(text)):
             return None  # "₹2,999 monthly ya yearly?" names the price on the table: a question about it, never a counter-offer
-        eco = getattr(self.p, "economics", None)
-        ladder = eco is not None and eco.list_price > 0 and bool(eco.ladder)
+        ladder = negotiation.ladder_enabled(self.p)
         if ctx is not None and ctx.has("payment_link") and not ladder:
             return None  # (a buyer who got the link and still haggles keeps getting honest answers when the product has a ladder)
         faq = self._faq_match(text)
         faq_line = ((lambda l: {"hi": faq.answer_hi, "hinglish": faq.answer_hinglish, "en": faq.answer}.get(l) or "")
                     if faq is not None and not faq.not_eligible else None)
         committed = d.get("requested_link") == "1" or d.get("terms_confirmed") == "1" or (ctx is not None and ctx.has("payment_link"))
-        r = negotiation.step(self.p, text, negotiation.NegState.load(d), d.get("need_known", ""), faq_line, committed=committed)
+        tone = tone_rules.effective_tone(getattr(self.p, "tone_level", "mid"), d, text, self.customer.age if self.customer else self.customer_age)
+        r = negotiation.step(self.p, text, negotiation.NegState.load(d), d.get("need_known", ""), faq_line, committed=committed, tone=tone)
         if r is None:
             return None
+        if r.toned:
+            d["_toned"] = "1"
         r.state.save(d)
         d["pending"] = "neg_close" if r.offer else "close"
         if r.offer:
@@ -1760,7 +1775,9 @@ class ProductSalesDomain:
                         objective=r.note or "Answer the price talk honestly; no pressure, no invented discount")
 
     def _apply_neg_offer(self, d: dict) -> None:
-        """The caller said yes to a concession: the agreed price goes into the terms, and into the ledger (closed price vs the profit floor)."""
+        """The caller said yes to a concession: the agreed price goes into the terms and the offer price (so the confirmation, the link and
+        the SMS all say it), into the negotiation ledger (agreed: never retracted, never re-offered higher) and into the dialog (closed price,
+        margin after the cost and any perk cost) for the console map."""
         try:
             o = json.loads(d.get("neg_offer") or "{}")
         except ValueError:
@@ -1771,8 +1788,21 @@ class ProductSalesDomain:
         if eco.list_price and price < eco.profit_floor + perk_cost:
             price = eco.profit_floor + perk_cost  # never below the floor (the promised perk's cost included), whatever was said
         upd = {}
-        if eco.price_terms and price and price != eco.list_price:
-            upd["terms"] = {l: eco.price_terms[l].format(price=f"{eco.currency}{int(round(price)):,}") for l in eco.price_terms}
+        if price and eco.list_price and price != eco.list_price:
+            new_p = f"{eco.currency}{int(round(price)):,}"
+            old_forms = [f"{eco.currency}{int(round(eco.list_price)):,}", f"{int(round(eco.list_price)):,}", str(int(round(eco.list_price)))]
+
+            def _swap(t: str) -> str:
+                for f in old_forms:
+                    if f in t:
+                        return t.replace(f, new_p if f.startswith(eco.currency) else new_p.lstrip(eco.currency), 1)
+                return t
+            if eco.price_terms:
+                upd["terms"] = {l: eco.price_terms[l].format(price=new_p) for l in eco.price_terms}
+            elif self.p.terms:
+                upd["terms"] = {l: _swap(t) for l, t in self.p.terms.items()}
+            upd["offer_price"] = _swap(self.p.offer_price) if any(f in self.p.offer_price for f in old_forms) else self.p.offer_price
+            d["agreed_offer_price"] = upd["offer_price"]  # voice/call.py may send this in the SMS instead of the list offer
         perk = next((x for x in eco.ladder if x.id == o.get("perk") and x.kind == "perk"), None)
         if perk is not None:
             base = upd.get("terms") or {l: honest.terms_text(self.p, l) for l in ("en", "hi", "hinglish")}
@@ -1783,7 +1813,12 @@ class ProductSalesDomain:
             d["closed_price"] = f"{price:.2f}"
             d["list_price"] = f"{eco.list_price:.2f}"
             d["profit_floor"] = f"{eco.profit_floor:.2f}"
-            d["margin_pct"] = f"{(price - eco.cost) / price * 100:.1f}" if eco.cost and price else ""
+            d["margin_pct"] = f"{(price - eco.cost - perk_cost) / price * 100:.1f}" if eco.cost and price else ""
+            ns = negotiation.NegState.load(d)
+            ns.agreed, ns.price = price, min(price, ns.price or price)
+            if perk is not None and perk.id not in ns.perks:
+                ns.perks.append(perk.id)
+            ns.save(d)
 
     def _repeat_request_step(self, text: str, d: dict, ctx, lang: str) -> TurnPlan | None:
         """"फिर से बोलिए / धीरे बोलो / say that again": the AGENT says the last thing again, shorter and slower, in plain words

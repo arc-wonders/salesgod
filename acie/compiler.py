@@ -94,6 +94,22 @@ def _extra_style(expr: ExpressionParams) -> str:
     return "".join(line + "\n" for line in lines)
 
 
+TONE_RULES = {
+    "professional": "- Register: PROFESSIONAL. Formal and courteous: address the caller as 'Sir' or 'Ma'am' (or 'ji'), 'aap' always, complete polite sentences, "
+                    "no slang, never 'bhai', 'yaar' or 'boss'. Example: \"Sir, yeh hamari sabse achhi offer hai.\"\n",
+    "mid": "- Register: MID. Friendly 'aap' with natural Hinglish, warm but not slangy, no 'bhai/yaar/boss' unless the caller used it first. "
+           "Example: \"Dekhiye, aapke liye kar sakta hoon, aaj join kar lenge?\"\n",
+    "casual": "- Register: CASUAL. Warm, street-friendly and short: 'bhai', 'boss' or 'yaar' now and then, easy words, quick sentences. Still respectful: "
+              "'aap' verb forms, no insults, never 'तू/तेरी/तुम'. Example: \"Bhai, kar deta hoon, aaj hi le lo?\"\n",
+}
+
+
+def _tone_style(plan: TurnPlan, expr: ExpressionParams) -> str:
+    """The register lines. Empty when no tone is set, so today's prompt is unchanged."""
+    t = (getattr(plan, "tone_level", "") or getattr(expr, "tone", "") or "").lower()
+    return TONE_RULES.get(t, "")
+
+
 def _clean(text, limit: int) -> str:
     return " ".join(str(text).replace("{", "").replace("}", "").split())[:limit]
 
@@ -183,7 +199,7 @@ class PromptCompiler:
             warmth=LEVEL_RULES["warmth"][expr.warmth],
             proactivity=LEVEL_RULES["proactivity"][expr.proactivity],
             ack=ack,
-        ) + _extra_style(expr)
+        ) + _extra_style(expr) + _tone_style(plan, expr)
         messages: list[dict[str, str]] = []
         for u in session.history[-self.history_turns:]:
             messages.append({"role": "user" if u.role == "customer" else "assistant", "content": u.text})

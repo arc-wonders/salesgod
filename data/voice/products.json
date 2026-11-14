@@ -669,6 +669,7 @@
    }
   ],
   "max_reoffers": 1,
+  "tone_level": "mid",
   "style": "natural",
   "tone": "warm, respectful and conversational, like a helpful person, never pushy",
   "price_note": "",

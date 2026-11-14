@@ -136,6 +136,7 @@ class ExpressionParams(BaseModel):
     explanation_style: Literal["direct", "example", "step_by_step"] = "direct"
     info_density: Level = "med"
     reassurance: Level = "low"
+    tone: str = ""  # professional | mid | casual (the campaign's tone_level); "" = mid
 
 
 # --------------------------------------------------------------------------- layer 4: decision
@@ -184,6 +185,7 @@ class TurnPlan(BaseModel):
     persona: str | None = None  # tone of voice from the campaign config (Product.tone)
     # validator rule packs for this product/plan (acie/rules): e.g. ["sales_compliance", "banking"]. Empty = none.
     rule_packs: list[str] = Field(default_factory=list)
+    tone_level: str = ""  # professional | mid | casual: the register of this reply (set by the domain; "" = mid)
 
 
 # --------------------------------------------------------------------------- session

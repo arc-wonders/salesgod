@@ -28,11 +28,13 @@ Nothing here lowers a price: the floor is the offer price. No urgency, no pressu
 from __future__ import annotations
 
 import json
+import math
 import re
 from dataclasses import asdict, dataclass, field
 
 from ..signals import NEGOTIATE_MORE
 from . import honest
+from . import negotiation_banks as nb
 
 _I = re.IGNORECASE
 LANGS = ("en", "hi", "hinglish")
@@ -96,6 +98,7 @@ class NegState:
     perks: list[str] = field(default_factory=list)    # ladder perks already offered
     ask_i: int = -1                                   # the closing-ask form used last (never the same twice in a row)
     sweet: bool = False                               # the last perk-only sweetener at the floor was given
+    agreed: float = 0.0                               # the price the caller said yes to (never retracted, never re-offered higher)
 
     @classmethod
     def load(cls, dialog: dict) -> "NegState":
@@ -116,6 +119,7 @@ class NegReply:
     end_call: bool = False
     note: str = ""
     offer: dict | None = None   # {"price": n, "perk": id}: a closing ask is pending on this
+    toned: bool = False         # the text already carries the call's tone (else the domain restyles it)
 
 
 def _t(en: str, hi: str, hl: str) -> dict[str, str]:
@@ -189,10 +193,16 @@ def explicit_push(text: str) -> bool:
     return bool(_PUSH.search(text)) or counter_number(text) is not None and detect(text) == "counter_offer"
 
 
-def _compare_reply(p, st: NegState) -> NegReply:
+def _compare_reply(p, st: NegState, tone: str = "mid") -> NegReply:
     """"What's better than Cult?" / "Gemini is free, what about it?": an honest comparison question gets an honest answer (what you get
     here), never a price floor or a concession."""
     st.last = "compare"
+    tone = clean_tone(tone)
+    if ladder_enabled(p):  # tone-aware: lead + what you get here
+        v = _value_lines(p, st, tone, "")
+        lead = _say(nb.COMPARE_LEAD, tone, st, "cmp")
+        return NegReply("negotiation", {l: _join(lead[l], v[l]) for l in LANGS}, st, toned=True,
+                        note="Honest comparison answer only: no concession, no floor line; the price is not on the table.")
     b = {l: " ; ".join(x for x in (_benefit(p, l, 0), _benefit(p, l, 1)) if x) for l in LANGS}
     parts = {l: ACK["competitor"][l] for l in LANGS}
     if all(b.values()):
@@ -235,54 +245,83 @@ def _fmt(p, n: float) -> str:
     return f"{cur}{int(round(n)):,}"
 
 
-# ---------------------------------------------------------------- close-in-profit bargaining banks (fixed text, three languages)
-# Every bank is a list of variants; NegState.used remembers which were said, so no round repeats a line.
-OPENERS = [
-    _t("Fair enough.", "ठीक है।", "Theek hai."),
-    _t("I understand.", "मैं समझता हूँ।", "Main samajhta hoon."),
-    _t("Okay, let me see what I can do.", "अच्छा, देखता हूँ मैं क्या कर सकता हूँ।", "Achha, dekhta hoon main kya kar sakta hoon."),
-    _t("Alright.", "चलिए।", "Chaliye."),
-]
-FIRST_NUMBER = _t("What number did you have in mind?", "आप बताइए, आपके मन में कितना है?", "Aap batao, aapke mann mein kitna hai?")
-PERK_LEADS = [
-    _t("Let me add something instead of cutting the price: one thing free.", "कीमत घटाने की जगह एक चीज़ फ्री कर देता हूँ।", "Keemat ghatane ki jagah ek cheez free kar deta hoon."),
-    _t("How about this: a bit more value rather than a lower number.", "एक काम करता हूँ: कम कीमत की जगह थोड़ा और वैल्यू जोड़ देता हूँ।", "Ek kaam karta hoon: kam keemat ki jagah thoda aur value jod deta hoon."),
-    _t("Here's one more thing from my side.", "लीजिए, एक चीज़ और मेरी तरफ़ से।", "Ye lijiye, ek cheez aur meri taraf se."),
-]
-PRICE_LINES = [  # a price concession; NO urgency or deadline wording (gate run 4: "अगर अभी तय हो जाए" was false urgency); {p} = the price
-    ("I can do {p} for you.", "मैं आपके लिए {p} कर सकता हूँ।", "Aapke liye main {p} kar sakta hoon."),
-    ("It has been nice talking to you, so I'll come down to {p}.", "आपसे बात करके अच्छा लगा, इसलिए {p} कर देता हूँ।",
-     "Aapse baat karke achha laga, isliye {p} kar deta hoon."),
-    ("Let me stretch a little more: {p}.", "थोड़ा और खींचता हूँ: {p}।", "Thoda aur kheenchta hoon: {p}."),
-    ("One more small step down, to {p}.", "एक छोटा क़दम और, {p}।", "Ek chhota kadam aur, {p}."),
-]
-MIDDLE_LINE = ("Let's meet in the middle: {p}.", "चलिए बीच का करते हैं: {p}।", "Chaliye beech ka karte hain: {p}.")
-FINAL_LINE = ("{p} is my final price, I can't go below it; it is a fair one and I'd be glad to have you.",
-              "{p} मेरी आख़िरी कीमत है, इससे नीचे नहीं जा सकता; ये ठीक कीमत है और आपका स्वागत है।",
-              "{p} meri aakhri keemat hai, isse neeche nahi ja sakta; ye theek keemat hai aur aapka swagat hai.")
-ACCEPT_LINES = [
-    ("Done, {p} it is, that works for me.", "ठीक है, {p} पक्का, ये मेरे लिए चलेगा।", "Done, {p} pakka, ye mere liye chalega."),
-    ("Deal, {p} works for me.", "चलिए, {p} में बात पक्की।", "Chaliye, {p} mein baat pakki."),
-    ("Alright, {p} it is.", "ठीक है, {p} कर देता हूँ।", "Theek hai, {p} kar deta hoon."),
-]
-ASKS = [  # closing-ask forms; never the same twice in a row
-    ("Shall I lock {p} and send the link?", "क्या मैं {p} पक्का कर दूँ और लिंक भेज दूँ?", "Kya main {p} pakka kar doon aur link bhej doon?"),
-    ("Should I send you the joining link at {p}?", "तो {p} पर जॉइनिंग लिंक भेज दूँ?", "To {p} par joining link bhej doon?"),
-    ("Is {p} a deal, then?", "तो {p} में बात पक्की?", "To {p} mein baat pakki?"),
-    ("Want me to SMS the link for {p} now?", "{p} का लिंक अभी SMS कर दूँ?", "{p} ka link abhi SMS kar doon?"),
-]
-LOWEST_LINE = ("{p} is already the lowest I can go.", "{p} मेरी सबसे कम कीमत है।", "{p} meri sabse kam keemat hai.")
-SWEET_LEAD = _t("The price can't move any further, but here is something that may help.", "कीमत इससे आगे नहीं हिल सकती, पर एक चीज़ शायद काम आए।",
-                "Keemat isse aage nahi hil sakti, par ek cheez shayad kaam aaye.")
+# ---------------------------------------------------------------- the Indian ladder (numbers only from the product's economics)
+# Wording lives in negotiation_banks.py: three tones x three languages, every bank rotated so no call repeats a line.
 SWEET_ORDER = ("referral", "cheaper_plan", "trial_pass", "annual_saving")
+_STEP_FRACTIONS = (0.33, 0.25, 0.17, 0.12, 0.08)   # each concession as a share of (list - floor): shrinking, e.g. 200 -> 150 -> 100 on a 599 room
 
 
-def _fill(row, p, price: float) -> dict[str, str]:
-    return {l: row[i].format(p=_fmt(p, price)) for i, l in enumerate(LANGS)}
+def clean_tone(t: str | None) -> str:
+    return t if t in nb.TONES else "mid"
+
+
+def ladder_enabled(p) -> bool:
+    """The cash ladder runs only for a product that has economics: a list price and a floor (cost + margin, or an explicit floor) below it.
+    A product with no economics (a real company's price, e.g. Claude Pro) gets value and reassurance only: no concessions."""
+    eco = getattr(p, "economics", None)
+    return eco is not None and eco.list_price > 0 and 0 < eco.profit_floor < eco.list_price
+
+
+def _grid(L: float) -> int:
+    return 50 if L >= 1000 else 10 if L >= 200 else 5 if L >= 50 else 1
+
+
+def _near(x: float, g: int) -> int:
+    """The friendly price (...49 / ...99 on a 50 grid) nearest to x."""
+    return int(round((x + 1) / g)) * g - 1 if g > 1 else int(round(x))
+
+
+def _up(x: float, g: int) -> int:
+    """The smallest friendly price at or above x (so the rounded floor never drops under the real floor)."""
+    return int(math.ceil((x + 1) / g - 1e-9)) * g - 1 if g > 1 else int(math.ceil(x - 1e-9))
+
+
+def ladder_prices(list_price: float, floor: float) -> list[int]:
+    """The concession prices, highest first, last = the final price (the floor rounded UP to a friendly number, never below it).
+    Steps shrink: each cut is a fraction of (list - floor). Empty when there is nothing to give (final == list)."""
+    g = _grid(list_price)
+    final = min(_up(floor, g), int(math.ceil(list_price)))
+    if list_price - final < g:
+        return []
+    room, prev, out = list_price - floor, float(list_price), []
+    for fr in _STEP_FRACTIONS:
+        x = _near(prev - fr * room, g)
+        if x >= prev:
+            x = _near(prev - g, g)
+        if x - final < max(g, 0.1 * room):  # too close to the final price to be a step of its own
+            break
+        out.append(x)
+        prev = x
+    return out + [final]
+
+
+def effective_floor(eco, st: NegState) -> float:
+    """The profit floor plus what the perks already promised cost us: a sale with a perk must still clear the margin."""
+    return eco.profit_floor + sum(x.cost for x in eco.ladder if x.kind == "perk" and x.id in st.perks)
+
+
+def margin_ok(eco, price: float, perk_ids=()) -> bool:
+    """price - cost - perk cost >= the minimum margin (the profit check every offer must pass)."""
+    perk = sum(x.cost for x in eco.ladder if x.kind == "perk" and x.id in perk_ids)
+    return price - perk >= eco.profit_floor - 1e-9
+
+
+_UNIT = re.compile(r"(\d+(?:\.\d+)?)?\s*(day|din|week|hafte|month|mahin|year|saal|annual)", _I)
+
+
+def per_day(eco) -> float | None:
+    m = _UNIT.search(eco.unit or "")
+    if not m:
+        return None
+    n = float(m.group(1) or 1)
+    u = m.group(2).lower()
+    per = 1 if u in ("day", "din") else 7 if u in ("week", "hafte") else 30 if u.startswith("mahin") or u == "month" else 365
+    days = per * n
+    return eco.list_price / days if days else None
 
 
 def _pick(st: NegState, key: str, n: int) -> int:
-    """The first variant of this bank not yet said on the call; once all were, the least repeated (round robin)."""
+    """The first variant of this bank not yet said on the call; once all were, round robin."""
     seen = [u for u in st.used if u.startswith(key + ":")]
     for i in range(n):
         if f"{key}:{i}" not in seen:
@@ -293,100 +332,135 @@ def _pick(st: NegState, key: str, n: int) -> int:
     return i
 
 
-def _ask(p, st: NegState, price: float) -> dict[str, str]:
-    st.ask_i = (st.ask_i + 1) % len(ASKS)
-    return _fill(ASKS[st.ask_i], p, price)
+def _say(bank, tone: str, st: NegState, key: str, **kw) -> dict[str, str]:
+    """One row of the bank for this tone (rotated), filled in for the three languages. kw values are strings or {lang: str}."""
+    rows = bank[tone]
+    row = rows[_pick(st, f"{key}:{tone}", len(rows))]
+    clean = lambda v: str(v).replace("{", "(").replace("}", ")")
+    return {l: row[i].format(**{k: clean(v[l] if isinstance(v, dict) else v) for k, v in kw.items()}) for i, l in enumerate(LANGS)}
 
 
-def _round50(x: float) -> int:
-    return int(round(x / 50.0)) * 50
+def _p(p, price: float) -> dict[str, str]:
+    return {l: _fmt(p, price) for l in LANGS}
 
 
-def _perk_cost(eco, ids) -> float:
-    return sum(x.cost for x in eco.ladder if x.kind == "perk" and x.id in ids)
+def _ask(p, st: NegState, tone: str, price: float) -> dict[str, str]:
+    return _say(nb.ASK, tone, st, "ask", p=_fmt(p, price))
 
 
-def effective_floor(eco, st: NegState) -> float:
-    """The profit floor plus what the perks already promised cost us: a sale with a perk must still clear the margin."""
-    return eco.profit_floor + _perk_cost(eco, st.perks)
+def _value_lines(p, st: NegState, tone: str, need_known: str, n_benefits: int = 2) -> dict[str, str]:
+    if need_known and (_VALUE.search(need_known) or _BUDGET.search(need_known) or _HAGGLE.search(need_known) or _PUSH.search(need_known)):
+        need_known = ""  # the "need" the call recorded is the price complaint itself: not a goal to tie the value to
+    joiner = {"en": " and ", "hi": " और ", "hinglish": " aur "}
+    b = {l: joiner[l].join(x for x in (_benefit(p, l, i) for i in range(n_benefits)) if x) for l in LANGS}
+    out = {l: "" for l in LANGS}
+    if all(b.values()):
+        out = _say(nb.VALUE_NEED if need_known else nb.VALUE, tone, st, "value", v=b, **({"need": need_known} if need_known else {}))
+    pd = per_day(p.economics)
+    if pd is not None and pd >= 1:
+        day = _say(nb.PER_DAY, tone, st, "perday", d=_fmt(p, pd))
+        out = {l: _join(out[l], day[l]) for l in LANGS}
+    return out
 
 
-def _remaining(eco, st: NegState, cur: float, floor: float):
-    # at most ONE perk per sale (a second perk would be stacking); cost counts against the margin through effective_floor()
-    perks = [x for x in eco.ladder if x.kind == "perk" and len(st.perks) < eco.max_perks and x.id not in st.perks and all(x.text.get(l) for l in LANGS)
-             and cur >= eco.profit_floor + x.cost]
-    prices = sorted((x for x in eco.ladder if x.kind == "price" and floor <= x.price < cur), key=lambda x: -x.price)
-    return perks, prices
+def _lowest_offer(st: NegState, cur: float) -> float:
+    return min(x for x in (st.price, cur) if x) if st.price else cur
 
 
-def _ladder_reply(p, kind: str, text: str, st: NegState, need_known: str, committed: bool = False) -> NegReply | None:
-    """Close-in-profit bargaining (economics in the product config): anchor at list, reframe value on the first push and let them name
-    their number, then concede one ladder step per push (value perks before cash, shrinking price steps, friendly rounding), accept a
-    counter at or above the profit floor at once, meet a counter below the current price halfway (never below the floor), tie every price
-    to a commitment (no deadline, no scarcity), state the final price once, give one last honest sweetener, then walk away warmly.
-    Every price on the table is at or above the profit floor; every line is picked so no sentence repeats on the call."""
+def _ladder_reply(p, kind: str, text: str, st: NegState, need_known: str, committed: bool = False, tone: str = "mid") -> NegReply | None:
+    """The Indian way, per product economics (list, floor = max(cost x (1+margin), floor_price), perk costs against the margin):
+      1. first push: a warm, firm no plus concrete value, no cut (no number given -> ask the budget; a number -> say no to it, ask them to come up);
+      2. every later push: ONE step down the shrinking ladder (fractions of list - floor, friendly ...49/...99 prices), framed personally,
+         tied to a closing ask; "last/final" only on the true last step above the floor, otherwise "going lower is difficult";
+      3. a counter at/above our current offer, or at/above the next step, or at/after the last step and >= floor: accepted at once;
+         a counter between the floor and the next step: meet in the middle (friendly rounding, never below the floor);
+         a counter below the floor: a no to that number, then the next step;
+      4. at the floor: one honest sweetener (a perk the margin allows, then a configured lever), then a warm walk-away. Never below the
+         floor, never back up (st.price only goes down), never retracts the agreed price, no urgency or invented approvals."""
+    tone = clean_tone(tone)
     eco = p.economics
     st = NegState(**asdict(st))
+    L = float(eco.list_price)
     floor = effective_floor(eco, st)
-    cur = st.price or eco.list_price
+    cur = st.price or L
     st.pushes += 1
-    say = lambda *banks: {l: _join(*(b[l] for b in banks)) for l in LANGS}
-    lead = ACK.get(kind, ACK["haggle"]) if st.pushes == 1 else OPENERS[_pick(st, "open", len(OPENERS))]
-    n = None
-    target = None
-    if kind == "counter_offer":
+    first = st.pushes == 1
+    n, target = None, None
+    if kind == "counter_offer" or (re.search(r"\d[\d,]{2,}", text) and not _NOT_A_PRICE.search(text)):  # "mera budget 2000 hai" names a rate too
         n = counter_number(text)
         if n is not None:
             target = float(max(0, cur - n)) if re.search(r"kam|कम|off|less", text, _I) and n < cur else float(n)
-    if target is not None and target >= floor:  # at or above the floor: accepted at once, even on the very first push
-        price = min(target, cur)
-        st.price, st.final_said = price, True
-        a = _fill(ACCEPT_LINES[_pick(st, "accept", len(ACCEPT_LINES))], p, price)
-        return NegReply("negotiation", say(a, _ask(p, st, price)), st, offer={"price": price}, note="Accepted at once; one closing ask.")
+    say = lambda *banks: {l: _join(*(b[l] for b in banks)) for l in LANGS}
+    g = _grid(L)
+
+    def accept(price: float, note: str) -> NegReply:
+        seq_ = ladder_prices(L, floor)
+        st.price, st.final_said = min(price, cur), st.final_said or bool(seq_ and price <= seq_[-1])
+        return NegReply("negotiation", say(_say(nb.ACCEPT, tone, st, "accept", p=_fmt(p, st.price)), _ask(p, st, tone, st.price)), st,
+                        offer={"price": st.price}, note=note, toned=True)
+
+    if st.agreed:  # the agreed price stands: never retracted, never lowered, never raised
+        return NegReply("negotiation", _say(nb.CLOSED_AGAIN, tone, st, "closed"), st, note="Price already agreed: it stays.", toned=True)
+    if target is not None and target >= cur:
+        return accept(cur, "Their number is at or above our offer: accepted at once, at our offer.")
     if st.closed:
-        return NegReply("negotiation", CLOSED_AGAIN[_pick(st, "closed", len(CLOSED_AGAIN))], st)
-    if st.pushes == 1 and target is None:  # first vague push: anchor at list, value, and let them name their number first
-        if committed:
-            return NegReply("negotiation", say(lead, FIRST_NUMBER), st, note="Already keen: let them name their number first.")
-        bank = lang_bank_value({l: _benefit(p, l) for l in LANGS}, need_known)
-        keep = _t(f"Would {_fmt(p, cur)} work for you with that, or what number do you have in mind?", f"इसके साथ क्या {_fmt(p, cur)} ठीक रहेगा, या आपके मन में कितना है?",
-                  f"Iske saath kya {_fmt(p, cur)} theek rahega, ya aapke mann mein kitna hai?")
-        return NegReply("negotiation", say(lead, bank, keep), st, note="Anchor at list; let them name a number; no concession yet.")
-    perks, prices = _remaining(eco, st, cur, floor)
-    if perks:  # value before cash
-        stp = perks[0]
-        st.perks.append(stp.id)
-        floor = effective_floor(eco, st)
-        line = {l: stp.text[l] for l in LANGS}
-        return NegReply("negotiation", say(PERK_LEADS[_pick(st, "perk", len(PERK_LEADS))], line, _ask(p, st, cur)), st,
-                        offer={"price": cur, "perk": stp.id}, note="A perk instead of a price cut, then a closing ask.")
-    if prices:
-        price = float(prices[0].price)
-        row = PRICE_LINES[_pick(st, "price", len(PRICE_LINES))]
-        mid_used = False
-        if n is not None and kind == "counter_offer":  # below the floor or not yet reachable: meet them part of the way, never under the floor
-            mid = float(_round50((cur + n) / 2.0))
-            if floor <= mid <= cur - 50 and mid != price:
-                price, row, mid_used = mid, MIDDLE_LINE, True
-        st.price = price
-        _, after = _remaining(eco, st, price, floor)
-        if not after:
-            st.final_said = True
-            return NegReply("price_floor", say(_fill(MIDDLE_LINE, p, price) if mid_used else {l: '' for l in LANGS}, _fill(FINAL_LINE, p, price), _ask(p, st, price)), st, offer={"price": price}, note="Final price, said once, warmly.")
-        return NegReply("negotiation", say(lead, _fill(row, p, price), _ask(p, st, price)), st, offer={"price": price}, note="One concession tied to a commitment, one closing ask.")
+        return NegReply("negotiation", _say(nb.CLOSED_AGAIN, tone, st, "closed"), st, toned=True)
+    seq = ladder_prices(L, floor)
+    nxt = next((x for x in seq if x < cur), None)
+    if first:  # one warm firm no, with value: no cut yet
+        if target is not None:
+            lead = _say(nb.NO_NUM, tone, st, "nonum", n=_fmt(p, target))
+            tail = _say(nb.ASK_COME_UP, tone, st, "comeup")
+        elif committed:
+            return NegReply("negotiation", say(_say(nb.NO_FIRST, tone, st, "no"), _say(nb.ASK_KEEP, tone, st, "keep")), st,
+                            note="Already keen: a warm no, let them name their number.", toned=True)
+        else:
+            lead = _say(nb.COMPARE_LEAD, tone, st, "cmp") if kind == "competitor" else _say(nb.NO_FIRST, tone, st, "no")
+            tail = _say(nb.ASK_BUDGET, tone, st, "budget")
+        return NegReply("negotiation", say(lead, _value_lines(p, st, tone, need_known), tail), st,
+                        note="Warm firm no with value; no concession yet; ask their budget/number.", toned=True)
+    if target is not None and target >= floor:
+        if nxt is None or target >= nxt:  # at/after the last step, or at/above the step we would give anyway: yes
+            return accept(target, "Their number clears the floor and is at/above our next step: accepted.")
+        mid = max(_near((cur + target) / 2.0, g), seq[-1] if seq else int(math.ceil(floor)))
+        if mid < cur:
+            st.price = float(mid)
+            final = bool(seq) and mid == seq[-1]
+            st.final_said = st.final_said or final
+            return NegReply("price_floor" if final else "negotiation",
+                            say(_say(nb.MID, tone, st, "mid", p=_fmt(p, mid)), _say(nb.NOT_LAST, tone, st, "notlast") if not final else {l: "" for l in LANGS},
+                                _ask(p, st, tone, mid)), st, offer={"price": float(mid)}, note="Met in the middle, never below the floor; one closing ask.", toned=True)
+    if nxt is not None:
+        st.price = float(nxt)
+        final = nxt == seq[-1]
+        st.final_said = st.final_said or final
+        lead = _say(nb.NO_NUM_THEN, tone, st, "nothen", n=_fmt(p, target)) if target is not None else {l: "" for l in LANGS}
+        body = _say(nb.FINAL, tone, st, "final", p=_fmt(p, nxt)) if final else say(
+            _say(nb.STEP, tone, st, "step", p=_fmt(p, nxt)), _say(nb.NOT_LAST, tone, st, "notlast") if cur < L else {l: "" for l in LANGS})
+        return NegReply("price_floor" if final else "negotiation", say(lead, body, _ask(p, st, tone, nxt)), st, offer={"price": float(nxt)},
+                        note="Final price, said once, warmly." if final else "One concession tied to a closing ask.", toned=True)
+    # at the floor: no more cash. State it once, then one honest sweetener, then a warm goodbye
     if not st.final_said:
         st.final_said = True
-        return NegReply("price_floor", say(_fill(LOWEST_LINE, p, cur), _ask(p, st, cur)), st, offer={"price": cur}, note="Floor stated once, warmly.")
-    if not st.sweet:  # one last NEW honest offer before the goodbye: a configured lever, never an invented one
+        return NegReply("price_floor", say(_say(nb.LOWEST, tone, st, "lowest", p=_fmt(p, cur)), _ask(p, st, tone, cur)), st, offer={"price": cur},
+                        note="Floor stated once, warmly.", toned=True)
+    if not st.sweet:
         st.sweet = True
+        perks = [x for x in eco.ladder if x.kind == "perk" and len(st.perks) < eco.max_perks and x.id not in st.perks and all(x.text.get(l) for l in LANGS)
+                 and cur >= eco.profit_floor + x.cost]
+        if perks:  # a perk instead of cash, only if the margin still clears with its cost
+            stp = perks[0]
+            st.perks.append(stp.id)
+            return NegReply("negotiation", say(_say(nb.PERK_LEAD, tone, st, "perk"), {l: stp.text[l] for l in LANGS}, _ask(p, st, tone, cur)), st,
+                            offer={"price": cur, "perk": stp.id}, note="One perk instead of cash (margin allows), then a closing ask.", toned=True)
         cfg = getattr(p, "negotiation", None)
         for name in SWEET_ORDER:
-            if cfg is not None and name in cfg.levers and name not in st.levers and _lever_text(p, name, "en") and all(_lever_text(p, name, l) for l in LANGS):
+            if cfg is not None and name in cfg.levers and name not in st.levers and all(_lever_text(p, name, l) for l in LANGS):
                 st.levers.append(name)
-                return NegReply("negotiation", say(SWEET_LEAD, {l: _lever_text(p, name, l) for l in LANGS}, _ask(p, st, cur)), st,
-                                offer={"price": cur}, note="Last honest sweetener from the config, then a warm goodbye.")
+                return NegReply("negotiation", say(_say(nb.SWEET_LEAD, tone, st, "sweet"), {l: _lever_text(p, name, l) for l in LANGS}, _ask(p, st, tone, cur)), st,
+                                offer={"price": cur}, note="Last honest sweetener from the config, then a warm goodbye.", toned=True)
     st.closed = True
-    return NegReply("negotiation", CLOSE_WARM[0], st, note="Final no: warm goodbye, callback offered.")
+    return NegReply("negotiation", _say(nb.CLOSE_WARM, tone, st, "close"), st, note="Final no: warm goodbye, callback offered.", toned=True)
 
 
 def lang_bank_value(b: dict, need_known: str) -> dict:
@@ -397,7 +471,7 @@ def lang_bank_value(b: dict, need_known: str) -> dict:
     return {l: bank[l].format(b1=clean(b[l])) for l in LANGS}
 
 
-def step(p, text: str, st: NegState, need_known: str = "", faq_line=None, committed: bool = False) -> NegReply | None:
+def step(p, text: str, st: NegState, need_known: str = "", faq_line=None, committed: bool = False, tone: str = "mid") -> NegReply | None:
     """One negotiation turn. Returns the reply for all three languages and the new state, or None when this is not price talk.
     `faq_line(lang)` gives the operator's approved FAQ answer for the question, when there is one."""
     kind = detect(text)
@@ -406,13 +480,14 @@ def step(p, text: str, st: NegState, need_known: str = "", faq_line=None, commit
     st = NegState(**asdict(st))
     st.rounds += 1
     if kind == "competitor" and not explicit_push(text):
-        return _compare_reply(p, st)
-    ladder_on = getattr(p, "economics", None) is not None and p.economics.list_price > 0 and bool(p.economics.ladder)
+        return _compare_reply(p, st, tone)
+    if kind == "counter_offer" and _COMP_NAME.search(text) and honest.is_question(text) and not _PUSH.search(text):
+        return _compare_reply(p, st, tone)  # "Cult 2,500 mein deta hai, aapka kyun lu?": their rate is the competitor's, a question: answered, no concession
+    ladder_on = ladder_enabled(p)
     if ladder_on and kind in ("value_doubt", "budget") and honest.is_question(text) and not explicit_push(text):
         return None  # a question about how the price works is answered by the conversation first, not met with a concession
-    if getattr(p, "economics", None) is not None and p.economics.list_price > 0 and p.economics.ladder \
-            and kind in ("haggle", "value_doubt", "budget", "counter_offer", "competitor"):
-        return _ladder_reply(p, kind, text, st, need_known, committed)
+    if ladder_on and kind in ("haggle", "value_doubt", "budget", "counter_offer", "competitor"):
+        return _ladder_reply(p, kind, text, st, need_known, committed, tone)
     if st.closed and kind in ("competitor", "discount_group", "free_trial"):
         return None  # a question again after walking away: the conversation answers it (never pushed)
     if st.closed:  # they already walked away once: never push, just stay kind
