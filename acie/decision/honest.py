@@ -98,13 +98,13 @@ def price_variants(p, lang: str) -> list[str]:
         return {"en": [f"To put it plainly: {first}."], "hi": [f"सीधे शब्दों में: {first}।"],
                 "hinglish": [f"Seedhe shabdon mein: {first}."]}[lang]
     return {
-        "en": [f"Once more, step by step. First: {first}. After that: {after}.",
+        "en": [f"Sure. First {first}; after that, {after}.",
                f"Short version: you start at {first}, and later it is {after}.",
                f"In two parts: {first}; and then {after}."],
-        "hi": [f"फिर से, धीरे-धीरे। पहले: {first}। उसके बाद: {after}।",
+        "hi": [f"जी, पहले {first}; उसके बाद {after}।",
                f"छोटे में: शुरू में {first}, और आगे चलकर {after}।",
                f"दो हिस्से हैं: {first}; और फिर {after}।"],
-        "hinglish": [f"Phir se, dheere-dheere. Pehle: {first}. Uske baad: {after}.",
+        "hinglish": [f"Ji, pehle {first}; uske baad {after}.",
                      f"Chhote mein: shuru mein {first}, aur aage chalkar {after}.",
                      f"Do hisse hain: {first}; aur phir {after}."],
     }[lang]

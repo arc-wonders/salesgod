@@ -44,13 +44,16 @@ _TRIAL = re.compile(r"free trial|trial|ट्रायल|demo|try (it )?(first|
 _COUNTER = re.compile(r"(?:₹|rs\.?|rupees?)\s*\d[\d,]{2,}|\b\d[\d,]{2,}\s*(?:pe|par|tak|mein|me|में)\s*(?:ho|chalega|done|final|kar|de)|\b\d[\d,]{2,}\s*(?:rupe\w*|rs)\b|\d[\d,]*\s*(rupe\w*|rs\.?|₹|dollars?|\$|bucks)?\s*(kam|कम|off|less|discount)\b|"
                       r"(₹|rs\.?|\$)\s*\d[\d,]*\s*(mein|me|में|for|tak|तक)?\s*(do|de|dedo|दो|दे|chahiye|चाहिए)?|\d[\d,]*\s*(rupe\w*|rs|₹|dollars?)?\s*(mein|me|में|for|tak|तक)\s*(do|de|dedo|दो|दे|chahiye|चाहिए|milega|मिलेगा|ho jayega|हो जाएगा)|"
                       r"(give|do|de|दो|दे)\s*(it|me)?\s*(for|at|in)?\s*(₹|rs\.?|\$)?\s*\d[\d,]*", _I)
+_COUNTER_MORE = re.compile(r"\b(?:for|at|around|about|to|in)\s*(?:₹|rs\.?|rupees?|\$)?\s*\d[\d,]{2,}\b|\b(?:want|need|make|give|take|do)\b.{0,18}\b\d[\d,]{2,}\b|"
+                          r"\b\d[\d,]{2,}\s*(?:max|only|hi|bas|tak|se zyada nahi)\b", _I)
 _COMP_NAME = re.compile(r"cult|gold.?s|anytime fitness|competitor|chatgpt|gpt|gemini|copilot|other (gym|app|plan)|dusr[ae] (gym|app|jagah)|doosre|दूसरे|कहीं और|kahin aur|elsewhere|वहाँ|wahan", _I)
 _COMP_PRICE = re.compile(r"cheap|sasta|सस्ता|सस्ती|price|dollar|\$|₹|rupe|रुपये|\b\d{3,5}\b|kitna|कितना|cost|monthly|मंथली|महंगा|mehenga|expensive|same|20|free hai|फ्री है", _I)
 _BUDGET = re.compile(r"budget|afford|bajet|बजट|tight|tangi|तंगी|paise (kam|nahi|nhi)|पैसे (कम|नहीं)|expensive for me|mere liye (mehenga|महंगा)|मेरे लिए (महंगा|ज़्यादा|ज्यादा)", _I)
 _VALUE = re.compile(r"worth|value for money|paisa vasool|पैसा वसूल|itna (paisa|mehenga|महंगा)|इतना (पैसा|महंगा)|mehenga|mehnga|महंगा|expensive|too much|"
                     r"zyada hai|jyada hai|ज़्यादा है|ज्यादा है|costly|pricey|over ?priced", _I)
-_HAGGLE = re.compile(honest.NEGOTIATE.pattern + "|" + NEGOTIATE_MORE + r"|still (too )?(high|much|expensive)|(ab|abhi|phir|fir) bhi (mehenga|zyada|jyada|kam)|aur kam|और कम|bargain|negotiat|best price|final price|last price|aakhri (rate|price)|आखिरी (रेट|प्राइस)|thoda (aur )?(kam|sasta)", _I)
+_HAGGLE = re.compile(honest.NEGOTIATE.pattern + "|" + NEGOTIATE_MORE + r"|still (too )?(high|much|expensive)|(ab|abhi|phir|fir) bhi (mehenga|zyada|jyada|kam)|aur kam|और कम|bargain|negotiat|how much (lower|less|cheaper)|(price|rate|keemat|कीमत) (lower|kam|कम)|more lower|\\blower\\b.{0,12}\\b(price|rate)\\b|(any|more|further|extra|koi|aur) (more |further |extra )?(discount|छूट|डिस्काउंट)|(give|do|de|dedo) (me )?(a |the |some )?(discount|छूट|डिस्काउंट)|best price|final price|last price|aakhri (rate|price)|आखिरी (रेट|प्राइस)|thoda (aur )?(kam|sasta)", _I)
 _NUM = re.compile(r"\d[\d,]*")
+_NOT_A_PRICE = re.compile(r"\b(?:days?|din|months?|mahine|weeks?|hafte|sessions?|minutes?|baje|bje|o.?clock|am|pm)\b", _I)
 
 
 def detect(text: str) -> str | None:
@@ -59,6 +62,8 @@ def detect(text: str) -> str | None:
     for name, rx in (("discount_group", _GROUP), ("free_trial", _TRIAL), ("counter_offer", _COUNTER)):
         if rx.search(t):
             return name
+    if _COUNTER_MORE.search(t) and not _NOT_A_PRICE.search(t):
+        return "counter_offer"
     if _COMP_NAME.search(t) and _COMP_PRICE.search(t):
         return "competitor"
     for name, rx in (("budget", _BUDGET), ("value_doubt", _VALUE), ("haggle", _HAGGLE)):
@@ -68,8 +73,10 @@ def detect(text: str) -> str | None:
 
 
 def counter_number(text: str) -> int | None:
-    m = _NUM.search(text.replace(",", ""))
-    return int(m.group(0)) if m else None
+    """The amount the caller names: the last number of 3+ digits ("not sold at 2,999, I want 2,500" -> 2500), else the last number."""
+    nums = [int(x) for x in re.findall(r"\d+", text.replace(",", ""))]
+    big = [x for x in nums if x >= 100]
+    return (big or nums or [None])[-1]
 
 
 @dataclass

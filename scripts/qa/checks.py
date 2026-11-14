@@ -272,6 +272,8 @@ DEFAULT_CHECKS = {
 # ---------------------------------------------------------------- positive expectations (must)
 
 def check_must(c: Ctx, must: dict) -> list[tuple[str, str]]:
+    while isinstance(must.get("must"), dict):  # fixtures wrote {"must": {"must": {...}}}: unwrap, or the expectations never ran
+        must = {**{k: v for k, v in must.items() if k != "must"}, **must["must"]}
     out = []
     fr = flat(c.reply)
     if "contains_any" in must and not any(flat(x) in fr for x in must["contains_any"]):

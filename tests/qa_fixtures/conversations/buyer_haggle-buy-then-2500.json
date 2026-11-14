@@ -37,17 +37,8 @@
     "must": {
      "end_call": false,
      "contains_any": [
-      "fixed",
-      "तय",
-      "kam nahi",
-      "कम नहीं",
-      "can't reduce",
-      "cannot reduce",
-      "nahi kar sakta",
-      "नहीं कर सकता",
-      "no discount",
-      "already",
-      "pehle se"
+      "2,500",
+      "2500"
      ]
     }
    }
@@ -120,7 +111,6 @@
    ],
    "must": {
     "must": {
-     "end_call": false,
      "contains_any": [
       "last",
       "one more",

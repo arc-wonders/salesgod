@@ -453,6 +453,7 @@ _ANNUAL = (r"annual|yearly|सालाना|saalana|salana|(saal|साल) (k
            r"(per|a|every) year|(plan|प्लान) (saal|साल)")
 _RUPEE_ASK = re.compile(r"rupe|rupay|रुपए|रुपये|रुपया|₹|inr|indian|डॉलर क्या|dollar kya|what.?s a dollar", re.I)
 _GOODBYE_NOW = re.compile(r"रखते हैं|रखती हूँ|रखता हूँ|rakhte hain|rakhti hoon|rakhta hoon|चलते हैं|chalte hain|रखो (फोन|फ़ोन)|(फोन|फ़ोन) रखो|रख दो|bye|बाय|phone rakh|rakho phone|hang up|गुड बाय|good ?bye", re.I)
+_CUT_CALL = re.compile(r"cut (the |this )?(call|phone)|(just )?hang up|(call|phone|fon) (kaat|band|rakh)|kaat do|काट दो|(कॉल|फोन|फ़ोन) (काट|बंद|रख)|band karo|बंद करो|stop (it|this)|bas karo|बस करो", re.I)
 _NOT_NOW_LINK = re.compile(r"(link|लिंक) (abhi )?(mat|मत|ना|nahi|नहीं)|(abhi|अभी) (mat|मत) bhej|मत भेजो|mat bhejo|don.?t send|"
                            r"not now|abhi nahi|अभी नहीं|i don.?t click|नहीं भेजना|nahi bhejna|मत भेजना|mat bhejna|कुछ नहीं भेज", re.I)
 # a price question with a twist goes to the conversation turn, not the price line ("is there an annual plan?")
@@ -942,6 +943,8 @@ class ProductSalesDomain:
         if d.get("pending") == "neg_close" and not _is_question(text) and (self._yes(text, intent, d) or _clean_yes(text) or intent == "affirm") \
                 and not _FIRM_NO.search(text):
             self._apply_neg_offer(d)
+            if d.get("terms_confirmed") == "1" and (_BUY.search(text) or d.get("requested_link") == "1"):
+                return self._link_plan(d, lang)  # they already heard the terms and asked for the link: the agreed price goes out, no second confirmation
             d["pending"] = "confirm"
             d["requested_link"] = "0"
             return self._confirm_plan(lang, d)
@@ -1054,6 +1057,17 @@ class ProductSalesDomain:
                                           "ज़रूर, हमारी टीम से कोई व्यक्ति आपको वापस कॉल करेगा। धन्यवाद!",
                                           "Zaroor, hamari team se koi aapko call karega. Thank you!"))
 
+        if _CUT_CALL.search(text) and not _OPT_OUT.search(text) and not _FIRM_NO.search(text):
+            ns = negotiation.NegState.load(d)
+            if ns.rounds > 0 and not ns.closed and (last := self._negotiate_step("any further discount", d, ctx, lang)) is not None:
+                return last  # "stop repeating, just cut the call" mid-haggle: ONE last new honest offer first
+            d.pop("pending", None)
+            d["outcome"] = d.get("outcome") or "declined"
+            return TurnPlan(intent="declined", llm_allowed=False, end_call=True, decision="caller wants to end: warm goodbye with a way back",
+                            objective="Understood, warm goodbye, they can come back any time",
+                            fallback=_tpl("Understood, I'll stop here. If you change your mind, just ask me and I can send the link or call you back. Thanks for your time!",
+                                          "ठीक है, मैं यहीं रुकता हूँ। मन बदले तो बस बता दीजिएगा, मैं लिंक भेज दूँगा या वापस कॉल कर लूँगा। आपके समय के लिए धन्यवाद!",
+                                          "Theek hai, main yahin rukta hoon. Mann badle to bas bata dijiyega, main link bhej dunga ya wapas call kar loonga. Aapke time ke liye thank you!"))
         if _GOODBYE_NOW.search(text) and (not self._asks(text, d) or _FIRM_NO.search(text)
                                           or re.search(r"(bye|बाय)\W*$", text, re.I)):
             d.pop("pending", None)
@@ -1493,12 +1507,15 @@ class ProductSalesDomain:
         allows, then a warm walk-away. State lives in dialog["_neg"] so it never loops or repeats."""
         if d.get("existing_user") == "1" or d.get("sad_hold") == "1" or _FIRM_NO.search(text) or _OPT_OUT.search(text):
             return None
-        if ctx is not None and ctx.has("payment_link"):
-            return None
+        eco = getattr(self.p, "economics", None)
+        ladder = eco is not None and eco.list_price > 0 and bool(eco.ladder)
+        if ctx is not None and ctx.has("payment_link") and not ladder:
+            return None  # (a buyer who got the link and still haggles keeps getting honest answers when the product has a ladder)
         faq = self._faq_match(text)
         faq_line = ((lambda l: {"hi": faq.answer_hi, "hinglish": faq.answer_hinglish, "en": faq.answer}.get(l) or "")
                     if faq is not None and not faq.not_eligible else None)
-        r = negotiation.step(self.p, text, negotiation.NegState.load(d), d.get("need_known", ""), faq_line)
+        committed = d.get("requested_link") == "1" or d.get("terms_confirmed") == "1" or (ctx is not None and ctx.has("payment_link"))
+        r = negotiation.step(self.p, text, negotiation.NegState.load(d), d.get("need_known", ""), faq_line, committed=committed)
         if r is None:
             return None
         r.state.save(d)
