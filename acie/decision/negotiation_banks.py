@@ -256,3 +256,31 @@ PER_DAY_Q = _b(
              "भाई, यह {u} के लिए एक ही पेमेंट {p} है; {d} रोज़ का बस हिसाब है, रोज़ का पेमेंट नहीं।",
              "Bhai, yeh {u} ke liye ek hi payment {p} hai; {d} roz ka bas hisaab hai, roz ka payment nahi.")],
 )
+
+# after the warm walk-away when NO price was agreed: never claim an agreement
+CLOSED_WALK = _b(
+    professional=[
+        ("Sir, I understand. {p} is the lowest I can offer, and the link is ready whenever you wish.", "सर, मैं समझता हूँ। {p} मेरी सबसे कम कीमत है, और लिंक जब चाहें तैयार है।",
+         "Sir, main samajhta hoon. {p} meri sabse kam keemat hai, aur link jab chahein tayyar hai."),
+        ("Sir, there is no hurry; I can also call you at a time that suits you.", "सर, कोई जल्दी नहीं है; मैं आपके सुविधाजनक समय पर कॉल भी कर सकता हूँ।",
+         "Sir, koi jaldi nahi hai; main aapke suvidhajanak samay par call bhi kar sakta hoon."),
+        ("Sir, thank you for hearing me out; whatever you decide, it was a pleasure.", "सर, मेरी बात सुनने के लिए धन्यवाद; आप जो भी तय करें, आपसे बात करके अच्छा लगा।",
+         "Sir, meri baat sunne ke liye dhanyavaad; aap jo bhi tay karein, aapse baat karke achha laga."),
+    ],
+    mid=[
+        ("I hear you. {p} is the lowest I can go, and the link is ready whenever you want.", "मैं समझता हूँ। {p} मेरी सबसे कम कीमत है, और लिंक जब चाहें तैयार है।",
+         "Main samajhta hoon. {p} meri sabse kam keemat hai, aur link jab chahein ready hai."),
+        ("No hurry at all; I can also call you back when it suits you.", "कोई जल्दी नहीं है; चाहें तो मैं आपके सुविधा वाले समय पर वापस कॉल कर सकता हूँ।",
+         "Koi jaldi nahi hai; chahein to main aapke suvidha wale time par wapas call kar sakta hoon."),
+        ("Thanks for hearing me out; whatever you decide, it was good talking to you.", "मेरी बात सुनने के लिए शुक्रिया; आप जो भी तय करें, आपसे बात करके अच्छा लगा।",
+         "Meri baat sunne ke liye shukriya; aap jo bhi tay karein, aapse baat karke achha laga."),
+    ],
+    casual=[
+        ("Bhai, {p} is my lowest, and the link is ready when you want.", "भाई, {p} मेरी सबसे कम है, और लिंक जब चाहो तैयार है।",
+         "Bhai, {p} meri sabse kam hai, aur link jab chahein ready hai."),
+        ("No hurry, boss; I can call you back whenever suits you.", "कोई जल्दी नहीं, बॉस; जब आपको सही लगे मैं वापस कॉल कर लूँगा।",
+         "Koi jaldi nahi, boss; jab aapko sahi lage main wapas call kar loonga."),
+        ("Thanks for the chat, bhai; whatever you decide, it was good talking.", "बात करने के लिए शुक्रिया भाई; जो भी तय करें, अच्छा लगा बात करके।",
+         "Baat karne ke liye shukriya bhai; jo bhi tay karein, achha laga baat karke."),
+    ],
+)

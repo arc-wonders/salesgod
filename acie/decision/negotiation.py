@@ -429,12 +429,15 @@ def _ladder_reply(p, kind: str, text: str, st: NegState, need_known: str, commit
         return NegReply("negotiation", say(_say(nb.ACCEPT, tone, st, "accept", p=_fmt(p, st.price)), _ask(p, st, tone, st.price)), st,
                         offer={"price": st.price}, note=note, toned=True)
 
-    if st.agreed:  # the agreed price stands: never retracted, never lowered, never raised
-        return NegReply("negotiation", _say(nb.CLOSED_AGAIN, tone, st, "closed"), st, note="Price already agreed: it stays.", toned=True)
+    if st.agreed:
+        if target is None:  # the agreed price stands: never retracted, never raised
+            return NegReply("negotiation", _say(nb.CLOSED_AGAIN, tone, st, "closed"), st, note="Price already agreed: it stays.", toned=True)
+        cur, st.price, st.agreed = min(cur, st.agreed), min(cur, st.agreed), 0.0   # they name a different number: a counter against the agreed price, not above it
+        st.closed = False
     if target is not None and target >= cur:
         return accept(cur, "Their number is at or above our offer: accepted at once, at our offer.")
-    if st.closed:
-        return NegReply("negotiation", _say(nb.CLOSED_AGAIN, tone, st, "closed"), st, toned=True)
+    if st.closed and not (target is not None and target >= floor):
+        return NegReply("negotiation", _say(nb.CLOSED_WALK, tone, st, "walk", p=_fmt(p, cur)), st, toned=True)
     seq = ladder_prices(L, floor)
     nxt = next((x for x in seq if x < cur), None)
     if first:  # one warm firm no, with value: no cut yet

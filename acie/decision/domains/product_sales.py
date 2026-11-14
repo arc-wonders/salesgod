@@ -569,6 +569,9 @@ _RESUME = {
 }
 
 
+_ABUSE = re.compile(r"fuck|f\*+k|\\bshit\\b|bastard|idiot|stupid|moron|bakwas|bakwaas|bewakoof|bevakoof|chutiy|madarchod|bhenchod|behenchod|harami|gandu|\\bsaala\\b|rubbish|nonsense|बकवास|बेवकूफ|हरामी|चूतिया|गंदू|घटिया", re.I)
+
+
 def _tpl(en: str, hi: str, hinglish: str) -> dict[str, str]:
     return {"en": en, "hi": hi, "hinglish": hinglish}
 
@@ -1029,6 +1032,14 @@ class ProductSalesDomain:
         if (side := self._compliance(text, intent, d, ctx)) is not None:
             return side
 
+        # ---------------- abuse / swearing / anger: a short apology and a way forward, in every tone (never a fact, never a pitch)
+        if _ABUSE.search(text) and not _OPT_OUT.search(text) and not _FIRM_NO.search(text) and not _CUT_CALL.search(text):
+            d["pending"] = d.get("pending") or "close"
+            return TurnPlan(intent="apology", llm_allowed=False, decision="caller is upset: apologise, no pitch", objective="Apologise briefly and ask what they need",
+                            fallback=_tpl("I'm sorry, that was my mistake and I may not have been clear. Tell me what you would like to know and I will answer plainly.",
+                                          "माफ़ कीजिए, ये मेरी गलती है, शायद मैं साफ़ नहीं बोल पाया। आप बताइए क्या जानना चाहते हैं, मैं सीधे जवाब दूँगा।",
+                                          "Maaf kijiye, ye meri galti hai, shayad main saaf nahi bol paya. Aap bataiye kya jaanna chahte hain, main seedha jawab dunga."))
+
         # ---------------- policy: the customer already decided
         if ctx is not None and (after := self._after_decision(intent, text, d, ctx, lang)) is not None:
             return after
@@ -1065,12 +1076,19 @@ class ProductSalesDomain:
         if (rep_ := self._repeat_request_step(text, d, ctx, lang)) is not None:
             return rep_
 
+        # ---------------- "can I just pay 33 a day instead of the full payment?" always gets the plain per-day answer, never a terms restatement
+        if negotiation.ladder_enabled(self.p) and negotiation.detect(text) == "per_day" and not _FIRM_NO.search(text) \
+                and (pd_ := self._negotiate_step(text, d, ctx, lang, force_kind="per_day")) is not None:
+            return pd_
+
         # ---------------- a counter that comes with consent ("okay 2,600 then, send the link"): their number is a counter, never a yes to ours
-        if negotiation.ladder_enabled(self.p) and d.get("pending") in ("neg_close", "confirm", "close") and not _FIRM_NO.search(text) and d.get("terms_confirmed") != "1":
+        if negotiation.ladder_enabled(self.p) and not _FIRM_NO.search(text):
             nn = negotiation.counter_number(text)
-            if nn is not None and nn >= 100 and not negotiation._NOT_A_PRICE.search(text) and not self._names_offered_price(text, d) \
-                    and (negotiation.NegState.load(d).price or 0) > 0 and (neg2 := self._negotiate_step(text, d, ctx, lang, force_kind="counter_offer")) is not None:
-                return neg2
+            ns0 = negotiation.NegState.load(d)
+            on_table = {int(x) for x in (ns0.price, ns0.agreed) if x}
+            if nn is not None and nn >= 100 and nn not in on_table and not negotiation._NOT_A_PRICE.search(text) and on_table \
+                    and (neg2 := self._negotiate_step(text, d, ctx, lang, force_kind="counter_offer")) is not None:
+                return neg2  # a number the caller names that is not our price is a counter, even after the terms were confirmed
 
         # ---------------- "yes" to a negotiated price: lock it in the terms, then the usual confirmation (terms + link) with the agreed price
         if d.get("pending") == "neg_close" and not _is_question(text) and (self._yes(text, intent, d) or _clean_yes(text) or intent == "affirm") \

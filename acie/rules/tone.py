@@ -91,7 +91,7 @@ def address(fallback: dict[str, str], tone: str, addr: str) -> dict[str, str]:
             out[l] = t
     return out
 _CASUAL_LEADS = {"en": ("Bhai, ", "Boss, ", "Bhai, "), "hi": ("भाई, ", "बॉस, ", "भाई, "), "hinglish": ("Bhai, ", "Boss, ", "Bhai, ")}
-_LOWER_OK = {"ye", "yeh", "aap", "aapka", "aapki", "kya", "main", "bas", "theek", "badhiya", "koi", "is", "iske", "haan", "bilkul", "achha",
+_LOWER_OK = {"ye", "yeh", "just", "great", "alright", "sure", "absolutely", "certainly", "so", "well", "right", "thanks", "thank", "please", "ji", "bilkul", "zaroor", "badhiya", "chaliye", "aap", "aapka", "aapki", "kya", "main", "bas", "theek", "badhiya", "koi", "is", "iske", "haan", "bilkul", "achha",
              "zaroor", "dekhiye", "the", "it", "it's", "that", "that's", "here", "here's", "that", "this", "sure", "great", "okay", "ok", "yes", "no", "of", "alright", "you", "we", "there", "to", "ji", "samajh", "samajhta"}
 _SWAPS = {
     "professional": [(r"\bBadhiya\b", "Bahut achha"), (r"\bchalo\b", "chaliye"), (r"\bChalo\b", "Chaliye"), (r"\bkoi baat nahi\b", "koi baat nahi, Sir"),
