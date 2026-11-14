@@ -24,13 +24,15 @@ class MemoryStore(Protocol):
         ...
 
 
+from .hashing import HashingEmbedder  # noqa: E402,F401  (re-export: acie.store imports it from here)
+
+
 def memory_enabled() -> bool:
     return os.getenv("ACIE_MEMORY", "0") == "1"
 
 
 def make_embedder() -> Embedder:
     """ACIE_EMBED=st picks sentence-transformers (falls back to hashing if it cannot load)."""
-    from .hashing import HashingEmbedder
     if os.getenv("ACIE_EMBED", "hashing") == "st":
         try:
             from .st import SentenceTransformerEmbedder

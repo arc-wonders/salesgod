@@ -14,6 +14,8 @@ import asyncio
 import difflib
 import re
 import inspect
+import json
+import os
 import time
 from collections.abc import Awaitable, Callable
 
@@ -164,7 +166,10 @@ class ACIEPipeline:
         session.context.record_turn(session.turn_index, turn.text, plan.intent, is_question(turn.text),
                                     objection=session.dialog.pop("_objection", None), sinks=self.context_sinks)
 
-        prompt = self.compiler.compile(plan, expr, session, turn.text)
+        extra = {}
+        if os.getenv("ACIE_MEMORY") == "1":  # semantic memory + profile reach the prompt only when memory is on
+            extra = {"profile": profile, "memories": json.loads(session.dialog.get("_memories", "[]"))}
+        prompt = self.compiler.compile(plan, expr, session, turn.text, **extra)
         validator = StreamingValidator(plan, expr, trusted=not plan.llm_allowed, customer_text=turn.text)
         sentences: list[str] = []
 

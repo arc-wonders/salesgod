@@ -4,7 +4,7 @@ import types
 import pytest
 
 from acie.feedback import FeedbackEngine, validation_penalty
-from acie.schemas import (CustomerProfile, ExpressionParams, HumanState, SessionState, TurnPlan, ValidationReport)
+from acie.schemas import (CustomerProfile, ExpressionParams, HumanState, SessionState, TurnPlan, Utterance, ValidationReport)
 
 PLAN = TurnPlan(intent="pitch", objective="x")
 
@@ -29,7 +29,7 @@ def test_reward_math():
     assert fb.turn_reward(a, a, penalty=1.0, barge_in=True) == pytest.approx(-0.8)
     assert fb.turn_reward(HumanState(), HumanState(frustration=1, confusion=1), 1.0, True) == -1.0  # clipped
     pos = HumanState(engagement=0.8)
-    assert fb.turn_reward(HumanState(), pos) == pytest.approx(0.5 * 0.3 / 3)
+    assert fb.turn_reward(HumanState(), pos) == pytest.approx(0.5 * 0.3 / 4)
 
 
 def test_weights_configurable(monkeypatch):
@@ -50,37 +50,95 @@ def test_penalty_codes_or_issues():
     assert validation_penalty(ns) == 0  # issue_codes win
 
 
-def test_pending_resolved_on_next_turn_and_delayed_credit():
-    pol, fb, p, s = Pol(), FeedbackEngine(), CustomerProfile(customer_id="c"), SessionState(session_id="s", customer_id="c")
+def mk():
+    pol, fb = Pol(), FeedbackEngine()
     fb.policy = pol
-    turn(fb, p, s, HumanState(frustration=0.4))
+    return pol, fb, CustomerProfile(customer_id="c"), SessionState(session_id="s", customer_id="c")
+
+
+def say(s, cust, agent):
+    s.history += [Utterance(role="customer", text=cust), Utterance(role="agent", text=agent)]
+
+
+def plan(intent, end=False):
+    return TurnPlan(intent=intent, objective="x", end_call=end)
+
+
+def step(fb, p, s, st, intent="answer", cust="haan", agent="ok", val=None, barge=False, end=False):
+    say(s, cust, agent)
+    fb.after_turn(p, cust, {}, None, st, plan(intent, end), session=s, expr=ExpressionParams(), validation=val,
+                  barge_in=barge)
+
+
+def test_pending_resolved_on_next_turn_and_calm_credit():
+    pol, fb, p, s = mk()
+    step(fb, p, s, HumanState(frustration=0.4), agent="first reply")
     assert pol.calls == []  # needs the next turn
-    turn(fb, p, s, HumanState(frustration=0.1), barge=True)
+    step(fb, p, s, HumanState(frustration=0.1), agent="a different answer entirely", barge=True)
     assert len(pol.calls) == 1 and pol.calls[0][2] == pytest.approx(0.8 * 0.3 - 0.3)
-    s.context.decision = "accepted"
-    s.history = []
     fb.end_session(p, s)
-    # last turn resolved at end (no next state: 0), then both turns credited with +1 (discounted)
-    rewards = [c[2] for c in pol.calls]
-    assert len(rewards) == 4 and rewards[1] == pytest.approx(0.0)
-    assert rewards[2] == pytest.approx(0.9) and rewards[3] == pytest.approx(1.0)
+    r = [c[2] for c in pol.calls]
+    assert r[1] == pytest.approx(0.0)  # last turn: no next state
+    assert r[2] == pytest.approx(0.5 * 0.9) and r[3] == pytest.approx(0.5)  # calm + answered credit
 
 
-def test_declined_negative_and_safety_excluded():
-    for decision, safety, expect in (("declined", False, -0.3), ("later", False, 0.2), (None, True, None)):
-        pol, fb, p = Pol(), FeedbackEngine(), CustomerProfile(customer_id="c")
-        s = SessionState(session_id="s", customer_id="c")
-        fb.policy = pol
-        turn(fb, p, s, HumanState())
-        if decision:
-            s.context.decision = decision
-        if safety:
-            s.dialog["safety_flag"] = "1"
+def test_sales_outcome_has_no_weight():
+    rewards = []
+    for decision in ("accepted", "undecided"):
+        pol, fb, p, s = mk()
+        step(fb, p, s, HumanState())
+        s.context.decision = decision
         fb.end_session(p, s)
-        if expect is None:
-            assert pol.calls == []
-        else:
-            assert pol.calls[-1][2] == pytest.approx(expect)
+        rewards.append([c[2] for c in pol.calls])
+    assert rewards[0] == rewards[1]  # accepting the offer earns nothing extra
+
+
+def test_respected_refusal_and_pushed_opt_out():
+    pol, fb, p, s = mk()
+    step(fb, p, s, HumanState(), intent="pitch")
+    s.context.decision = "later"
+    step(fb, p, s, HumanState(), intent="callback", end=True, agent="sure, I will call later")
+    fb.end_session(p, s)
+    assert pol.calls[-1][2] == pytest.approx(1.0)  # respected 0.5 + calm 0.5
+    pol, fb, p, s = mk()
+    s.context.decision = "declined"
+    step(fb, p, s, HumanState(), intent="recover", agent="but it is a great deal")
+    s.context.promised = ["number_removed_no_more_calls"]
+    step(fb, p, s, HumanState(), intent="opt_out", agent="removed your number", end=True)
+    fb.end_session(p, s)
+    assert pol.calls[-1][2] == pytest.approx(-1.0)
+
+
+def test_repeat_hangup_and_unanswered():
+    pol, fb, p, s = mk()
+    step(fb, p, s, HumanState(), agent="Our plan costs a small monthly fee.")
+    step(fb, p, s, HumanState(), agent="Our plan costs a small monthly fee.")  # repeat, caller hangs up
+    fb.end_session(p, s)
+    assert pol.calls[-1][2] == pytest.approx(-1.0)  # hangup -1 plus repeat -0.5, clipped
+    pol, fb, p, s = mk()
+    step(fb, p, s, HumanState(), cust="what does it cost?", agent="sorry, say again",
+         val=ValidationReport(ok=False, used_fallback=True))
+    fb.end_session(p, s)
+    assert pol.calls[-1][2] <= -0.5 + 1e-9
+
+
+def test_deterministic():
+    out = []
+    for _ in range(2):
+        pol, fb, p, s = mk()
+        for i in range(3):
+            step(fb, p, s, HumanState(frustration=0.1 * i), agent=f"reply number {i}")
+        fb.end_session(p, s)
+        out.append([c[2] for c in pol.calls])
+    assert out[0] == out[1]
+
+
+def test_safety_excluded():
+    pol, fb, p, s = mk()
+    step(fb, p, s, HumanState())
+    s.dialog["safety_flag"] = "1"
+    fb.end_session(p, s)
+    assert pol.calls == []
 
 
 def test_learner_hook_called_and_missing_is_skipped(monkeypatch):
