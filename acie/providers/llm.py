@@ -19,6 +19,9 @@ class LLMProvider(ProviderBase):
 
     async def provide(self, turn: TurnInput, session: SessionState, guide: SignalGuide) -> PartialSignals | None:
         u = await self.nlu.understand(turn.text, guide.history, guide.intents, guide.about)
+        if u is not None and getattr(u, "crisis", False):
+            # safety second net (acie/safety.crisis_from_nlu): may only ADD a crisis flag, never suppress one
+            session.dialog["_nlu_crisis"] = (getattr(u, "crisis_reason", "") or "1")[:120]
         if u is None:
             return None
         gist = getattr(u, "gist", "") or ""

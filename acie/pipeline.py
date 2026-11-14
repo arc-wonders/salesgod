@@ -27,7 +27,7 @@ from .feedback import FeedbackEngine
 from .personalization.policy import AdaptationPolicy, detect_explicit_requests, make_default_policy
 from .personalization.profile_store import MemoryProfileStore, ProfileStore
 from .context import is_question
-from .safety import distress_followup_plan, distress_plan
+from .safety import CONCERN_T, DISTRESS_T, concern_plan, distress_followup_plan, distress_plan, distress_score
 from . import psyche
 from .psyche import emotion_policy
 from .psyche.ledger import SaidLedger
@@ -284,7 +284,14 @@ class ACIEPipeline:
         expr = self.policy.decide(turn.text, state, profile, session, explicit, intent)
         # the emotion table (acie/psyche/emotion_policy.py): one deterministic row per turn from the 14 state dims.
         # The crisis row is always active (it is the old distress override, now a row); the others need ACIE_PSYCHE=1
-        strat = emotion_policy.decide(state, turn.text, turn.voice, flagged=bool(session.dialog.get("safety_flag")))
+        # crisis evidence: phonetic + 2-turn window + voice (acie/safety.distress_score), OR the NLU's crisis flag
+        hist = [u.text for u in session.history if u.role == "customer"][-2:]
+        d_score, d_ev = distress_score(turn.text, hist, getattr(turn, "voice", None))
+        nlu_crisis = session.dialog.pop("_nlu_crisis", None)
+        flagged = bool(session.dialog.get("safety_flag")) or bool(nlu_crisis) or d_score >= DISTRESS_T
+        if d_ev or nlu_crisis:
+            session.dialog["_distress"] = json.dumps({"score": round(d_score, 2), "evidence": d_ev[:4], "nlu": nlu_crisis})
+        strat = emotion_policy.decide(state, turn.text, turn.voice, flagged=flagged)
         session.dialog["_row"] = strat.row  # the domain reads it (a sad caller pauses the selling in both configs)
         if psyche.enabled() and strat.row != "crisis":
             expr = emotion_policy.apply_to_expression(expr, strat)
@@ -301,6 +308,10 @@ class ACIEPipeline:
                 session.dialog["safety_flag"] = "1"
                 session.dialog.pop("pending", None)
                 profile.outcomes.append("safety_distress")
+        elif CONCERN_T <= d_score < DISTRESS_T and not session.dialog.get("safety_flag") \
+                and not session.dialog.get("concern_asked"):
+            plan = concern_plan()  # middle band: a gentle check-in instead of selling; a clearer answer reaches crisis
+            session.dialog["concern_asked"] = "1"
         else:
             # the domain may react to how the caller feels right now (e.g. recover when annoyed)
             session.dialog["_frustration"] = f"{state.frustration:.2f}"
