@@ -93,7 +93,7 @@ class TemplateBackend:
 class OpenAICompatibleBackend:
     def __init__(self, base_url: str | None = None, model: str | None = None, api_key: str | None = None,
                  temperature: float = 0.3, max_tokens: int | None = None, timeout_s: float = 5.0,
-                 first_token_s: float | None = None, label: str | None = None):
+                 first_token_s: float | None = None, label: str | None = None, extra_body: dict | None = None):
         # ACIE_EXPR_* point only the reply writer at another model (e.g. Gemini through its OpenAI-compatible
         # endpoint) while the understanding layer stays on the local Qwen (ACIE_LLM_*, guided JSON, fast)
         env = lambda k, d: os.getenv(f"ACIE_EXPR_{k}") or os.getenv(f"ACIE_LLM_{k}", d)
@@ -104,8 +104,8 @@ class OpenAICompatibleBackend:
         self.max_tokens = max_tokens or int(env("MAX_TOKENS", "320"))  # Devanagari is token-heavy
         # e.g. '{"chat_template_kwargs": {"enable_thinking": false}}' for Qwen3 on vLLM,
         # '{"reasoning_effort": "low"}' for Gemini
-        self.extra_body = json.loads(os.getenv("ACIE_EXPR_EXTRA_BODY") if os.getenv("ACIE_EXPR_BASE_URL")
-                                     else os.getenv("ACIE_LLM_EXTRA_BODY", "{}") or "{}")
+        self.extra_body = extra_body if extra_body is not None else json.loads(
+            os.getenv("ACIE_EXPR_EXTRA_BODY") if os.getenv("ACIE_EXPR_BASE_URL") else os.getenv("ACIE_LLM_EXTRA_BODY", "{}") or "{}")
         self.client = httpx.AsyncClient(timeout=timeout_s)
         # ACIE_EXPR_FIRST_TOKEN_S (default off): no first token in time -> speak the safe template instead
         env_ft = os.getenv("ACIE_EXPR_FIRST_TOKEN_S")

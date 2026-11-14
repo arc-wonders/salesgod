@@ -107,7 +107,7 @@ class App:
                                         playbook=pbm.load(DATA, product.tenant, product.id))
             prompt = f"{product.product_name}, {product.seller_name}, subscription, offer, हाँ, नहीं, ठीक है, बताइए"
         pipe = ACIEPipeline(DecisionEngine(domain), backend=self.backends[call.backend], store=self.store,
-                            buffer_reply=call.backend == "llm", nlu=self.nlu if call.backend == "llm" else None,
+                            buffer_reply=call.backend != "template", nlu=self.nlu if call.backend != "template" else None,
                             session_store=getattr(self, "session_store", None))
         for sink in getattr(self, "sinks", ()):
             pipe.context_sinks.append(sink.for_call(call.call_id) if hasattr(sink, "for_call") else sink)
@@ -227,12 +227,21 @@ def build_app() -> tuple[FastAPI, App]:
         state.world = WorldKnowledge()
         from acie.understanding import LLMUnderstanding
         state.nlu = LLMUnderstanding()
-        state.backends = {"llm": make_backend_from_env(), "template": TemplateBackend()}
+        # qwen: the local vLLM (ACIE_LLM_*); gemini: ACIE_EXPR_* when set; llm: whichever ACIE_EXPR_* points at
+        import json as _json
+        qwen = OpenAICompatibleBackend(base_url=os.getenv("ACIE_LLM_BASE_URL", "http://localhost:8000/v1"),
+                                       model=os.getenv("ACIE_LLM_MODEL", "acie-expression"),
+                                       api_key=os.getenv("ACIE_LLM_API_KEY", "EMPTY"),
+                                       max_tokens=int(os.getenv("ACIE_LLM_MAX_TOKENS", "320")),
+                                       extra_body=_json.loads(os.getenv("ACIE_LLM_EXTRA_BODY", "{}") or "{}"))
+        state.backends = {"llm": make_backend_from_env(), "qwen": qwen, "template": TemplateBackend()}
+        if os.getenv("ACIE_EXPR_BASE_URL"):
+            state.backends["gemini"] = state.backends["llm"]
         state.products()  # writes the default product on first start
         state.pipelines = {"llm": ACIEPipeline(DecisionEngine(BankDemoDomain()), backend=state.backends["llm"],
                                                store=state.store, buffer_reply=True)}
-        log.info("ready: whisper=%s fish=%s llm=%s", state.stt.model_name, state.tts.model,
-                 os.getenv("ACIE_LLM_MODEL"))
+        log.info("ready: whisper=%s fish=%s replies=%s nlu=%s backends=%s", state.stt.model_name, state.tts.model,
+                 getattr(state.backends["llm"], "model", "?"), os.getenv("ACIE_LLM_MODEL"), sorted(state.backends))
         asyncio.create_task(_warmup())
 
     async def _warmup() -> None:
@@ -316,7 +325,7 @@ def build_app() -> tuple[FastAPI, App]:
                               campaign=campaign, customer_name=str(body.get("customer_name", ""))[:40],
                               customer_age=_age(body.get("customer_age")),
                               customer_id=body.get("customer_id", "c1") if campaign == "bank_demo" else to)
-            if call.backend not in ("llm", "template") or call.language not in ("hi", "en", "hinglish"):
+            if call.backend not in state.backends or call.language not in ("hi", "en", "hinglish"):
                 raise HTTPException(400, "bad backend/language")
             state.calls[call.call_id] = call
             try:
@@ -354,7 +363,8 @@ def build_app() -> tuple[FastAPI, App]:
         campaign = body.get("campaign", "claude-pro")
         if campaign not in state.products():
             raise HTTPException(400, "unknown campaign")
-        call = CallRecord(to="sim", campaign=campaign, language=body.get("language", "hi"), backend="llm",
+        call = CallRecord(to="sim", campaign=campaign, language=body.get("language", "hi"),
+                          backend=body.get("backend", "llm") if body.get("backend", "llm") in state.backends else "llm",
                           customer_name=str(body.get("customer_name", ""))[:40],
                           customer_age=_age(body.get("customer_age")))
         call.customer_id = f"sim-{call.call_id}"
