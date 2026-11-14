@@ -8,8 +8,9 @@ data/sft/prompts.jsonl
 data/voice/calls/
 data/voice/profiles/
 data/voice/sims/
-data/voice/calls/
 runs/
 models/
 data/bandit.json
 data/real/
+data/style_xgb.json
+data/style_log.jsonl
