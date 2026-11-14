@@ -724,4 +724,4 @@ class ACIEPipeline:
                 pass
 
         return TurnResult(text=text, plan=plan, state=state, expression=expr,
-                          validation=validator.report(), timings_ms=t)
+                          validation=validator.report(), timings_ms=t, result=session.context.result or None)

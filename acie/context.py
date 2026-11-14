@@ -85,6 +85,8 @@ class CallContext(BaseModel):
     objections: list[str] = Field(default_factory=list)
     decision: str = "undecided"
     outcome: str = ""  # see _OUTCOMES
+    call_type: str = ""  # which call type ran (acie/calltypes); "" = the plain sales call
+    result: dict = Field(default_factory=dict)  # the call-type pack's CallResult (acie/calltypes/schema.py), rebuilt every turn
 
     def has(self, promise: str) -> bool:
         return promise in self.promised
