@@ -28,6 +28,19 @@ _PATTERNS = [
     # English
     r"\bkill myself\b", r"\bwant to die\b", r"\bwanna die\b", r"\bfeel like dying\b", r"\bend my life\b",
     r"\bsuicid", r"\bdon'?t want to live\b", r"\bno reason to live\b", r"\bhurt myself\b",
+    # live call 2ccf3f1387 (14 Nov): "मेरा गोल है छत से कूदना" (ASR: "छट से कूदना") and "मैं जिंदगी से हारा हुआ हूँ
+    # मुझे नहीं जीना" (ASR: "जिन्दगी ते खारा ... नहीं दीना") were NOT caught; the agent pitched the gym and then said
+    # "आपका दिन शुभ हो". Word order, method phrases, and the ASR garbles seen on that call (only next to "जिंदगी")
+    r"(नहीं|नही) (जीना|जीना है|जीना चाहत|जीने का)", r"(नहीं|नही) रहना (इस दुनिया|दुनिया)", r"दुनिया में (नहीं|नही) रहना", r"दुनिया छोड (दूं|दू|दूंगा|दूंगी|देना)",
+    r"(जिंदगी|जिन्दगी|जिदगी) (से|ते)( मैं)? (हार|खार|तंग|परेशान|थक|ऊब)",
+    r"(जिंदगी|जिन्दगी|जिदगी)\S*( \S+){0,6} (नहीं|नही) (जीना|दीना|जीणा)",
+    r"(जिंदगी|जिन्दगी|जिदगी) (खत्म|बेकार|बोझ)",
+    r"(छत|छट|बिल्डिंग|पुल|ब्रिज|टेरेस|बालकनी) (से|पर से) (कूद|छलांग|छलाग)",
+    r"(ट्रेन|गाडी|गाड़ी) के (आगे|नीचे) (कूद|लेट|आ जा)", r"नस काट", r"(जहर|जेहर) खा", r"फंदा",
+    r"nahi?n? jeena", r"jeena nahi", r"zindagi se (haar|tang|pareshan|thak)", r"(chhat|chat|roof|building|bridge|pul) se (kood|kud|jump)",
+    r"(zeher|zehar|jahar) kha", r"nas kaat", r"duniya chhod",
+    r"\bjump(ing)? off (the |a )?(roof|building|bridge|terrace|balcony)", r"\bend it all\b", r"\bno point (in )?living\b",
+    r"\bdon'?t want to be alive\b", r"\btired of (living|life|being alive)\b", r"\bgive up on (life|living)\b",
 ]
 _RX = re.compile("|".join(_PATTERNS), re.IGNORECASE)
 
