@@ -65,7 +65,7 @@ def _v(voice, name, default=0.0):
     return float(getattr(voice, name, default) or default) if voice is not None else default
 
 
-def decide(state, text: str = "", voice=None, flagged: bool = False, nlu_intent: str = "") -> Strategy:
+def decide(state, text: str = "", voice=None, flagged: bool = False, nlu_intent: str = "", signals=None) -> Strategy:
     """state: HumanState or dict of dims. First matching row wins (see the module table)."""
     g = (lambda k, d=0.0: float(state.get(k, d))) if isinstance(state, dict) else (lambda k, d=0.0: float(getattr(state, k, d)))
     if flagged or is_distress(text):
@@ -80,7 +80,7 @@ def decide(state, text: str = "", voice=None, flagged: bool = False, nlu_intent:
     if g("anxiety") >= 0.60:
         return _TABLE["anxious"]
     if (g("satisfaction", 0.5) <= 0.25 and g("engagement", 0.5) <= 0.40 and g("excitement") <= 0.20) \
-            or (nlu_intent == "personal" and g("calmness", 0.5) <= 0.40):
+            or ((nlu_intent == "personal" or (signals is not None and signals.heard("personal"))) and g("calmness", 0.5) <= 0.40):
         return _TABLE["sad"]
     if g("confusion") >= 0.60:
         return _TABLE["confused"]

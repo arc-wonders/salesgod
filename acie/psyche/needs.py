@@ -54,6 +54,8 @@ NO = re.compile(r"नहीं चाहिए|नही चाहिए|नह�
 # asking for a lower price is negotiation (a question about the price), never a decline, even with "नहीं" in it
 NEGOTIATE = re.compile(r"कम (नहीं |नही )?(कर|हो)|और कम|थोड़ा कम|थोडा कम|बोरा सा कम|कुछ कम|kam (nahi |nhi )?(kar|ho)|thoda kam|cheaper|lower (the )?price|"
                        r"\breduce\b|bargain|(some|any|a little|more) discount|discount (do|de|aur|mil)|सस्ता कर|sasta kar|और डिस्काउंट", _I)
+from ..signals import NEGOTIATE_MORE  # noqa: E402
+NEGOTIATE = re.compile(NEGOTIATE.pattern + "|" + NEGOTIATE_MORE, _I)
 BARE_NO = {"no", "nope", "nahi", "nahin", "nai", "na", "नहीं", "नही", "ना", "ने", "नो"}
 LATER = re.compile(r"\b(later|call me back|call back|call me later|some other time|another time|not now|abhi nahi|baad mein|baad me)\b|"
                    r"बाद में|बाद मे|अभी नहीं|अभी मत|कल कॉल|कल फोन|फिर कभी|बाद में कॉल", _I)
@@ -113,6 +115,12 @@ class NeedInput:
     decided: str = "undecided"                             # call context decision
     turn_index: int = 0
     prev_agent: str = ""
+    signals: object = None                                 # acie.signals.TurnSignals (learned providers' fused reading), or None
+
+    def heard(self, *labels: str) -> bool:
+        """A learned provider (any model) heard one of these intents; `nlu_intent` is the legacy single-label form."""
+        sg = self.signals
+        return self.nlu_intent in labels or (sg is not None and sg.heard(*labels))
 
 
 @dataclass
@@ -130,7 +138,7 @@ def signals(inp: NeedInput) -> dict[str, bool]:
         "crisis": bool(CRISIS.search(t)),
         "bye": bool(CLOSE.search(t)) or inp.intent == "goodbye",
         "thanks": bool(THANKS.search(t)),
-        "no": bool(NO.search(t)) or (0 < len(toks) <= 2 and all(w in BARE_NO for w in toks)) or inp.intent == "deny" or inp.nlu_intent == "deny",
+        "no": bool(NO.search(t)) or (0 < len(toks) <= 2 and all(w in BARE_NO for w in toks)) or inp.intent == "deny" or inp.heard("deny"),
         "negotiate": bool(NEGOTIATE.search(t)),
         "later": bool(LATER.search(t)) or inp.intent == "callback",
         "complaint": bool(COMPLAINT.search(t)),
@@ -139,7 +147,7 @@ def signals(inp: NeedInput) -> dict[str, bool]:
         "lang_trouble": bool(LANG_TROUBLE.search(t)),
         "asking": bool(ASKING.search(t)) or inp.question_topic not in ("none", ""),
         "busy": bool(BUSY.search(t)),
-        "personal": bool(PERSONAL.search(t)) or inp.nlu_intent in ("personal", "small_talk"),
+        "personal": bool(PERSONAL.search(t)) or inp.heard("personal", "small_talk"),
         "sale": bool(SALE.search(t)),
         "garbled": garbled(t),
         "go_on": bool(GO_ON.search(t)) or inp.intent in ("affirm", "tell_more", "benefits", "price"),
