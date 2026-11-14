@@ -1461,7 +1461,7 @@ class ProductSalesDomain:
             hit = next((i for i in build_catalog(p) if i.kind != "faq" and _matches(i, text)), None)
             generic = self._tpl3(lambda l: (hit.text.get(l) if hit is not None else None) or self._unknown_answer(text, d, l))
         elif os.environ.get("ACIE_KB") == "1" and len(text.split()) >= 3 and self._kb_line(text, "en") and not (u is not None and u.garbled):
-            generic = self._tpl3(lambda l: self._kb_line(text, l) or self._unknown_answer(text, d, l))  # a statement about their interest: the KB talks about it
+            generic = self._tpl3(lambda l: self._kb_line(text, l, d) or self._unknown_answer(text, d, l))  # a statement about their interest: the KB talks about it
         else:
             generic = _tpl("Sorry, I didn't quite get that. Could you say it once more?",
                            "माफ़ कीजिए, मैं ठीक से समझ नहीं पाया। एक बार फिर से बताएँगे?",
@@ -1588,8 +1588,11 @@ class ProductSalesDomain:
         if os.environ.get("ACIE_KB") == "1":  # the knowledge base answers first (nearest entry in the reply language, never "contact the owner")
             try:
                 from ...knowledge.retrieve import retrieve
-                res = retrieve(p, text, lang, k=1)
+                said = set(json.loads((d or {}).get("_kb_said") or "[]")) if d is not None else set()
+                res = retrieve(p, text, lang, k=1, exclude=frozenset(said))  # never the same KB entry twice on a call
                 if res.confident and res.hits and res.hits[0].text.strip():
+                    if d is not None and lang == "hinglish":  # the template builds all three languages at once: record once
+                        d["_kb_said"] = json.dumps(sorted(said | {res.hits[0].entry.id}))
                     return res.hits[0].text.strip()
             except Exception:  # noqa: BLE001 - a KB problem must never fail the turn
                 logging.getLogger("acie.decision").exception("KB retrieval failed")
@@ -1623,12 +1626,16 @@ class ProductSalesDomain:
                         objective="The line is unclear: ask them to repeat, warmly; after two in a row offer a callback or another language; no guess, no pitch",
                         fallback=line)
 
-    def _kb_line(self, text: str, lang: str) -> str:
+    def _kb_line(self, text: str, lang: str, d: dict | None = None) -> str:
         """The knowledge base's confident answer for this line in this language, else ''."""
         try:
             from ...knowledge.retrieve import retrieve
-            res = retrieve(self.p, text, lang, k=1)
-            return res.hits[0].text.strip() if res.confident and res.hits else ""
+            res = retrieve(self.p, text, lang, k=1, exclude=frozenset(json.loads((d or {}).get("_kb_said") or "[]")))
+            if res.confident and res.hits:
+                if d is not None and lang == "hinglish":  # (the template builds all three languages at once; record it once)
+                    d["_kb_said"] = json.dumps(sorted(set(json.loads(d.get("_kb_said") or "[]")) | {res.hits[0].entry.id}))
+                return res.hits[0].text.strip()
+            return ""
         except Exception:  # noqa: BLE001
             return ""
 
