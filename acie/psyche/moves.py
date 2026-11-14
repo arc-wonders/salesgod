@@ -374,6 +374,10 @@ def answer_again(mc: MoveContext, why: str = "") -> Move:
     the honest line (a different one each time); a catalog item already said -> the same fact in other words, finally
     "that's all I have on this, <where to look>"; nothing matched -> the honest generic line. Never a listening cue."""
     t, p, L, lang = mc.text, mc.product, mc.ledger, mc.lang
+    kind = honest.info_request(t)
+    if kind is not None:
+        return _say(mc, "answer_fact", {l: honest.info_request_variants(p, kind, l) + honest.end_variants(p, l) for l in LANGS}, slot="info:" + kind,
+                    note="Say honestly you can only send the payment link by SMS; do not offer to end the call.")
     topics = honest.find_topics(p, t)
     if topics and (topics[0].beats_faq or not honest.covered_by_faq(p, t)):
         return _unknown(mc, topics[0])
@@ -507,6 +511,8 @@ def _do_answer(mc: MoveContext) -> Move:
     t, L, p, lang = mc.text, mc.ledger, mc.product, mc.lang
     if p is None:
         return _unknown(mc)
+    if honest.info_request(t) is not None:
+        return answer_again(mc, "a request for something that cannot be sent")
     if honest.health_question(t):
         return _say(mc, "answer_health", _by_lang(lambda l: honest.health_variants(p, l)), slot="health",
                     note="Never promise what is safe for a health condition; send them to their doctor; no selling.")
@@ -637,7 +643,7 @@ def repeat_move(mc: MoveContext, intent: str) -> Move:
     else the honest "that's all I have"."""
     if intent in ("goodbye", "declined"):  # the caller's own goodbye / no: the only repeat that may close the call
         return _simple("close", CLOSE, mc, "closure", end_call=True, note="Close politely; do not repeat.")
-    if honest.is_question(mc.text) and mc.product is not None:  # a question, asked again: answer it in other words
+    if (honest.is_question(mc.text) or honest.info_request(mc.text)) and mc.product is not None:  # a question, asked again: answer it in other words
         return answer_again(mc, "the reply would have repeated an earlier one")
     if intent in ("not_understood", "clarify", "hello", "off_topic"):
         mc.need.flags["garbled"] = True

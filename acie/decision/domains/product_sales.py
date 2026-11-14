@@ -377,8 +377,8 @@ _BUY = re.compile(r"\bsend\b|bhej|भेज|le (lunga|lenge|leta|leti|lo)|ले
                   r"try (it|kar)|ट्राई कर|कोशिश कर|join (karna|kar|krna)|जॉइन (करना|कर)|join करना|join कर|"
                   r"lena hai|लेना है|le leta|sign up", re.IGNORECASE)
 _PRICE_CORE = re.compile(r"price|cost|how much|kitn|कितन|कीमत|दाम|\brate\b|रेट|\bfees?\b|paise kitne|पैसे कितने", re.I)
-_PRICE_ASK = re.compile(r"price|cost|how much|kitn|fees?\b|rate\b|कितन|कीमत|दाम|पैसे|paise|paisa|rupe|rupay|रुपए|रुपये|रुपया|dollar|डॉलर|डालर|\$|"
-                        r"permanent|हमेशा|hamesha|kat(ega|ta|enge)|कट|auto.?(renew|charge|debit)|60|साठ|off\b|छूट|"
+_PRICE_ASK = re.compile(r"price|cost|how much|kitn|\bfees?\b|\brate\b|कितन|कीमत|दाम|पैसे|paise|paisa|rupe|rupay|रुपए|रुपये|रुपया|dollar|डॉलर|डालर|\$|"
+                        r"permanent|हमेशा|hamesha|\bkat(ega|ta|enge)\b|कट|auto.?(renew|charge|debit)|60|साठ|\boff\b|छूट|"
                         r"(after|baad|बाद).{0,12}(3|three|teen|तीन)|(3|three|teen|तीन).{0,20}(after|baad|बाद)", re.I)
 _RENEWAL_ASK = re.compile(r"permanent|हमेशा|hamesha|kat(ega|ta|enge)|कट|auto|renew|deduct|after|baad|बाद|always|forever|"
                           r"(20|बीस|twenty).{0,20}(bhi|भी|too|also)", re.I)  # not "why is it 60% off?" (live call: a wall of terms)
@@ -1354,7 +1354,10 @@ class ProductSalesDomain:
         if faq is not None and not faq.not_eligible:
             return ({"hi": faq.answer_hi, "hinglish": faq.answer_hinglish}.get(lang) or (faq.answer if lang == "en" else "")) or None
         if re.search(r"kab tak|कब तक|how long|valid", text, re.I) and re.search(r"offer|ऑफर|discount|डिस्काउंट|price|कीमत", text, re.I):
-            return honest.offer_end_variants(p, lang)[0]
+            line = honest.offer_end_variants(p, lang)[0]
+            if _RUPEE_ASK.search(text) and p.rupee_terms.get(lang):
+                line += " " + re.sub(r"^(यानी|yaani|that's)\s*", "", p.rupee_terms[lang]).strip().capitalize() + ("।" if lang == "hi" else ".")
+            return line
         return None
 
     def _honest_step(self, text: str, d: dict, lang: str) -> TurnPlan | None:
@@ -1386,7 +1389,11 @@ class ProductSalesDomain:
             d["no_link"] = "1"  # they did not ask for the payment link: do not push it
         d["pending"] = d.get("pending") or "close"
         lines = self._tpl3(lambda l: honest.info_request_variants(self.p, kind, l)[0])
-        return TurnPlan(intent="answer", llm_allowed=False, decision="honest answer: cannot send that", fallback=lines,
+        bye = bool(_GOODBYE_NOW.search(text))
+        if bye:
+            d.pop("pending", None)
+            d["outcome"] = d.get("outcome") or "declined"
+        return TurnPlan(intent="answer", llm_allowed=False, end_call=bye, decision="honest answer: cannot send that", fallback=lines,
                         objective="Say honestly you can only send the payment link by SMS; do not turn their request into a payment-link offer")
 
     def _repeat_request_step(self, text: str, d: dict, ctx, lang: str) -> TurnPlan | None:

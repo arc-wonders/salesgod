@@ -186,7 +186,7 @@ class ACIEPipeline:
         else:
             intent_out = "nothing_new"
         session.dialog["_pm"] = mv.to_json()
-        return plan.model_copy(update={"intent": intent_out, "llm_allowed": False, "end_call": mv.end_call or plan.end_call and plan.intent in ("goodbye", "declined"),
+        return plan.model_copy(update={"intent": intent_out, "llm_allowed": False, "end_call": mv.end_call or plan.end_call and (plan.intent in ("goodbye", "declined") or str(plan.decision).startswith("honest answer")),
                                        "decision": "psyche_move", "fallback": dict(mv.text), "lead": None, "facts": {},
                                        "objective": mv.note or "Say something new"})
 

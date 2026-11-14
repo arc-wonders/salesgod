@@ -317,7 +317,7 @@ _INFO_NOUN = {
     "whatsapp": r"whatsapp|व्हाट्सएप|व्हाट्सऐप|\bwa\b|e-?mail|ईमेल|इमेल|\bmail\b",
     "free_signup": r"(free|फ्री|muft|मुफ्त)\W+(\w+\W+){0,2}(link|लिंक|signup|sign up|साइनअप|account|अकाउंट)|(link|लिंक)\W+(\w+\W+){0,3}(free|फ्री|muft|मुफ्त)",
 }
-_PAID = re.compile(r"payment link|पेमेंट लिंक|paid|pay kar|पे कर|buy|pro\b|premium|subscribe|सब्सक्राइब", _I)
+_PAID = re.compile(r"payment link|पेमेंट लिंक|pay kar|पे कर|\bpro\b|premium|subscribe|सब्सक्राइब", _I)
 
 
 def info_request(text: str) -> str | None:
