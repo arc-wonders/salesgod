@@ -722,6 +722,10 @@ def build_app() -> tuple[FastAPI, App]:
         finally:
             state.live_sessions.pop(call.call_id, None)
 
+    # ------------------------------------------------------------------ productgen (add a product by name): one self-contained block
+    from acie.productgen.api import register as _productgen_register
+    _productgen_register(api, _require, DATA, CALLS_DIR)
+
     @api.get("/healthz")
     async def health() -> dict:
         return {"ok": state.stt is not None}

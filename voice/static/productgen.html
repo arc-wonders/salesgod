@@ -1,0 +1,497 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SalesGod - Add a product</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;450;500;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* Same tokens as console.html */
+:root{
+  --bg:220 10% 5.7%;--fg:60 8% 92%;--muted:216 5% 65%;--tertiary:217 5% 47%;--body:216 5% 65%;
+  --rule:210 9% 13.5%;--rule-strong:214 8% 18%;--rule-heavy:216 8% 25%;
+  --panel:214 12% 8%;--elevated:216 10% 10%;--sidebar:220 10% 5.7%;--hover:210 9% 12.5%;
+  --signal:16 100% 56%;--green:153 44% 49%;--amber:38 85% 55%;--red:358 70% 60%;--blue:216 70% 64%;--slate:217 12% 60%;--violet:262 60% 68%;
+  --font:'Geist',ui-sans-serif,system-ui,sans-serif;--mono:'Geist Mono',ui-monospace,monospace;
+}
+.light{
+  --bg:45 14% 95%;--fg:220 10% 9%;--muted:220 5% 36%;--tertiary:220 4% 48%;--body:220 6% 26%;
+  --rule:40 8% 84%;--rule-strong:40 6% 76%;--rule-heavy:40 6% 70%;
+  --panel:45 18% 98%;--elevated:45 12% 93%;--sidebar:45 12% 92%;--hover:40 10% 87%;
+  --signal:16 100% 50%;--green:153 45% 32%;--amber:38 80% 36%;--red:358 65% 46%;--blue:216 55% 45%;--slate:217 12% 42%;--violet:262 45% 50%;
+}
+*,*::before,*::after{box-sizing:border-box}
+html,body{margin:0;min-height:100%;background:hsl(var(--bg));color:hsl(var(--fg));font-family:var(--font);font-size:13px;line-height:1.5}
+button,input,select,textarea{font:inherit;color:inherit}
+button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,summary:focus-visible{outline:1.5px solid hsl(var(--signal));outline-offset:2px}
+.mono{font-family:var(--mono)}
+a{color:hsl(var(--blue))}
+.topbar{display:flex;height:56px;align-items:center;gap:12px;padding:0 24px;border-bottom:1px solid hsl(var(--rule));position:sticky;top:0;z-index:5;background:hsl(var(--bg)/.95)}
+.brand{display:flex;align-items:center;gap:10px}
+.brand .mk{width:20px;height:20px;border-radius:5px;background:hsl(var(--signal));display:grid;place-items:center}
+.brand .mk i{width:8px;height:8px;border-radius:50%;background:hsl(var(--bg))}
+.brand b{font-weight:600;font-size:14px;letter-spacing:-.02em}
+.sp{flex:1}
+.tabs{display:flex;gap:4px;padding:10px 24px 0;border-bottom:1px solid hsl(var(--rule))}
+.tab{height:34px;padding:0 14px;border:0;border-bottom:2px solid transparent;background:none;color:hsl(var(--muted));cursor:pointer;font-weight:450}
+.tab.on{color:hsl(var(--fg));border-bottom-color:hsl(var(--signal));font-weight:500}
+.wrap{display:grid;grid-template-columns:minmax(300px,420px) minmax(0,1fr);gap:0;min-height:calc(100vh - 100px)}
+.col{padding:20px 24px 56px}
+.col.left{border-right:1px solid hsl(var(--rule))}
+h1{margin:0 0 4px;font-size:20px;font-weight:500;letter-spacing:-.02em}
+h2{margin:0;font-size:14px;font-weight:500}
+p.sub{margin:0 0 14px;color:hsl(var(--body));font-size:12px;line-height:1.6}
+.btn{display:inline-flex;align-items:center;gap:7px;height:32px;padding:0 13px;border:1px solid hsl(var(--rule-strong));border-radius:999px;background:transparent;font-size:12.5px;font-weight:500;cursor:pointer;white-space:nowrap}
+.btn:hover{border-color:hsl(var(--rule-heavy));background:hsl(var(--elevated))}
+.btn.pri{background:hsl(var(--signal));border-color:hsl(var(--signal));color:hsl(220 10% 6%)}
+.btn.sm{height:24px;padding:0 9px;font-size:11.5px}
+.btn.ghost{border-color:transparent;color:hsl(var(--muted))}
+.btn.ghost:hover{color:hsl(var(--fg));background:hsl(var(--hover))}
+.btn.danger{color:hsl(var(--red))}
+.btn:disabled{opacity:.45;cursor:default}
+input,select,textarea{width:100%;height:32px;padding:0 10px;border:1px solid hsl(var(--rule-strong));border-radius:7px;background:hsl(var(--bg));font-size:12.5px}
+input[type=checkbox]{width:auto;height:auto}
+textarea{height:auto;padding:8px 10px;resize:vertical;line-height:1.55}
+.lbl{display:block;margin:12px 0 5px;color:hsl(var(--tertiary));font-size:10.5px;font-weight:500;letter-spacing:.14em;text-transform:uppercase}
+.hint{color:hsl(var(--tertiary));font-size:11.5px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.chk{display:flex;gap:8px;align-items:flex-start;margin:10px 0;font-size:12.5px}
+details.adv{margin-top:14px;border:1px solid hsl(var(--rule));border-radius:10px;background:hsl(var(--panel))}
+details.adv>summary{cursor:pointer;padding:10px 14px;font-weight:500}
+details.adv .in{padding:0 14px 14px}
+.tag{display:inline-flex;align-items:center;gap:5px;height:20px;padding:0 8px;border:1px solid hsl(var(--rule-strong));border-radius:999px;font-family:var(--mono);font-size:10px;color:hsl(var(--muted));white-space:nowrap}
+.tag.green{color:hsl(var(--green));border-color:hsl(var(--green)/.45)}
+.tag.red{color:hsl(var(--red));border-color:hsl(var(--red)/.45)}
+.tag.amber{color:hsl(var(--amber));border-color:hsl(var(--amber)/.45)}
+.tag.blue{color:hsl(var(--blue));border-color:hsl(var(--blue)/.45)}
+.tag.sig{color:hsl(var(--signal));border-color:hsl(var(--signal)/.45)}
+.card{border:1px solid hsl(var(--rule));border-radius:10px;background:hsl(var(--panel));margin:12px 0}
+.card>.hd{display:flex;gap:8px;align-items:center;padding:10px 14px;border-bottom:1px solid hsl(var(--rule))}
+.card>.bd{padding:10px 14px}
+.err{color:hsl(var(--red));font-size:12px;margin-top:8px;white-space:pre-wrap}
+.ok{color:hsl(var(--green))}
+.stage{display:flex;gap:10px;align-items:baseline;padding:6px 0;border-bottom:1px solid hsl(var(--rule))}
+.stage .dot{width:8px;height:8px;border-radius:50%;background:hsl(var(--tertiary));flex:none;position:relative;top:0}
+.stage.running .dot{background:hsl(var(--amber));animation:pl 1.4s infinite}
+.stage.done .dot{background:hsl(var(--green))}.stage.failed .dot,.stage.cancelled .dot{background:hsl(var(--red))}.stage.skipped .dot{background:hsl(var(--slate))}
+@keyframes pl{0%{box-shadow:0 0 0 0 hsl(var(--amber)/.55)}100%{box-shadow:0 0 0 7px hsl(var(--amber)/0)}}
+.chk-row{display:flex;gap:10px;padding:7px 0;border-bottom:1px solid hsl(var(--rule));align-items:baseline}
+.chk-row .m{flex:none;width:44px;font-family:var(--mono);font-size:10.5px}
+.tree details{margin-left:14px;border-left:1px solid hsl(var(--rule));padding-left:10px}
+.tree>details{margin-left:0;border-left:0;padding-left:0}
+.tree summary{cursor:pointer;display:flex;gap:8px;align-items:center;padding:4px 0;list-style:none}
+.tree summary::-webkit-details-marker{display:none}
+.tree summary::before{content:'\25B8';color:hsl(var(--tertiary));font-size:10px;width:10px}
+.tree details[open]>summary::before{content:'\25BE'}
+.qa{margin:6px 0 10px 4px;padding:8px 10px;border:1px solid hsl(var(--rule));border-radius:8px;background:hsl(var(--bg))}
+.qa .q{font-weight:500}
+.qa .a{color:hsl(var(--body));margin-top:3px}
+.qa .a b{font-family:var(--mono);font-size:10px;color:hsl(var(--tertiary));margin-right:6px;font-weight:400}
+.vrow{display:flex;gap:10px;align-items:center;padding:8px 10px;border-bottom:1px solid hsl(var(--rule));cursor:pointer}
+.vrow:hover{background:hsl(var(--panel))}
+.vrow.on{background:hsl(var(--elevated))}
+.empty{padding:40px 20px;text-align:center;color:hsl(var(--tertiary))}
+.pill-tabs{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0}
+.pill{height:26px;padding:0 11px;border:1px solid hsl(var(--rule-strong));border-radius:999px;background:none;cursor:pointer;font-size:12px}
+.pill.on{background:hsl(var(--elevated));border-color:hsl(var(--rule-heavy))}
+.diff-list{font-family:var(--mono);font-size:11px;color:hsl(var(--body));word-break:break-all}
+@media (max-width:900px){.wrap{grid-template-columns:1fr}.col.left{border-right:0;border-bottom:1px solid hsl(var(--rule))}}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <div class="brand"><span class="mk"><i></i></span><b>SalesGod</b><span class="tag">add a product</span></div>
+  <div class="sp"></div>
+  <select id="prodsel" style="width:260px" aria-label="Generated products"></select>
+  <a class="btn ghost" href="/">Console</a>
+  <button class="btn ghost" id="theme" aria-label="Toggle theme">Theme</button>
+</div>
+<div class="tabs" role="tablist">
+  <button class="tab on" data-tab="gen" role="tab">Generate</button>
+  <button class="tab" data-tab="ver" role="tab">Versions</button>
+  <button class="tab" data-tab="gaps" role="tab">Gaps from calls</button>
+</div>
+<div id="app"></div>
+
+<script>
+'use strict';
+const store = { get(k, d) { try { return localStorage.getItem(k) ?? d; } catch { return d; } }, set(k, v) { try { localStorage.setItem(k, v); } catch {} } };
+if (store.get('sg_theme', 'dark') === 'light') document.documentElement.classList.add('light');
+document.getElementById('theme').onclick = () => { const l = document.documentElement.classList.toggle('light'); store.set('sg_theme', l ? 'light' : 'dark'); };
+
+const S = { tab: 'gen', defaults: null, product: null, versions: [], published: null, vnum: null, v: null, vtab: 'info', job: null, jobTimer: null, diff: null, gaps: null, err: '', brand: null };
+const $ = (sel, el = document) => el.querySelector(sel);
+
+function h(tag, attrs, ...kids) {
+  const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs || {})) {
+    if (k === 'class') e.className = v; else if (k.startsWith('on')) e[k] = v; else if (v === true) e.setAttribute(k, ''); else if (v !== false && v != null) e.setAttribute(k, v);
+  }
+  for (const c of kids.flat()) if (c != null && c !== false) e.append(c.nodeType ? c : document.createTextNode(String(c)));
+  return e;
+}
+async function api(path, opts) {
+  const r = await fetch(path, { credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, ...opts });
+  if (r.status === 401) { S.err = 'Sign in on the console first (/), then reload this page.'; throw new Error('401'); }
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(typeof j.detail === 'string' ? j.detail : JSON.stringify(j.detail || j));
+  return j;
+}
+const post = (p, b) => api(p, { method: 'POST', body: JSON.stringify(b) });
+const pq = () => `product_id=${encodeURIComponent(S.product.product_id)}&tenant=${encodeURIComponent(S.product.tenant)}`;
+const badge = (t, c) => h('span', { class: 'tag ' + (c || '') }, t);
+const provBadge = (p) => badge(p, p === 'public' ? 'blue' : p === 'operator' ? 'green' : 'amber');
+
+/* ---------------------------------------------------------------- form */
+const F = { name: '', authorised: false };
+const field = (label, id, opts = {}) => h('div', {}, h('label', { class: 'lbl', for: id }, label),
+  opts.area ? h('textarea', { id, rows: opts.rows || 3, placeholder: opts.ph || '' }, '') : h('input', { id, type: opts.type || 'text', placeholder: opts.ph || '', step: 'any', min: opts.min }));
+const val = (id) => { const e = document.getElementById(id); return e ? e.value.trim() : ''; };
+const num = (id) => { const v = val(id); return v === '' ? null : Number(v); };
+
+function critField(label, key, d) {
+  return h('div', {}, h('label', { class: 'lbl', for: 'c_' + key }, label), h('input', { id: 'c_' + key, type: 'number', value: d[key], min: 0 }));
+}
+function collectSpec() {
+  const d = S.defaults.criteria;
+  const crit = {};
+  for (const k of Object.keys(d)) {
+    const e = document.getElementById('c_' + k);
+    if (!e) continue;
+    crit[k] = e.type === 'checkbox' ? e.checked : Number(e.value);
+  }
+  const price = { list_price: num('f_list'), offer_price: num('f_offer'), unit: val('f_unit'), validity: val('f_validity') };
+  const eco = { floor: num('f_floor'), cost: num('f_cost'), min_margin_pct: num('f_margin'), perks: val('f_perks').split('\n').map((s) => s.trim()).filter(Boolean) };
+  const langs = ['en', 'hi', 'hinglish'].filter((l) => document.getElementById('l_' + l).checked);
+  const spec = {
+    name: val('f_name'), category: val('f_cat'), seller: val('f_seller'), website: val('f_web'), notes: val('f_notes'), city: val('f_city') || 'India',
+    languages: langs, price: Object.fromEntries(Object.entries(price).filter(([, v]) => v !== null && v !== '')),
+    economics: Object.fromEntries(Object.entries(eco).filter(([, v]) => v !== null && !(Array.isArray(v) && !v.length))),
+    tone: val('f_tone'), audience: val('f_aud'), compliance_notes: val('f_comp'), banned_phrases: val('f_ban').split('\n').map((s) => s.trim()).filter(Boolean),
+    authorised: document.getElementById('f_auth').checked, tenant: val('f_tenant') || 'default', criteria: crit,
+  };
+  if (val('f_pid')) spec.product_id = val('f_pid');
+  return spec;
+}
+let brandTimer;
+function brandCheck() {
+  clearTimeout(brandTimer);
+  brandTimer = setTimeout(async () => {
+    const name = val('f_name');
+    const box = document.getElementById('brandbox');
+    if (!box) return;
+    if (name.length < 2) { box.replaceChildren(); return; }
+    try {
+      const b = await post('/api/productgen/brand-check', { name, seller: val('f_seller'), authorised: document.getElementById('f_auth').checked });
+      box.replaceChildren(b.real_brand
+        ? h('div', { class: 'err' }, `"${b.brand_match || name}" looks like a real company's product. Public-knowledge facts only, provenance "public", every claim marked for review. Tick the box above only if you own or are authorised to sell it.`)
+        : h('div', { class: 'hint' }, 'Demo / own product: full detail will be generated and labelled "synthetic".'));
+    } catch (e) { box.replaceChildren(); }
+  }, 350);
+}
+function genForm() {
+  const d = S.defaults.criteria;
+  const root = h('div', {},
+    h('h1', {}, 'Add a product'), h('p', { class: 'sub' }, 'Type the name. Everything else is optional; the generator fills the information tree and the decision tree offline and saves a new version you can review before Publish.'),
+    h('label', { class: 'lbl', for: 'f_name' }, 'Product name (required)'),
+    h('input', { id: 'f_name', placeholder: 'e.g. ZenBrew Coffee Subscription', oninput: brandCheck, value: F.name }),
+    h('label', { class: 'chk' }, h('input', { type: 'checkbox', id: 'f_auth', onchange: brandCheck }), h('span', {}, 'I own / am authorised to sell this product')),
+    h('div', { id: 'brandbox' }),
+    h('details', { class: 'adv' }, h('summary', {}, 'Advanced criteria and inputs'), h('div', { class: 'in' },
+      h('div', { class: 'sec-lbl lbl' }, 'About the product'),
+      h('div', { class: 'grid2' }, field('Category', 'f_cat'), field('Seller / brand', 'f_seller', {})),
+      field('Website', 'f_web', { ph: 'https://' }), field('Description / notes', 'f_notes', { area: true, rows: 4, ph: 'what it is, who buys it, what makes it different' }),
+      h('div', { class: 'grid2' }, field('Target city / market', 'f_city', { ph: 'India' }), field('Tone', 'f_tone', { ph: 'warm, never pushy' })),
+      field('Audience', 'f_aud'),
+      h('label', { class: 'lbl' }, 'Languages'),
+      h('div', { class: 'row' }, ...['en', 'hi', 'hinglish'].map((l) => h('label', { class: 'row' }, h('input', { type: 'checkbox', id: 'l_' + l, checked: true, disabled: l === 'en' }), l))),
+      h('div', { class: 'sec-lbl lbl' }, 'Price and offer'),
+      h('div', { class: 'grid2' }, field('List price', 'f_list', { type: 'number', min: 0 }), field('Offer price', 'f_offer', { type: 'number', min: 0 })),
+      h('div', { class: 'grid2' }, field('What one price covers', 'f_unit', { ph: 'per month' }), field('Offer validity (only if real)', 'f_validity')),
+      h('div', { class: 'sec-lbl lbl' }, 'Economics (never invented: leave empty for no negotiation)'),
+      h('div', { class: 'grid2' }, field('Floor (lowest acceptable price)', 'f_floor', { type: 'number', min: 0 }), field('or Cost', 'f_cost', { type: 'number', min: 0 })),
+      field('Minimum margin % (with cost)', 'f_margin', { type: 'number', min: 0 }), field('Allowed value perks (one per line)', 'f_perks', { area: true, rows: 2 }),
+      h('div', { class: 'sec-lbl lbl' }, 'Compliance'),
+      field('Compliance notes', 'f_comp', { area: true, rows: 2 }), field('Extra banned phrases (one per line)', 'f_ban', { area: true, rows: 2 }),
+      h('div', { class: 'sec-lbl lbl' }, 'Criteria the version must meet'),
+      h('div', { class: 'grid2' }, critField('Topics min', 'min_topics', d), critField('Topics max', 'max_topics', d), critField('Q&A entries min', 'min_entries', d),
+        critField('Offerings min', 'min_offerings', d), critField('Offerings max', 'max_offerings', d), critField('Situations min', 'min_situations', d),
+        critField('Situations max', 'max_situations', d), critField('Ladder depth min', 'min_ladder_depth', d), critField('Repair rounds max', 'max_repair_rounds', d)),
+      h('p', { class: 'hint' }, 'Always checked: every entry in all languages, provenance labels, every price at or above the floor and offer below list, no health or financial guarantees, no false urgency, no competitor disparagement, no invented certifications, real-brand rule.'),
+      h('div', { class: 'grid2' }, field('Tenant', 'f_tenant', { ph: 'default' }), field('Product id (optional)', 'f_pid'))
+    )),
+    h('div', { class: 'row', style: 'margin-top:16px' },
+      h('button', { class: 'btn pri', id: 'gobtn', onclick: startGen }, 'Generate'),
+      h('button', { class: 'btn danger', id: 'cancelbtn', style: 'display:none', onclick: cancelJob }, 'Cancel')),
+    h('div', { class: 'err', id: 'generr' }));
+  return root;
+}
+async function startGen() {
+  const gerr = document.getElementById('generr');
+  gerr.textContent = '';
+  F.name = val('f_name');
+  try {
+    const spec = collectSpec();
+    if (!spec.name) { gerr.textContent = 'The product name is required.'; return; }
+    const r = await post('/api/productgen/start', { spec });
+    S.job = { id: r.job_id, spec_pid: null, status: 'running', stages: [] };
+    pollJob();
+  } catch (e) { gerr.textContent = e.message; }
+}
+async function cancelJob() { if (S.job) { try { await post(`/api/productgen/jobs/${S.job.id}/cancel`, {}); } catch (e) {} } }
+function pollJob() {
+  clearTimeout(S.jobTimer);
+  const tick = async () => {
+    if (!S.job) return;
+    try {
+      const j = await api('/api/productgen/jobs/' + S.job.id);
+      S.job = j;
+      renderJob();
+      if (j.status === 'running' || j.status === 'queued') S.jobTimer = setTimeout(tick, 1200);
+      else { await loadProducts(); if (j.version) { S.product = { product_id: j.product_id, tenant: j.tenant }; await loadVersions(); await openVersion(j.version); } render(); }
+    } catch (e) { S.job.error = e.message; renderJob(); }
+  };
+  tick();
+}
+function renderJob() {
+  const box = document.getElementById('jobbox');
+  const j = S.job;
+  const go = document.getElementById('gobtn'), cb = document.getElementById('cancelbtn');
+  if (go) go.disabled = j && (j.status === 'running' || j.status === 'queued');
+  if (cb) cb.style.display = j && j.status === 'running' ? '' : 'none';
+  if (!box) return;
+  if (!j) { box.replaceChildren(S.v ? '' : h('div', { class: 'empty' }, 'Nothing running. Fill in the name and press Generate.')); return; }
+  box.replaceChildren(h('div', { class: 'card' }, h('div', { class: 'hd' }, h('h2', {}, 'Progress'), badge(j.status, j.status === 'done' ? 'green' : j.status === 'failed' ? 'red' : 'amber')),
+    h('div', { class: 'bd' }, (j.stages || []).map((s) => h('div', { class: 'stage ' + s.status }, h('span', { class: 'dot' }), h('b', {}, s.label), h('span', { class: 'hint' }, s.detail || s.status))),
+      j.error ? h('div', { class: 'err' }, j.error) : null)));
+}
+
+/* ---------------------------------------------------------------- version view */
+async function loadProducts() {
+  const j = await api('/api/productgen/products');
+  S.products = j.products;
+  const sel = document.getElementById('prodsel');
+  sel.replaceChildren(h('option', { value: '' }, S.products.length ? 'Choose a product...' : 'No generated products yet'),
+    ...S.products.map((p) => h('option', { value: p.tenant + '/' + p.product_id, selected: S.product && S.product.product_id === p.product_id }, `${p.name} (v${p.latest}${p.published ? ', live v' + p.published : ''})`)));
+}
+async function loadVersions() {
+  const j = await api(`/api/productgen/versions?${pq()}`);
+  S.versions = j.versions; S.published = j.published;
+}
+async function openVersion(n) {
+  const j = await api(`/api/productgen/version?${pq()}&n=${n}`);
+  S.vnum = n; S.v = j.version; S.published = j.published;
+}
+const TOPIC_COUNT = (kb, path) => kb.entries.filter((e) => e.topic_path === path || e.topic_path.startsWith(path + '/')).length;
+
+function entryView(e) {
+  return h('div', { class: 'qa' },
+    h('div', { class: 'q' }, (e.question_variants.en || e.question_variants.hinglish || e.question_variants.hi || ['?'])[0], ' ', provBadge(e.provenance), e.teach ? badge('teach', 'sig') : null,
+      /review/.test(e.source || '') ? badge('review', 'red') : null, /^gap:|gap:/.test(e.source || '') ? badge('from calls', 'blue') : null),
+    ['en', 'hi', 'hinglish'].map((l) => h('div', { class: 'a' }, h('b', {}, l), e.answer[l] || '(missing)')),
+    e.source ? h('div', { class: 'hint' }, e.source) : null);
+}
+function topicNode(kb, t) {
+  const kids = kb.topics.filter((x) => x.path.startsWith(t.path + '/') && x.path.split('/').length === t.path.split('/').length + 1);
+  const own = kb.entries.filter((e) => e.topic_path === t.path);
+  return h('details', {}, h('summary', {}, h('b', {}, t.title.en), badge(TOPIC_COUNT(kb, t.path) + ' Q&A'), kids.length ? badge(kids.length + ' sub') : null, h('span', { class: 'hint mono' }, t.path),
+    h('button', { class: 'btn sm', onclick: (ev) => { ev.preventDefault(); expandNode('topic', t.path); } }, 'Expand')),
+    h('div', { class: 'hint', style: 'margin:2px 0 6px 14px' }, t.overview.en),
+    kids.map((k) => topicNode(kb, k)), own.map(entryView));
+}
+function infoTree() {
+  const kb = S.v.bundle.kb;
+  const tops = kb.topics.filter((t) => !t.path.includes('/'));
+  return h('div', {}, h('div', { class: 'row' }, badge(tops.length + ' topics'), badge(kb.entries.length + ' entries'), badge(kb.offerings.length + ' offerings'), badge(kb.interests.length + ' interest tags'),
+    badge(kb.allow_synthetic ? 'synthetic allowed' : 'public only', kb.allow_synthetic ? 'amber' : 'blue')),
+    h('div', { class: 'tree', style: 'margin-top:10px' }, tops.map((t) => topicNode(kb, t))),
+    h('div', { class: 'card' }, h('div', { class: 'hd' }, h('h2', {}, 'Offerings')), h('div', { class: 'bd' }, kb.offerings.length ? kb.offerings.map((o) => h('div', { class: 'chk-row' }, h('b', {}, o.name.en), provBadge(o.provenance),
+      o.price_label ? badge(o.price_label.en, 'sig') : badge('no price'), h('span', { class: 'hint' }, 'suits: ' + o.who_suits.join(', ') + ' / min fit ' + o.min_fit))) : h('div', { class: 'hint' }, 'None.'))),
+    h('div', { class: 'card' }, h('div', { class: 'hd' }, h('h2', {}, 'Interest tags')), h('div', { class: 'bd' }, kb.interests.map((i) => h('div', { class: 'chk-row' }, h('b', {}, i.label.en), h('span', { class: 'hint' }, i.keywords.slice(0, 6).join(', '))))))
+  );
+}
+function nodeView(n) {
+  const w = n.when || {};
+  return h('details', {}, h('summary', {}, h('b', {}, n.title), badge((n.children || []).length + ' branches'), h('span', { class: 'hint mono' }, n.id),
+    h('button', { class: 'btn sm', onclick: (ev) => { ev.preventDefault(); expandNode('playbook', n.id); } }, 'Expand')),
+    h('div', { class: 'qa' }, h('div', { class: 'hint' }, 'when: ' + [w.keywords && w.keywords.length ? 'words ' + w.keywords.slice(0, 5).join(' | ') : '', (w.intents || []).join(','), (w.objections || []).map((o) => 'objection ' + o).join(',')].filter(Boolean).join(' / ')),
+      (n.points || []).map((p) => h('div', { class: 'a' }, '- ' + p)), h('div', { class: 'a' }, h('b', {}, 'ask'), n.ask), n.goal ? h('div', { class: 'hint' }, 'goal: ' + n.goal) : null),
+    (n.children || []).map(nodeView));
+}
+function decisionTree() {
+  const t = S.v.bundle.tree;
+  return h('div', {}, h('div', { class: 'row' }, badge(t.nodes.length + ' situations'), badge(t.ladder.length + ' ladder rungs'), badge((t.clusters || []).length + ' interest clusters'), badge(t.fit_rules.length + ' fit rules')),
+    h('div', { class: 'card' }, h('div', { class: 'hd' }, h('h2', {}, 'Discovery ladder')), h('div', { class: 'bd' }, t.ladder.map((r, i) => h('div', { class: 'chk-row' }, h('span', { class: 'm' }, (i + 1) + '.'), h('b', {}, r.level), h('span', {}, r.question.en), h('span', { class: 'hint' }, r.question.hi))))),
+    h('div', { class: 'tree' }, t.nodes.map(nodeView)),
+    h('div', { class: 'card' }, h('div', { class: 'hd' }, h('h2', {}, 'Interest clusters and offering fit')), h('div', { class: 'bd' },
+      (t.clusters || []).map((c) => h('div', { class: 'chk-row' }, h('b', {}, c.tags.join(' + ')), h('span', { class: 'hint' }, c.keywords.slice(0, 6).join(', ')))),
+      t.fit_rules.map((r) => h('div', { class: 'chk-row' }, h('b', {}, r.offering), h('span', { class: 'hint' }, 'for ' + r.who_suits.join(', ') + ', min fit ' + r.min_fit))))));
+}
+function reportView() {
+  const r = S.v.report, rh = S.v.repair_history || [];
+  if (!r || !r.checks) return h('div', { class: 'empty' }, 'No report for this version.');
+  return h('div', {}, h('div', { class: 'row' }, badge(r.passed ? 'all criteria pass' : 'some criteria fail', r.passed ? 'green' : 'amber'), badge(r.publishable ? 'publishable' : 'blocked from Publish', r.publishable ? 'green' : 'red')),
+    h('div', { class: 'card' }, h('div', { class: 'bd' }, r.checks.map((c) => h('div', { class: 'chk-row' }, h('span', { class: 'm ' + (c.passed ? 'ok' : '') , style: c.passed ? '' : 'color:hsl(var(--red))' }, c.passed ? 'PASS' : 'FAIL'),
+      h('div', {}, h('b', {}, c.label, c.blocking ? '' : ' (warning only)'), h('div', { class: 'hint' }, c.detail), c.items && c.items.length ? h('div', { class: 'hint mono' }, c.items.slice(0, 8).join(', ') + (c.items.length > 8 ? ' ...' : '')) : null))))),
+    rh.length ? h('div', { class: 'card' }, h('div', { class: 'hd' }, h('h2', {}, 'Auto-repair')), h('div', { class: 'bd' }, rh.map((x) => h('div', { class: 'chk-row' }, h('span', { class: 'm' }, 'round ' + x.round), h('span', { class: 'hint' }, (x.fixes || []).join('; ') || 'checked', x.failed.length ? ' / still failing: ' + x.failed.join(', ') : ' / clean'))))) : null,
+    (S.v.effective && S.v.effective.notes || []).map((n) => h('div', { class: 'hint' }, n)));
+}
+function productView() {
+  const p = S.v.bundle.product, neg = S.v.bundle.negotiation || {};
+  return h('div', {}, h('div', { class: 'card' }, h('div', { class: 'hd' }, h('h2', {}, 'Product config')), h('div', { class: 'bd' },
+    ['product_name', 'seller_name', 'one_liner', 'original_price', 'offer_price', 'discount', 'offer_validity', 'pitch_en', 'pitch_hi', 'pitch_hinglish', 'tone'].map((k) => h('div', { class: 'chk-row' }, h('b', { style: 'width:130px;flex:none' }, k), h('span', {}, p[k] || '')) ),
+    h('div', { class: 'chk-row' }, h('b', { style: 'width:130px;flex:none' }, 'benefits'), h('span', {}, (p.benefits || []).join(' / '))),
+    h('div', { class: 'chk-row' }, h('b', { style: 'width:130px;flex:none' }, 'faqs'), h('span', {}, (p.faqs || []).length + ' FAQs')))),
+    h('div', { class: 'card' }, h('div', { class: 'hd' }, h('h2', {}, 'Negotiation suggestion'), badge(neg.suggested ? 'suggested' : 'none', neg.suggested ? 'amber' : '')), h('div', { class: 'bd' },
+      h('div', { class: 'hint' }, neg.reason || ''),
+      neg.economics ? [h('div', { class: 'chk-row' }, h('b', {}, 'floor'), h('span', {}, String(neg.economics.cost * (1 + (neg.economics.min_margin_pct || 0) / 100)))),
+        ...neg.economics.ladder.map((s) => h('div', { class: 'chk-row' }, h('b', {}, s.kind), h('span', {}, s.kind === 'price' ? String(s.price) : (s.text.en || ''))))] : null)));
+}
+function diffView() {
+  const prev = S.versions.filter((v) => v.version < S.vnum).pop();
+  const box = h('div', {}, h('div', { class: 'row' }, h('span', { class: 'hint' }, 'Compare v' + S.vnum + ' with'), h('select', { id: 'diffsel', style: 'width:auto' }, S.versions.filter((v) => v.version !== S.vnum).map((v) => h('option', { value: v.version, selected: prev && v.version === prev.version }, 'v' + v.version))),
+    h('button', { class: 'btn sm', onclick: loadDiff }, 'Show')), h('div', { id: 'diffout' }));
+  setTimeout(() => { if (prev) loadDiff(); }, 0);
+  return box;
+}
+async function loadDiff() {
+  const sel = document.getElementById('diffsel');
+  if (!sel || !sel.value) return;
+  const j = await api(`/api/productgen/diff?${pq()}&a=${sel.value}&b=${S.vnum}`);
+  const out = document.getElementById('diffout');
+  const d = j.diff;
+  out.replaceChildren(h('p', { class: 'hint' }, d.total_changes + ' changes'),
+    ...['entries', 'topics', 'offerings', 'interests', 'nodes', 'ladder'].map((k) => h('div', { class: 'card' }, h('div', { class: 'hd' }, h('b', {}, k), badge('+' + d[k].added.length, 'green'), badge('-' + d[k].removed.length, 'red'), badge('~' + d[k].changed.length, 'amber')),
+      (d[k].added.length + d[k].removed.length + d[k].changed.length) ? h('div', { class: 'bd diff-list' }, d[k].added.slice(0, 40).map((x) => h('div', { class: 'ok' }, '+ ' + x)), d[k].removed.slice(0, 40).map((x) => h('div', { style: 'color:hsl(var(--red))' }, '- ' + x)), d[k].changed.slice(0, 40).map((x) => h('div', {}, '~ ' + x))) : null)),
+    Object.keys(d.product_fields).length ? h('div', { class: 'card' }, h('div', { class: 'hd' }, h('b', {}, 'product fields')), h('div', { class: 'bd diff-list' }, Object.keys(d.product_fields).map((k) => h('div', {}, '~ ' + k)))) : null);
+}
+function versionPanel() {
+  if (!S.v) return h('div', { class: 'empty' }, 'Generate a product, or choose one above, to see its versions.');
+  const v = S.v;
+  const live = S.published === v.version;
+  const pend = v.kind === 'gap_proposals';
+  const body = pend ? h('div', { class: 'empty' }, 'This version holds pending proposals. Review them in "Gaps from calls".') :
+    S.vtab === 'info' ? infoTree() : S.vtab === 'dec' ? decisionTree() : S.vtab === 'rep' ? reportView() : S.vtab === 'prod' ? productView() : diffView();
+  return h('div', {}, h('div', { class: 'row' }, h('h1', {}, (v.spec && v.spec.name) || S.product.product_id), badge('v' + v.version), badge(v.kind), badge(v.status, v.status === 'published' ? 'green' : v.status === 'needs_review' ? 'red' : 'amber'),
+    live ? badge('live', 'green') : null, v.effective && v.effective.real_brand ? badge('real brand: public only', 'blue') : null, h('span', { class: 'sp' }),
+    pend ? null : h('button', { class: 'btn pri', disabled: live || !(v.report && v.report.publishable), onclick: publish }, live ? 'Published' : 'Publish')),
+    h('p', { class: 'sub' }, [v.note, v.model ? 'model ' + v.model : '', v.created_at].filter(Boolean).join(' / ')),
+    h('div', { class: 'err', id: 'verr' }, S.err),
+    pend ? null : h('div', { class: 'pill-tabs' }, [['info', 'Information tree'], ['dec', 'Decision tree'], ['rep', 'Validation'], ['prod', 'Product and negotiation'], ['diff', 'Diff']].map(([k, l]) => h('button', { class: 'pill' + (S.vtab === k ? ' on' : ''), onclick: () => { S.vtab = k; render(); } }, l))),
+    body);
+}
+async function publish() {
+  S.err = '';
+  try {
+    const r = await post('/api/productgen/publish', { product_id: S.product.product_id, tenant: S.product.tenant, version: S.vnum });
+    await loadVersions(); await openVersion(S.vnum); await loadProducts(); S.err = '';
+    alert('Published v' + r.version + ': ' + r.entries + ' entries, ' + r.nodes + ' situations written. Console edits were kept.');
+  } catch (e) { S.err = e.message; }
+  render();
+}
+async function expandNode(kind, id) {
+  S.err = '';
+  try {
+    const r = await post('/api/productgen/expand', { product_id: S.product.product_id, tenant: S.product.tenant, node: { kind, id }, version: S.vnum });
+    S.job = { id: r.job_id, status: 'running', stages: [{ label: 'Expand ' + id, status: 'running', detail: '' }] };
+    S.tab = 'gen'; render(); pollJob();
+  } catch (e) { S.err = e.message; render(); }
+}
+
+/* ---------------------------------------------------------------- versions and gaps tabs */
+function versionsTab() {
+  if (!S.product) return h('div', { class: 'empty' }, 'Choose a product above.');
+  return h('div', { class: 'wrap' }, h('div', { class: 'col left' }, h('h2', {}, 'Version history'), h('div', { style: 'margin-top:8px' }, S.versions.slice().reverse().map((v) => h('div', { class: 'vrow' + (v.version === S.vnum ? ' on' : ''), onclick: async () => { await openVersion(v.version); render(); } },
+    h('b', {}, 'v' + v.version), badge(v.kind), badge(v.status, v.published ? 'green' : v.status === 'needs_review' ? 'red' : ''), v.published ? badge('live', 'green') : null,
+    h('span', { class: 'hint' }, v.counts && v.counts.entries != null ? v.counts.entries + ' Q&A' : (v.proposals ? v.proposals + ' proposals' : '')))))),
+    h('div', { class: 'col' }, versionPanel()));
+}
+async function loadGaps() { if (S.product) S.gaps = await api(`/api/productgen/gaps?${pq()}`); }
+function gapsTab() {
+  if (!S.product) return h('div', { class: 'empty' }, 'Choose a product above.');
+  const g = S.gaps || { unanswered: [], pending: [] };
+  return h('div', { class: 'col', style: 'max-width:1000px' }, h('h1', {}, 'Gaps from calls'),
+    h('p', { class: 'sub' }, 'Questions callers asked that got "I don\'t have that" or scored low against the knowledge base. Mining is deterministic; proposals are written by the model and wait here until you approve them. New knowledge only appears after Publish, between calls.'),
+    h('div', { class: 'row' }, h('button', { class: 'btn pri', onclick: scanGaps }, 'Mine calls and propose answers'), h('button', { class: 'btn', onclick: async () => { await loadGaps(); render(); } }, 'Refresh'),
+      S.defaults.auto_approve ? badge('auto-approve on (demo products only)', 'amber') : null),
+    h('div', { class: 'err' }, S.err),
+    h('div', { class: 'card' }, h('div', { class: 'hd' }, h('h2', {}, 'Unanswered so far'), badge(g.unanswered.length)), h('div', { class: 'bd' }, g.unanswered.length ? g.unanswered.map((c) => h('div', { class: 'chk-row' },
+      badge(c.count + 'x', 'amber'), h('div', {}, h('b', {}, c.question), h('div', { class: 'hint' }, c.questions.slice(1, 4).join(' / ')), h('div', { class: 'hint mono' }, c.reasons.join(', ') + ' / calls ' + c.call_ids.slice(0, 4).join(', '))))) : h('div', { class: 'hint' }, 'Nothing unanswered in the saved calls.'))),
+    g.pending.map((pv) => h('div', { class: 'card' }, h('div', { class: 'hd' }, h('h2', {}, 'Pending proposals (version ' + pv.version + ')'), h('span', { class: 'hint' }, pv.note)),
+      h('div', { class: 'bd' }, pv.proposals.map((p) => h('div', { class: 'chk-row' },
+        p.status === 'pending' ? h('input', { type: 'checkbox', class: 'sel', 'data-v': pv.version, 'data-id': p.id, checked: true }) : badge(p.status, p.status === 'approved' ? 'green' : 'red'),
+        h('div', { style: 'flex:1' }, h('b', {}, p.questions[0]), badge(p.count + ' calls', 'amber'), h('div', { class: 'hint mono' }, 'calls: ' + p.call_ids.slice(0, 4).join(', ')),
+          p.entries.map(entryView), p.nodes.map((n) => h('div', { class: 'qa' }, h('b', {}, 'new situation: ' + n.title)))))),
+        h('div', { class: 'row', style: 'margin-top:10px' },
+          h('button', { class: 'btn pri sm', onclick: () => approve(pv.version, true) }, 'Approve selected and publish'),
+          h('button', { class: 'btn sm', onclick: () => approve(pv.version, false) }, 'Approve selected'),
+          h('button', { class: 'btn sm danger', onclick: () => rejectAll(pv.version) }, 'Reject all'))))));
+}
+async function scanGaps() {
+  S.err = '';
+  try {
+    const r = await post('/api/productgen/gaps/scan', { product_id: S.product.product_id, tenant: S.product.tenant });
+    S.job = { id: r.job_id, status: 'running', stages: [] };
+    const poll = async () => { const j = await api('/api/productgen/jobs/' + r.job_id); if (j.status === 'running' || j.status === 'queued') { setTimeout(poll, 1200); return; } if (j.error) S.err = j.error; await loadGaps(); await loadVersions(); render(); };
+    poll();
+  } catch (e) { S.err = e.message; render(); }
+}
+async function approve(version, publish) {
+  const sel = [...document.querySelectorAll('input.sel')].filter((x) => +x.dataset.v === version);
+  const ids = sel.filter((x) => x.checked).map((x) => x.dataset.id), rej = sel.filter((x) => !x.checked).map((x) => x.dataset.id);
+  S.err = '';
+  try { await post('/api/productgen/approve-gaps', { product_id: S.product.product_id, tenant: S.product.tenant, version, approve: ids, reject: rej, publish }); await loadGaps(); await loadVersions(); await loadProducts(); } catch (e) { S.err = e.message; }
+  render();
+}
+async function rejectAll(version) {
+  const ids = [...document.querySelectorAll('input.sel')].filter((x) => +x.dataset.v === version).map((x) => x.dataset.id);
+  try { await post('/api/productgen/approve-gaps', { product_id: S.product.product_id, tenant: S.product.tenant, version, approve: [], reject: ids }); await loadGaps(); } catch (e) { S.err = e.message; }
+  render();
+}
+
+/* ---------------------------------------------------------------- shell */
+function render() {
+  document.querySelectorAll('.tab').forEach((t) => t.classList.toggle('on', t.dataset.tab === S.tab));
+  const app = document.getElementById('app');
+  if (!S.defaults) { app.replaceChildren(h('div', { class: 'empty' }, S.err || 'Loading...')); return; }
+  const keep = S.tab === 'gen' && document.getElementById('f_name') ? snapshotForm() : null;
+  if (S.tab === 'gen') {
+    app.replaceChildren(h('div', { class: 'wrap' }, h('div', { class: 'col left', id: 'formcol' }, S.defaults.llm_configured ? null : h('div', { class: 'err' }, 'No model endpoint is configured on this server (PRODUCTGEN_BASE_URL / PRODUCTGEN_MODEL, or the ACIE_EXPR_* settings). Generation will be refused.'), genForm()),
+      h('div', { class: 'col' }, h('div', { id: 'jobbox' }), S.job && S.job.status === 'done' || !S.job ? versionPanel() : null)));
+    if (keep) restoreForm(keep);
+    renderJob();
+  } else if (S.tab === 'ver') app.replaceChildren(versionsTab());
+  else app.replaceChildren(gapsTab());
+}
+function snapshotForm() { const o = {}; document.querySelectorAll('#formcol input,#formcol textarea').forEach((e) => { o[e.id] = e.type === 'checkbox' ? e.checked : e.value; }); return o; }
+function restoreForm(o) { for (const [k, v] of Object.entries(o)) { const e = document.getElementById(k); if (e) { if (e.type === 'checkbox') e.checked = v; else e.value = v; } } }
+
+document.querySelectorAll('.tab').forEach((t) => t.onclick = async () => { S.tab = t.dataset.tab; S.err = ''; if (S.tab === 'gaps') await loadGaps().catch((e) => { S.err = e.message; }); render(); });
+document.getElementById('prodsel').onchange = async (ev) => {
+  const [tenant, pid] = ev.target.value.split('/');
+  if (!pid) return;
+  S.product = { tenant, product_id: pid };
+  await loadVersions();
+  await openVersion(S.versions[S.versions.length - 1].version);
+  S.gaps = null; S.err = ''; render();
+};
+(async () => {
+  try {
+    S.defaults = await api('/api/productgen/defaults');
+    await loadProducts();
+    const q = new URLSearchParams(location.search).get('product');  // deep link: /productgen?product=tenant/product-id
+    if (q && q.includes('/')) {
+      const [tenant, pid] = q.split('/');
+      S.product = { tenant, product_id: pid };
+      await loadVersions();
+      if (S.versions.length) await openVersion(S.versions[S.versions.length - 1].version);
+      await loadProducts();
+    }
+  } catch (e) { S.err = S.err || e.message; }
+  render();
+})();
+</script>
+</body>
+</html>
