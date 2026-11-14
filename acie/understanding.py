@@ -39,6 +39,31 @@ class Understanding(BaseModel):
     urgency: float = Field(0.0, ge=0, le=1)
     engagement: float = Field(0.5, ge=0, le=1)
     gist: str = ""
+    # extended human-state dims: None = the server did not return it (old servers / flag off), so it
+    # is simply not fused and the lexicon alone decides
+    satisfaction: float | None = Field(None, ge=0, le=1)
+    anxiety: float | None = Field(None, ge=0, le=1)
+    excitement: float | None = Field(None, ge=0, le=1)
+    calmness: float | None = Field(None, ge=0, le=1)
+    trust: float | None = Field(None, ge=0, le=1)
+    certainty: float | None = Field(None, ge=0, le=1)
+    cognitive_load: float | None = Field(None, ge=0, le=1)
+    attention: float | None = Field(None, ge=0, le=1)
+    participation: float | None = Field(None, ge=0, le=1)
+    receptiveness: float | None = Field(None, ge=0, le=1)
+
+
+STATE_DIMS_PROMPT = (
+    "\n- satisfaction (0 dislikes, 1 likes what is offered/said), anxiety, excitement, calmness, trust (0 suspects a "
+    "scam), certainty (0 hedging), cognitive_load (needs time / overwhelmed), attention, participation (reply "
+    "effort), receptiveness (open to the agent's pitch): 0..1 each for THIS turn; 0.5 when neutral."
+)
+_NEW = ["satisfaction", "anxiety", "excitement", "calmness", "trust", "certainty", "cognitive_load",
+        "attention", "participation", "receptiveness"]
+
+
+def state_dims_enabled() -> bool:
+    return os.getenv("ACIE_NLU_STATE_DIMS", "0") == "1"
 
 
 SYSTEM = """You analyse one turn of a phone conversation for a sales agent. The customer's words come from
@@ -62,6 +87,15 @@ Output JSON only, following the schema.
 
 def _schema(intents: list[str]) -> dict:
     lvl = {"type": "number", "minimum": 0, "maximum": 1}
+    sch = _base_schema(intents, lvl)
+    if state_dims_enabled():
+        for d in _NEW:
+            sch["properties"][d] = lvl
+            sch["required"].append(d)
+    return sch
+
+
+def _base_schema(intents: list[str], lvl: dict) -> dict:
     return {
         "type": "object",
         "properties": {
@@ -91,8 +125,8 @@ class LLMUnderstanding:
         guide = "\n".join(f"- {k}: {v}" for k, v in intents.items())
         user = (f"WHAT THE AGENT IS CALLING ABOUT: {about}\n\nINTENTS:\n{guide}\n\nCONVERSATION SO FAR:\n{convo}\n\n"
                 f"CUSTOMER NOW SAYS: {text}")
-        body = {"model": self.model, "temperature": 0, "max_tokens": 110,
-                "messages": [{"role": "system", "content": SYSTEM}, {"role": "user", "content": user}],
+        body = {"model": self.model, "temperature": 0, "max_tokens": 230 if state_dims_enabled() else 110,
+                "messages": [{"role": "system", "content": SYSTEM + (STATE_DIMS_PROMPT if state_dims_enabled() else "")}, {"role": "user", "content": user}],
                 "guided_json": _schema(list(intents)), **self.extra_body}
         try:
             r = await self.client.post(f"{self.base_url}/chat/completions", json=body)

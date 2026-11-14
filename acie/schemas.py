@@ -84,6 +84,17 @@ class HumanState(BaseModel):
     confusion: float = 0.0
     urgency: float = 0.0
     engagement: float = 0.5
+    # extended dims (state lane); all in [0, 1]
+    satisfaction: float = 0.5  # liking vs disliking what is offered / said
+    anxiety: float = 0.0
+    excitement: float = 0.0
+    calmness: float = 0.5
+    trust: float = 0.5
+    certainty: float = 0.5
+    cognitive_load: float = 0.0
+    attention: float = 0.5
+    participation: float = 0.5
+    receptiveness: float = 0.5
     signals: list[str] = Field(default_factory=list)  # human-readable evidence for this turn
 
 
