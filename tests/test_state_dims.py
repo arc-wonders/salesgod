@@ -156,7 +156,7 @@ def test_decay_to_baseline_not_zero():
     sess.state = est.estimate(T("mujhe bharosa nahi, fraud hai"), sess)
     assert sess.state.trust < 0.4
     for _ in range(12):
-        sess.state = est.estimate(T("theek hai bataiye aap kya kehna chah rahe the aaj"), sess)
+        sess.state = est.estimate(T("aap kal ka program mujhe ek line mein samjhaiye zara"), sess)
     assert 0.4 <= sess.state.trust <= 0.6
     assert 0.4 <= sess.state.calmness <= 0.6
     assert sess.state.anxiety < 0.05
@@ -168,7 +168,7 @@ def test_decay_zero_baseline_dim():
     sess.state = est.estimate(T("dar lag raha hai"), sess)
     a1 = sess.state.anxiety
     assert a1 > 0.5
-    sess.state = est.estimate(T("theek hai bataiye aap kya kehna chah rahe the aaj"), sess)
+    sess.state = est.estimate(T("aap kal ka program mujhe ek line mein samjhaiye zara"), sess)
     assert 0 < sess.state.anxiety < a1
 
 
@@ -179,7 +179,7 @@ def test_asymmetric_rise_fast_decay_slow():
     up = est.estimate(T("I am scared"), sess).anxiety
     assert up == pytest.approx(0.7 * 0.9, abs=0.01)
     sess.state = HumanState(anxiety=0.9)
-    down = est.estimate(T("theek hai bataiye aap kya kehna chah rahe the aaj"), sess).anxiety
+    down = est.estimate(T("aap kal ka program mujhe ek line mein samjhaiye zara"), sess).anxiety
     assert down == pytest.approx(0.7 * 0.9, abs=0.01)
 
 
@@ -187,7 +187,7 @@ def test_nlu_fusion_with_new_dims():
     est = HumanStateEstimator()
     sess = SessionState(session_id="s", customer_id="c")
     nlu = Understanding(trust=0.1, anxiety=0.8, gist="worried")
-    s = est.estimate(T("theek hai bataiye aap kya kehna chah rahe the aaj"), sess, nlu)
+    s = est.estimate(T("aap kal ka program mujhe ek line mein samjhaiye zara"), sess, nlu)
     assert s.trust < 0.5 and s.anxiety > 0.25
 
 
