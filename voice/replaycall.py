@@ -90,6 +90,10 @@ def show(call_id: str, r: dict) -> dict:
     print(f"\n=== {call_id}  line noise {r['noise_db']} dBFS  | original heard {len(orig)} turns, replay heard {len(rep)}")
     for t in orig:
         print(f"   orig: {t['text']}")
+    print(f"   replay ended: {r['replay'].get('end_reason')}")
+    for t in r["replay"]["turns"]:
+        if t["role"] == "agent":
+            print(f"   agent: {t['text'][:110]} [{t.get('intent')}]")
     allt = r["replay"]["turns"]
     for t in rep:
         i = allt.index(t)
@@ -99,7 +103,7 @@ def show(call_id: str, r: dict) -> dict:
         print(f"   now : {t['text']}\n         -> {e.get('label')} ({e.get('confidence')}) arousal {e.get('arousal')} "
               f"words-frustration {st.get('frustration')} sim {t.get('voice_similarity')}  [{z}]")
     for e in ev:
-        if e["type"] in ("noise", "recovered_speech", "voicemail", "kept_caller"):
+        if e["type"] in ("noise", "recovered_speech", "voicemail", "kept_caller", "barge_in", "barge_in_ignored"):
             print(f"   {e['type']}: {e.get('why', '')} {e.get('text', '')!r} sim={e.get('voice_similarity')} snr={e.get('snr_db')}")
     return {"orig": len(orig), "replay": len(rep),
             "recovered": sum(e["type"] == "recovered_speech" for e in ev),

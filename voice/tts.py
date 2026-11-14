@@ -1,4 +1,4 @@
-"""Fish Audio TTS over their HTTP API (model s2.1-pro by default), streamed as 8 kHz PCM."""
+"""Fish Audio TTS over their HTTP API (model s2.1-pro-free by default: free, no API credit needed), streamed as 8 kHz PCM."""
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ FISH_URL = "https://api.fish.audio/v1/tts"
 class FishTTS:
     def __init__(self) -> None:
         self.key = os.environ["FISH_API_KEY"]
-        self.model = os.getenv("FISH_MODEL", "s2.1-pro")
+        self.model = os.getenv("FISH_MODEL", "s2.1-pro-free")
         self.voices = {"en": os.getenv("FISH_VOICE_EN") or None, "hi": os.getenv("FISH_VOICE_HI") or None}
         self.client = httpx.AsyncClient(timeout=httpx.Timeout(30.0, connect=5.0))
 

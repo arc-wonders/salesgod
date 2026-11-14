@@ -95,6 +95,12 @@ class SpeakerLock:
         if e is not None and n_samples >= 16000:  # >= 1 s: reliable enough to learn from
             self.embs = (self.embs + [e])[-24:]
 
+    def provisional_sim(self, e: np.ndarray | None) -> float | None:
+        """Before the caller is confirmed: best similarity to the clean turns learned so far (None if none)."""
+        if e is None or not self.embs:
+            return None
+        return round(max(float(e @ x) for x in self.embs), 3)
+
     @property
     def confirmed(self) -> bool:
         return self._caller() is not None

@@ -60,6 +60,15 @@ NO_RESPONSE = {
                  "Lagta hai awaaz nahi aa rahi. Main baad mein call karta hoon, thank you."],
 }
 GOODBYE_GRACE_S = 2.5
+GOODBYE_MAX_S = 8.0  # after our goodbye, noise / half-heard words never keep the line open longer than this
+# Whisper's stock outputs on line noise (diag of live calls 6bb1ca00ad / 9d69a31bae / 7920edcd26: these came
+# out of pure noise while the agent spoke, caller-voice similarity 0.07-0.2, and "कर दो" + "करते हैं" from
+# noise sent a payment link). They are only believed when the voice is the caller's.
+STOCK_NOISE = {"कर दो", "कर दो कर दो", "हुआ है", "हुआ है हुआ है", "करते हैं", "कि अ", "कर दो कि अ", "thank you",
+               "thank you very much", "thanks for watching", "okay", "ok", "you", "bye", "we'll be on", "we're ready",
+               "हां", "हाँ", "जी", "कि", "अ", "हम्म", "hmm", "yes", "yeah", "उनको लेकर", "कि उनको लेकर"}
+CLEAN_RMS = 0.03
+BARGE_STAGES = [(500, 0.35), (800, 0.35), (1200, 0.32)]  # (ms of the caller's run, voice similarity needed)  # a turn loud enough (with the agent silent) to teach the caller's voice print
 MAX_CALL_S = 360.0
 
 
@@ -68,7 +77,7 @@ class CallRecord:
     to: str
     customer_id: str = "c1"
     language: str = "hi"  # opening language
-    backend: str = "llm"  # llm | template
+    backend: str = "llm"  # llm (default reply model) | gemini | qwen | template
     campaign: str = "bank_demo"  # bank_demo | <product id>
     customer_name: str = ""
     customer_age: int | None = None  # optional: how the agent pitches and explains (a 21-year-old is not a 70-year-old)
@@ -124,6 +133,13 @@ class CallSession:
         self.busy = False  # a customer turn is being processed
         self.max_loop_lag = 0.0
         self.send_lock = asyncio.Lock()
+        # one voice at a time: the greeting, a reply and the "can you hear me?" prompt each streamed their own
+        # TTS at once, and Plivo played the chunks interleaved ("multiple voices", owner 14 Nov)
+        self.speak_lock = asyncio.Lock()
+        self.in_turn = False  # a turn ACCEPTED as the caller's is being answered
+        self.barge_checked_run = -1  # VAD run already voice-checked for barge-in
+        self.barge_stage = 0
+        self.accepted_turns = 0
         self.primary: list = []  # prosody of the caller's accepted turns (speaker lock)
         self.speaker = SpeakerLock()
         # learns this line's noise floor and the caller's normal voice from pickup (voice/calibrator.py)
@@ -243,7 +259,8 @@ class CallSession:
             if during_agent and not self.barge_in_pending and dur < 0.8 and self.agent_speaking():
                 self.event("noise", {"duration_s": round(dur, 2), "why": "while agent speaking"})
             else:
-                await self.utterances.put((data, started, self.barge_in_pending))
+                overlap = during_agent or self.agent_speaking()
+                await self.utterances.put((data, started, self.barge_in_pending, overlap))
             self.barge_in_pending = False
             self.speech_started_at = None
             self.started_during_agent = False
@@ -267,18 +284,36 @@ class CallSession:
 
     async def check_barge_in(self) -> None:
         d = self.detector
-        # continuous, confident (p>=0.7) and loud enough: quiet echo of our own voice and line noise
-        # pass the VAD but sit far below real speech on the customer channel
-        if (self.agent_speaking() and not self.barge_in_pending and d.in_speech
-                and time.monotonic() >= self.protected_until
-                and d.run_frames * 32 >= self.app.cfg.barge_in_ms
-                and d.run_energy >= max(self.app.cfg.barge_in_rms, 0.25 * (self.primary_rms() or 0),
-                                        4 * (self.calib.noise_level or 0))):  # noisy line: 12 dB over its floor
-            self.speaking_epoch += 1
-            self.barge_in_pending = True
-            self.play_until = time.monotonic()
-            await self.clear_audio()
-            self.event("barge_in", {})
+        if not (self.agent_speaking() and not self.barge_in_pending and d.in_speech
+                and time.monotonic() >= self.protected_until):
+            return
+        run_ms = d.run_frames * 32
+        if self.speaker.confirmed:
+            # we know the caller's voice: stop for THEIR voice, never for noise or a background voice. Checked in
+            # stages because a short clip scores lower (voice/diag_bargein.py on 122 real caller turns: the
+            # first 0.5 / 0.8 / 1.0 s pass >= 0.35 for 66% / 88% / 94% of callers, noise 0% / 0% / 7%)
+            stage = self.barge_stage if self.barge_checked_run == d.run_start else 0
+            if stage >= len(BARGE_STAGES) or run_ms < BARGE_STAGES[stage][0]:
+                return
+            self.barge_checked_run, self.barge_stage = d.run_start, stage + 1
+            clip = np.concatenate(d.frames[-max(16, min(d.run_frames, 40)):])
+            _, _, sim = await asyncio.to_thread(self.speaker.score, clip)
+            if sim is None or sim < BARGE_STAGES[stage][1]:
+                self.event("barge_in_ignored", {"voice_similarity": sim, "run_ms": run_ms})
+                return
+            if not (self.agent_speaking() and not self.barge_in_pending):
+                return
+        # before the caller's voice is known: continuous, confident (p>=0.7) and loud enough. Quiet echo of
+        # our own voice and line noise pass the VAD but sit far below real speech on the customer channel
+        elif not (run_ms >= self.app.cfg.barge_in_ms
+                  and d.run_energy >= max(self.app.cfg.barge_in_rms, 0.25 * (self.primary_rms() or 0),
+                                          4 * (self.calib.noise_level or 0))):  # noisy line: 12 dB over its floor
+            return
+        self.speaking_epoch += 1
+        self.barge_in_pending = True
+        self.play_until = time.monotonic()
+        await self.clear_audio()
+        self.event("barge_in", {})
 
     async def watchdog(self) -> None:
         t0 = time.monotonic()
@@ -297,12 +332,20 @@ class CallSession:
                 await self.no_response()
             elif idle > SILENCE_HANGUP_S and self.utterances.empty():
                 await self.hangup("silence")
-            elif (self.hangup_after_speaking and not self.agent_speaking() and self.utterances.empty()
-                  and not self.detector.in_speech and not self.busy
-                  and now - max(self.play_until, self.last_activity) > GOODBYE_GRACE_S):
+            elif self.goodbye_due(now):
                 # wait for a quiet moment after the goodbye: the caller often says "ok thanks" or asks
                 # something else, and hanging up 0.6 s after the agent stops felt like being cut off
                 await self.hangup(getattr(self, "hangup_reason", "agent_ended"))
+
+    def goodbye_due(self, now: float) -> bool:
+        """After our goodbye: hang up at the first quiet moment (the caller often says "ok thanks"), and
+        in any case GOODBYE_MAX_S after it finished, unless the caller's own new turn is being answered."""
+        if not self.hangup_after_speaking or self.agent_speaking() or self.in_turn:
+            return False
+        since = now - self.play_until
+        quiet = (self.utterances.empty() and not self.detector.in_speech and not self.busy
+                 and now - self.last_activity > GOODBYE_GRACE_S)
+        return since > GOODBYE_GRACE_S and (quiet or since > GOODBYE_MAX_S)
 
     async def no_response(self) -> None:
         sess = self.pipeline.sessions.get(self.session_id)
@@ -352,17 +395,18 @@ class CallSession:
 
     async def turn_worker(self) -> None:
         while not self.closed.is_set():
-            audio, started, barge = await self.utterances.get()
+            audio, started, barge, overlap = await self.utterances.get()
             self.busy = True
             try:
-                await self.handle_utterance(audio, started, barge)
+                await self.handle_utterance(audio, started, barge, overlap)
             except Exception as e:
                 log.exception("[%s] turn failed", self.call.call_id)
                 self.event("error", {"message": f"{type(e).__name__}: {e}"})
             finally:
                 self.busy = False
+                self.in_turn = False
 
-    async def handle_utterance(self, audio: np.ndarray, started: float, barge: bool) -> None:
+    async def handle_utterance(self, audio: np.ndarray, started: float, barge: bool, overlap: bool = False) -> None:
         t_end = time.monotonic()
         sess = self.pipeline.sessions.get(self.session_id)
         dur_s = len(audio) / 16000
@@ -375,7 +419,7 @@ class CallSession:
         n = sum(1 for t in self.call.turns if t["role"] == "customer") + 1
         self.app.save_audio(self.call.call_id, n, audio)  # for listening back / STT debugging
         # Whisper (GPU), the voice print and the voice features (CPU) run at the same time: no added latency
-        (text, stt_lang, stt_ms, quiet), (prosody, feats), (emb, is_caller, voice_sim) = await asyncio.gather(
+        (text, stt_lang, stt_ms, quiet, nsp), (prosody, feats), (emb, is_caller, voice_sim) = await asyncio.gather(
             self.transcribe(audio, hint, prefer),
             asyncio.to_thread(measure_voice, audio),
             asyncio.to_thread(self.speaker.score, audio))
@@ -392,7 +436,9 @@ class CallSession:
             # between words, so loudness over the noise floor cannot tell them apart.
             self.event("recovered_speech", {"text": quiet, "voice_similarity": voice_sim, "snr_db": reading.snr_db})
             text = quiet
-        if VOICEMAIL.search(text):  # carrier announcement / voicemail greeting, not the customer
+        if VOICEMAIL.search(text) and self.accepted_turns == 0:
+            # carrier announcement / voicemail greeting: only at the start. Later, "trainer is not available?"
+            # from the caller must not hang up the call
             self.event("voicemail", {"text": text})
             await self.hangup("voicemail")
             return
@@ -417,6 +463,27 @@ class CallSession:
                             speech_rate_wps=round(len(text.split()) / max(dur_s, 0.5), 2))
         if prosody is not None:
             prosody.words_per_s = round(len(text.split()) / dur_s, 2) if dur_s > 0 else None
+        rms = float(np.sqrt(np.mean(audio * audio))) if len(audio) else 0.0
+        confirmed = self.speaker.confirmed
+        caller_voice = voice_sim is not None and voice_sim >= (0.5 if overlap else 0.4)
+        psim = None if confirmed else self.speaker.provisional_sim(emb)
+        # not confirmed yet, but one clean turn is known: noise scored 0.07-0.2 against it, the caller 0.49+
+        unlike_first = psim is not None and psim < 0.35
+        # a quiet stock phrase with the agent silent is believed only if Whisper heard speech in it
+        # (live 6bb1ca00ad: the caller's real "Yes." no-speech 0.17; noise phrases 0.55-0.88)
+        if is_caller and self.stock_noise(text) and not caller_voice and (
+                confirmed or overlap or unlike_first or (rms < 0.035 and nsp >= 0.3)):
+            self.event("noise", {"duration_s": round(dur_s, 2), "why": "noise phrase, not the caller's voice",
+                                 "text": text, "voice_similarity": voice_sim if confirmed else psim,
+                                 "rms": round(rms, 3), "overlap": overlap})
+            return
+        if is_caller and self.hangup_after_speaking and self.stock_noise(text) and not caller_voice:
+            # after our goodbye a noise phrase never reopens the call (live call 9d69a31bae said goodbye twice
+            # more to noise heard as "हुआ है"). Real sentences always do: after "I think we've lost the line"
+            # the caller's "what do you have in the gym?" must be answered
+            self.event("noise", {"duration_s": round(dur_s, 2), "why": "after goodbye, not clearly the caller",
+                                 "text": text, "voice_similarity": voice_sim})
+            return
         if not is_caller:
             self.event("noise", {"duration_s": round(dur_s, 2), "why": "different voice (background)",
                                  "text": text, "voice_similarity": voice_sim})
@@ -425,8 +492,13 @@ class CallSession:
             self.event("noise", {"duration_s": round(dur_s, 2), "why": "background voice", "text": text,
                                  "loudness_db": prosody.loudness_db, "f0_hz": prosody.f0_median_hz})
             return
-        # accepted as the caller: this turn now teaches the voice print and the baseline
-        self.speaker.learn(emb, len(audio))
+        # accepted as the caller. Only CLEAN turns teach the voice print (agent silent, loud enough, real
+        # words): the old lock learned from everything, so noise heard as words could become "the caller"
+        self.accepted_turns += 1
+        self.in_turn = True
+        # callers who talk over the agent still get learned from their clearly loud, longer turns
+        if not self.stock_noise(text) and rms >= CLEAN_RMS and (not overlap or (rms >= 0.05 and dur_s >= 1.5)):
+            self.speaker.learn(emb, len(audio))
         self.calib.accept(feats)
         if prosody is not None:
             self.primary.append(prosody)
@@ -475,6 +547,13 @@ class CallSession:
             self.hangup_reason = "safety_distress" if result.plan.intent == "safety_distress" else "agent_ended"
 
     @staticmethod
+    def stock_noise(text: str) -> bool:
+        # punctuation only: \w does not cover Devanagari vowel signs ("कर दो" became "कर द")
+        t = re.sub(r"[.,!?।॥…\"“”‘’()\[\]:;~-]", " ", text.lower())
+        t = re.sub(r"\s+", " ", t).strip()
+        return t in STOCK_NOISE
+
+    @staticmethod
     def wants_to_buy(sess) -> bool:
         """The call's NLU says they are leaning to buy (acie/understanding.py buying_signal)."""
         try:
@@ -485,9 +564,10 @@ class CallSession:
     async def transcribe(self, audio: np.ndarray, hint: str | None, prefer: str | None):
         stt = self.app.stt
         if hasattr(stt, "transcribe_detail"):
-            return await stt.transcribe_detail(audio, hint, prefer)
+            out = await stt.transcribe_detail(audio, hint, prefer)
+            return out if len(out) == 5 else (*out, 0.5)
         text, lang, ms = await stt.transcribe(audio, hint, prefer)  # test doubles
-        return text, lang, ms, ""
+        return text, lang, ms, "", 0.5
 
     async def send_link(self) -> None:
         """The agent just said it is sending the payment link: send it (once per call)."""
@@ -517,13 +597,22 @@ class CallSession:
                     await q.put(None)
                     break
                 s = f"{s} {nxt}"
-            # the turn's ExpressionParams aren't stored until run_turn returns, so read the script
-            await self.speak([s], detect_language(s), epoch, first_audio, t_end)
+            # the turn's ExpressionParams aren't stored until run_turn returns, so read the script. One language
+            # per reply: switching Fish's language between sentences changed the accent mid-answer
+            lang = first_audio.setdefault("lang", detect_language(s))
+            await self.speak([s], lang, epoch, first_audio, t_end)
 
     async def speak(self, sentences: list[str], language: str, epoch: int | None = None,
                     first_audio: dict | None = None, t_end: float | None = None) -> None:
         epoch = self.speaking_epoch if epoch is None else epoch
+        async with self.speak_lock:
+            await self._speak(sentences, language, epoch, first_audio, t_end)
+
+    async def _speak(self, sentences: list[str], language: str, epoch: int,
+                     first_audio: dict | None, t_end: float | None) -> None:
         for s in sentences:
+            if epoch != self.speaking_epoch:
+                return
             if DEVA.search(s):  # Hindi turn: respell English names the Hindi voice misreads
                 for rx, say in self.pronounce:
                     s = rx.sub(say, s)
