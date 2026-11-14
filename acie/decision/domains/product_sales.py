@@ -451,6 +451,9 @@ class ProductSalesDomain:
             product = product.model_copy(update={
                 "renewal_note": {k: v for k, v in product.renewal_note.items() if "$" not in v},
                 "annual_note": {k: v for k, v in product.annual_note.items() if "$" not in v}})
+        if product.product_name not in product.pitch_hinglish and product.product_name in product.pitch_hi:
+            # the Hinglish pitch is still the Claude default while the Hindi one was written for this product
+            product = product.model_copy(update={"pitch_hinglish": ""})
         self.p = product
         if playbook is None and product.playbook_tree:
             from ... import playbook as pbm

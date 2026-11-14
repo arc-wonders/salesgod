@@ -317,3 +317,12 @@ async def test_distress_is_sticky_for_the_rest_of_the_call():
     await pipe.run_turn(T("मेरे मरने का मन कर रहा है"))
     r = await pipe.run_turn(T("haan theek hai credit card batao"))
     assert r.plan.intent == "safety_followup" and "14416" in r.text
+
+
+async def test_distress_followup_says_number_slowly_and_goodbye():
+    pipe = make_pipe()
+    await pipe.run_turn(T("मेरे मरने का मन कर रहा है"))
+    r = await pipe.run_turn(T("नंबर धीरे धीरे बोलो, लिख लेते हैं"))
+    assert "एक, चार" in r.text and not r.plan.end_call
+    r = await pipe.run_turn(T("लिख लिया बेटा, अच्छा रखते हैं फ़ोन"))
+    assert r.plan.intent == "safety_goodbye" and r.plan.end_call

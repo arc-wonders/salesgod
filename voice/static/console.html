@@ -1,0 +1,894 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SalesGod Console</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;450;500;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* Tokens and shell from the GroundSet Motion product shell (product-shell.css, flow-builder.css). */
+:root{
+  --bg:220 10% 5.7%;--fg:60 8% 92%;--muted:216 5% 65%;--tertiary:217 5% 47%;--body:216 5% 65%;
+  --rule:210 9% 13.5%;--rule-strong:214 8% 18%;--rule-heavy:216 8% 25%;
+  --panel:214 12% 8%;--elevated:216 10% 10%;--sidebar:220 10% 5.7%;--hover:210 9% 12.5%;
+  --signal:16 100% 56%;--green:153 44% 49%;--amber:38 85% 55%;--red:358 70% 60%;--blue:216 70% 64%;--slate:217 12% 60%;--violet:262 60% 68%;
+  --font:'Geist',ui-sans-serif,system-ui,sans-serif;--mono:'Geist Mono',ui-monospace,monospace;
+}
+.light{
+  --bg:45 14% 95%;--fg:220 10% 9%;--muted:220 5% 36%;--tertiary:220 4% 48%;--body:220 6% 26%;
+  --rule:40 8% 84%;--rule-strong:40 6% 76%;--rule-heavy:40 6% 70%;
+  --panel:45 18% 98%;--elevated:45 12% 93%;--sidebar:45 12% 92%;--hover:40 10% 87%;
+  --signal:16 100% 50%;--green:153 45% 32%;--amber:38 80% 36%;--red:358 65% 46%;--blue:216 55% 45%;--slate:217 12% 42%;--violet:262 45% 50%;
+}
+*,*::before,*::after{box-sizing:border-box}
+html,body{margin:0;height:100%;background:hsl(var(--bg));color:hsl(var(--fg));font-family:var(--font);font-size:13px;line-height:1.5;font-feature-settings:'ss01','tnum'}
+button,input,select,textarea{font:inherit;color:inherit}
+button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:1.5px solid hsl(var(--signal));outline-offset:2px}
+.mono{font-family:var(--mono)}
+svg.i{width:16px;height:16px;flex:none;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+svg.i.sm{width:13px;height:13px}
+
+/* shell */
+.gs{display:flex;height:100dvh;overflow:hidden}
+.side{display:flex;flex:0 0 228px;flex-direction:column;height:100dvh;border-right:1px solid hsl(var(--rule));background:hsl(var(--sidebar))}
+.brand{display:flex;align-items:center;gap:10px;height:56px;flex:0 0 56px;padding:0 18px;border-bottom:1px solid hsl(var(--rule))}
+.brand .mk{width:20px;height:20px;border-radius:5px;background:hsl(var(--signal));display:grid;place-items:center}
+.brand .mk i{width:8px;height:8px;border-radius:50%;background:hsl(var(--bg))}
+.brand b{font-weight:600;font-size:14px;letter-spacing:-.02em}
+.brand small{font-family:var(--mono);font-size:9.5px;letter-spacing:.14em;color:hsl(var(--tertiary));text-transform:uppercase;margin-left:auto}
+.nav{flex:1;overflow-y:auto;padding:16px 12px}
+.group{margin-top:18px;padding:0 10px 8px;color:hsl(var(--tertiary));font-size:10.5px;font-weight:500;letter-spacing:.16em;text-transform:uppercase}
+.group:first-child{margin-top:0}
+.nav-item{position:relative;display:flex;align-items:center;gap:10px;width:100%;height:34px;margin-bottom:2px;padding:0 10px;border:0;border-radius:6px;background:transparent;color:hsl(var(--muted));font-size:13px;font-weight:450;text-align:left;cursor:pointer;transition:color .15s,background .15s}
+.nav-item svg{color:hsl(var(--tertiary))}
+.nav-item:hover{background:hsl(var(--panel));color:hsl(var(--fg))}
+.nav-item.on{background:hsl(var(--elevated));color:hsl(var(--fg));font-weight:500;box-shadow:inset 0 0 0 1px hsl(var(--rule))}
+.nav-item.on svg{color:hsl(var(--fg))}
+.nav-item.on::before{content:'';position:absolute;left:-12px;top:9px;bottom:9px;width:2px;border-radius:0 2px 2px 0;background:hsl(var(--signal))}
+.nav-item .cnt{margin-left:auto;font-family:var(--mono);font-size:10px;color:hsl(var(--green))}
+.side-foot{padding:8px 10px 12px;border-top:1px solid hsl(var(--rule));position:relative}
+.org{display:flex;align-items:center;gap:9px;width:100%;padding:7px 10px;border:1px solid transparent;border-radius:6px;background:transparent;text-align:left;cursor:pointer}
+.org:hover{border-color:hsl(var(--rule-strong));background:hsl(var(--panel))}
+.org .dot{width:8px;height:8px;flex:0 0 8px;border-radius:2px}
+.org b{display:block;font-size:12px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.org small{display:block;color:hsl(var(--tertiary));font-size:11px}
+.menu{position:absolute;left:10px;right:10px;bottom:calc(100% - 4px);background:hsl(var(--panel));border:1px solid hsl(var(--rule-strong));border-radius:10px;padding:6px;box-shadow:0 18px 50px hsl(220 20% 1%/.45);z-index:40}
+.menu button{display:flex;align-items:center;gap:9px;width:100%;padding:7px 9px;border:0;border-radius:6px;background:none;cursor:pointer;text-align:left;font-size:12.5px}
+.menu button:hover{background:hsl(var(--hover))}
+.menu .sep{height:1px;background:hsl(var(--rule));margin:5px 0}
+.main{display:flex;min-width:0;flex:1;flex-direction:column}
+.topbar{display:flex;height:56px;flex:0 0 56px;align-items:center;gap:12px;padding:0 24px;border-bottom:1px solid hsl(var(--rule));background:hsl(var(--bg)/.94)}
+.crumbs{display:flex;min-width:0;flex:1;align-items:center;gap:8px;color:hsl(var(--tertiary));font-size:12.5px;white-space:nowrap}
+.crumbs i{font-style:normal}
+.crumbs b{color:hsl(var(--fg));font-weight:500}
+.icon-btn{display:grid;flex:0 0 34px;width:34px;height:34px;place-items:center;border:1px solid hsl(var(--rule-strong));border-radius:999px;background:transparent;color:hsl(var(--muted));cursor:pointer}
+.icon-btn:hover{border-color:hsl(var(--rule-heavy));color:hsl(var(--fg))}
+.conn{display:inline-flex;align-items:center;gap:7px;height:28px;padding:0 11px;border:1px solid hsl(var(--rule-strong));border-radius:999px;font-family:var(--mono);font-size:10.5px;color:hsl(var(--muted));letter-spacing:.04em}
+.conn i{width:6px;height:6px;border-radius:50%;background:hsl(var(--tertiary))}
+.conn.ok i{background:hsl(var(--green));box-shadow:0 0 0 3px hsl(var(--green)/.18)}
+.conn.bad i{background:hsl(var(--red))}
+.content{flex:1;min-height:0;overflow:auto}
+.pad{max-width:1480px;margin:0 auto;padding:28px 32px 56px}
+.flush{height:100%;display:flex;flex-direction:column;min-height:0}
+.head{padding:22px 28px 16px;border-bottom:1px solid hsl(var(--rule));display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap}
+.pad .head{padding:0 0 18px;margin-bottom:22px}
+.head.compact{padding:14px 28px;align-items:center}
+.head h1{margin:0;font-size:22px;font-weight:500;letter-spacing:-.025em;line-height:1.2}
+.head p{max-width:650px;margin:6px 0 0;color:hsl(var(--body));font-size:12px;line-height:1.65}
+.head .sp{flex:1}
+.head .acts{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+
+/* controls */
+.btn{display:inline-flex;align-items:center;gap:7px;height:32px;padding:0 13px;border:1px solid hsl(var(--rule-strong));border-radius:999px;background:transparent;color:hsl(var(--fg));font-size:12.5px;font-weight:500;cursor:pointer;white-space:nowrap;text-decoration:none}
+.btn:hover{border-color:hsl(var(--rule-heavy));background:hsl(var(--elevated))}
+.btn.pri{background:hsl(var(--signal));border-color:hsl(var(--signal));color:hsl(220 10% 6%)}
+.btn.pri:hover{filter:brightness(1.07)}
+.btn.sm{height:27px;padding:0 10px;font-size:12px}
+.btn.ghost{border-color:transparent;color:hsl(var(--muted))}
+.btn.ghost:hover{color:hsl(var(--fg));background:hsl(var(--hover))}
+.btn.danger{color:hsl(var(--red))}
+.btn:disabled{opacity:.45;cursor:default;filter:none}
+input,select,textarea{width:100%;height:32px;padding:0 10px;border:1px solid hsl(var(--rule-strong));border-radius:7px;background:hsl(var(--bg));font-size:12.5px}
+textarea{height:auto;padding:8px 10px;resize:vertical;line-height:1.55}
+input:hover,select:hover,textarea:hover{border-color:hsl(var(--rule-heavy))}
+select.inline{width:auto}
+.lbl{display:block;margin:12px 0 5px;color:hsl(var(--tertiary));font-size:10.5px;font-weight:500;letter-spacing:.14em;text-transform:uppercase}
+.hint{color:hsl(var(--tertiary));font-size:11.5px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.row{display:flex;gap:8px;align-items:center}
+.err{color:hsl(var(--red));font-size:12px;margin-top:8px;white-space:pre-wrap}
+.tag{display:inline-flex;align-items:center;gap:5px;height:20px;padding:0 8px;border:1px solid hsl(var(--rule-strong));border-radius:999px;font-family:var(--mono);font-size:10px;letter-spacing:.03em;color:hsl(var(--muted));white-space:nowrap}
+.tag b{font-weight:500;color:hsl(var(--fg))}
+.tag.sig{color:hsl(var(--signal));border-color:hsl(var(--signal)/.45);background:hsl(var(--signal)/.07)}
+.tag.green{color:hsl(var(--green));border-color:hsl(var(--green)/.45)}
+.tag.red{color:hsl(var(--red));border-color:hsl(var(--red)/.45)}
+.tag.amber{color:hsl(var(--amber));border-color:hsl(var(--amber)/.45)}
+.tag.blue{color:hsl(var(--blue));border-color:hsl(var(--blue)/.45)}
+.sec-lbl{font-size:10.5px;font-weight:500;letter-spacing:.16em;text-transform:uppercase;color:hsl(var(--tertiary))}
+.empty{padding:48px 24px;text-align:center;color:hsl(var(--tertiary));font-size:12px}
+.empty b{display:block;color:hsl(var(--fg));font-size:14px;font-weight:500;margin-bottom:4px}
+
+/* live */
+.live{flex:1;min-height:0;display:grid;grid-template-columns:300px minmax(0,1fr) 320px}
+.live>section{min-height:0;overflow-y:auto;overflow-x:hidden;border-right:1px solid hsl(var(--rule))}
+.live>section:last-child{border-right:0;background:hsl(var(--panel))}
+.pane-head{position:sticky;top:0;z-index:2;display:flex;align-items:center;gap:8px;height:44px;padding:0 16px;border-bottom:1px solid hsl(var(--rule));background:hsl(var(--bg)/.96)}
+.live>section:last-child .pane-head{background:hsl(var(--panel)/.96)}
+.ci{display:block;width:100%;padding:11px 16px;border:0;border-bottom:1px solid hsl(var(--rule));background:none;text-align:left;cursor:pointer}
+.ci:hover{background:hsl(var(--panel))}
+.ci.on{background:hsl(var(--elevated));box-shadow:inset 2px 0 0 hsl(var(--signal))}
+.ci .t{display:flex;align-items:center;gap:8px;font-weight:500;font-size:13px}
+.ci .m{margin-top:3px;color:hsl(var(--tertiary));font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.st{margin-left:auto;font-family:var(--mono);font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:hsl(var(--tertiary))}
+.st.live{color:hsl(var(--green))}.st.ringing,.st.dialing{color:hsl(var(--amber))}.st.failed{color:hsl(var(--red))}
+.pulse{width:7px;height:7px;border-radius:50%;background:hsl(var(--green));animation:pl 1.6s infinite;flex:none}
+@keyframes pl{0%{box-shadow:0 0 0 0 hsl(var(--green)/.55)}100%{box-shadow:0 0 0 8px hsl(var(--green)/0)}}
+.tx{padding:18px 24px 40px;display:flex;flex-direction:column;gap:14px;max-width:880px}
+.turn{display:grid;grid-template-columns:76px minmax(0,1fr);gap:12px}
+.turn .who{padding-top:2px;font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:hsl(var(--tertiary))}
+.turn.c .who{color:hsl(var(--muted))}
+.turn.a .who{color:hsl(var(--signal))}
+.turn .txt{font-size:13.5px;line-height:1.6}
+.turn.c .txt{color:hsl(var(--body))}
+.turn .sub{margin-top:3px;font-family:var(--mono);font-size:10px;color:hsl(var(--tertiary))}
+.dec{margin-top:10px;border:1px solid hsl(var(--rule));border-radius:10px;background:hsl(var(--panel));overflow:hidden}
+.dec .r1{display:flex;flex-wrap:wrap;gap:6px;padding:10px 12px;border-bottom:1px solid hsl(var(--rule))}
+.dec .r2{display:grid;grid-template-columns:repeat(4,1fr);border-bottom:1px solid hsl(var(--rule))}
+.dec .r2>div{padding:8px 12px;border-right:1px solid hsl(var(--rule))}
+.dec .r2>div:last-child{border-right:0}
+.meter{font-family:var(--mono);font-size:9.5px;letter-spacing:.06em;text-transform:uppercase;color:hsl(var(--tertiary));display:flex;justify-content:space-between}
+.meter b{color:hsl(var(--fg));font-weight:500}
+.bar{height:3px;margin-top:6px;border-radius:2px;background:hsl(var(--rule-strong));overflow:hidden}
+.bar i{display:block;height:100%;background:hsl(var(--signal))}
+.bar.red i{background:hsl(var(--red))}.bar.amber i{background:hsl(var(--amber))}.bar.blue i{background:hsl(var(--blue))}
+.dec .r3{padding:9px 12px;font-size:12px;color:hsl(var(--body))}
+.dec .r3 em{color:hsl(var(--tertiary));font-style:normal;font-family:var(--mono);font-size:10px;letter-spacing:.06em;text-transform:uppercase;margin-right:6px}
+.dec details{padding:0 12px 9px;font-size:11.5px;color:hsl(var(--tertiary))}
+.dec details pre{margin:6px 0 0;white-space:pre-wrap;font-family:var(--mono);font-size:10.5px}
+.path{padding:14px 16px}
+.step{position:relative;display:flex;align-items:center;gap:10px;height:34px;padding:0 10px;border-radius:7px;color:hsl(var(--tertiary));font-size:12.5px}
+.step .n{width:18px;font-family:var(--mono);font-size:10px;color:hsl(var(--tertiary))}
+.step.passed{color:hsl(var(--muted))}
+.step.hot{background:hsl(var(--signal)/.1);color:hsl(var(--fg));box-shadow:inset 0 0 0 1px hsl(var(--signal)/.5)}
+.step.hot .n{color:hsl(var(--signal))}
+.leaf{margin:4px 0 6px 28px;padding:9px 11px;border:1px solid hsl(var(--signal)/.5);border-radius:8px;background:hsl(var(--signal)/.06);font-size:12px}
+.leaf .k{font-family:var(--mono);font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:hsl(var(--signal))}
+.kv{display:grid;grid-template-columns:96px minmax(0,1fr);gap:8px 10px;padding:14px 16px;margin:0;border-top:1px solid hsl(var(--rule));font-size:12px}
+.kv dt{color:hsl(var(--tertiary));font-family:var(--mono);font-size:10px;letter-spacing:.04em;padding-top:1px}
+.kv dd{margin:0;overflow-wrap:anywhere}
+
+/* tree */
+.tree{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) 380px}
+.canvas{position:relative;overflow:hidden;cursor:grab;touch-action:none;background-color:hsl(var(--bg));background-image:radial-gradient(hsl(var(--rule-strong)) 1px,transparent 1px);background-size:20px 20px}
+.canvas.drag{cursor:grabbing}
+.layer{position:absolute;left:0;top:0;transform-origin:0 0}
+.layer svg{position:absolute;left:0;top:0;overflow:visible;pointer-events:none}
+.edge{fill:none;stroke:hsl(var(--rule-heavy));stroke-width:1.4}
+.edge.hot{stroke:hsl(var(--signal));stroke-width:2.2;stroke-dasharray:6 5;animation:flow 1s linear infinite}
+@keyframes flow{to{stroke-dashoffset:-11}}
+.nd{position:absolute;width:212px;border:1px solid hsl(var(--rule-strong));border-radius:10px;background:hsl(var(--panel));padding:9px 11px 8px;box-shadow:0 1px 2px rgba(0,0,0,.18);cursor:pointer;transition:border-color .15s,box-shadow .15s}
+.nd::before{content:'';position:absolute;left:-1px;top:10px;bottom:10px;width:2px;border-radius:0 2px 2px 0;background:var(--kind)}
+.nd:hover{border-color:hsl(var(--rule-heavy))}
+.nd .k{display:flex;align-items:center;gap:6px;font-size:9.5px;font-weight:500;letter-spacing:.16em;text-transform:uppercase;color:var(--kind)}
+.nd .t{margin-top:3px;font-size:13px;font-weight:500;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nd .m{margin-top:2px;font-size:11px;color:hsl(var(--tertiary));white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nd.sel{border-color:hsl(var(--blue));box-shadow:0 0 0 3px hsl(var(--blue)/.18)}
+.nd.hot{border-color:hsl(var(--signal));box-shadow:0 0 0 3px hsl(var(--signal)/.22),0 0 24px hsl(var(--signal)/.25)}
+.nd.new{border-style:dashed;border-color:hsl(var(--green))}
+.nd.dirty .k::after{content:'edited';margin-left:auto;color:hsl(var(--amber));letter-spacing:.08em}
+.k-root{--kind:hsl(var(--signal))}.k-gate{--kind:hsl(var(--slate))}.k-gate-safety{--kind:hsl(var(--red))}.k-gate-compliance{--kind:hsl(var(--blue))}.k-gate-close{--kind:hsl(var(--green))}.k-gate-conversation{--kind:hsl(var(--amber))}
+.k-node{--kind:hsl(var(--violet))}.k-free{--kind:hsl(var(--tertiary))}
+.col-lbl{position:absolute;font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:hsl(var(--tertiary));white-space:nowrap}
+.tools{position:absolute;top:12px;left:12px;right:12px;z-index:5;display:flex;align-items:center;gap:6px;flex-wrap:wrap;pointer-events:none}
+.tools>*{pointer-events:auto}
+.tools .btn{background:hsl(var(--panel))}
+.tools .btn.pri{background:hsl(var(--signal))}
+.zoom{position:absolute;left:12px;bottom:12px;z-index:5;display:flex;flex-direction:column;border:1px solid hsl(var(--rule-strong));border-radius:8px;overflow:hidden;background:hsl(var(--panel))}
+.zoom button{display:grid;place-items:center;width:30px;height:28px;border:0;border-bottom:1px solid hsl(var(--rule));background:none;cursor:pointer;color:hsl(var(--muted))}
+.zoom button:last-child{border-bottom:0}
+.zoom button:hover{color:hsl(var(--fg));background:hsl(var(--hover))}
+.legend{position:absolute;right:12px;bottom:12px;z-index:5;display:flex;gap:12px;padding:7px 11px;border:1px solid hsl(var(--rule));border-radius:8px;background:hsl(var(--panel)/.92);font-size:11px;color:hsl(var(--tertiary))}
+.legend i{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:5px;vertical-align:-1px}
+.insp{border-left:1px solid hsl(var(--rule));background:hsl(var(--panel));overflow-y:auto;min-height:0;display:flex;flex-direction:column}
+.insp-head{padding:16px 18px 14px;border-bottom:1px solid hsl(var(--rule))}
+.insp-head .k{font-size:9.5px;font-weight:500;letter-spacing:.16em;text-transform:uppercase;color:var(--kind)}
+.insp-head h3{margin:4px 0 0;font-size:15px;font-weight:500;letter-spacing:-.01em}
+.insp-head p{margin:6px 0 0;color:hsl(var(--body));font-size:12px;line-height:1.6}
+.insp-body{padding:4px 18px 22px;flex:1}
+.insp-foot{position:sticky;bottom:0;display:flex;gap:8px;padding:12px 18px;border-top:1px solid hsl(var(--rule));background:hsl(var(--panel))}
+.pts{margin:8px 0 0;padding:0;list-style:none}
+.pts li{position:relative;padding:6px 0 6px 16px;border-bottom:1px solid hsl(var(--rule));font-size:12.5px;color:hsl(var(--body))}
+.pts li::before{content:'';position:absolute;left:2px;top:13px;width:5px;height:5px;border:1px solid hsl(var(--signal))}
+
+/* sim */
+.sim{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) 320px}
+.sim>section{min-height:0;display:flex;flex-direction:column;border-right:1px solid hsl(var(--rule))}
+.sim>section:last-child{border-right:0;background:hsl(var(--panel));overflow:auto;display:block}
+.sim .bar-top{display:flex;gap:8px;align-items:center;padding:10px 24px;border-bottom:1px solid hsl(var(--rule));flex-wrap:wrap}
+.sim .scroll{flex:1;overflow:auto}
+.composer{display:flex;gap:8px;padding:12px 24px;border-top:1px solid hsl(var(--rule))}
+.composer input{height:38px;border-radius:999px;padding:0 16px}
+.composer .btn{height:38px}
+
+/* progress */
+.strip{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border:1px solid hsl(var(--rule));border-radius:10px;overflow:hidden;background:hsl(var(--panel))}
+.strip>div{padding:14px 17px;border-right:1px solid hsl(var(--rule));border-bottom:1px solid hsl(var(--rule))}
+.strip>div:nth-child(4n){border-right:0}
+.strip>div:nth-last-child(-n+4){border-bottom:0}
+.strip .v{font-size:24px;font-weight:500;letter-spacing:-.03em;line-height:1.1}
+.strip .k{margin-top:4px;font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:hsl(var(--tertiary))}
+.hero{display:grid;grid-template-columns:auto 1fr;gap:28px;align-items:center;padding:20px 22px;margin-bottom:16px;border:1px solid hsl(var(--rule));border-radius:10px;background:hsl(var(--panel))}
+.hero .v{font-size:44px;font-weight:500;letter-spacing:-.04em;line-height:1}
+.hero .v small{font-size:20px;color:hsl(var(--tertiary))}
+.big{height:6px;border-radius:3px;background:hsl(var(--rule-strong));overflow:hidden}
+.big i{display:block;height:100%;background:hsl(var(--signal));transition:width .6s}
+.cols{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:16px;margin-top:16px;align-items:start}
+.panel{border:1px solid hsl(var(--rule));border-radius:10px;background:hsl(var(--panel));overflow:hidden}
+.panel+.panel{margin-top:16px}
+.panel-head{display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid hsl(var(--rule))}
+.panel-head b{font-weight:500;font-size:13px}
+.panel-head .tag{margin-left:auto}
+.item{display:grid;grid-template-columns:minmax(0,1fr) 140px 40px;gap:12px;align-items:center;padding:8px 16px;border-bottom:1px solid hsl(var(--rule));font-size:12.5px}
+.item:last-child{border-bottom:0}
+.item .p{height:4px;border-radius:2px;background:hsl(var(--rule-strong));overflow:hidden}
+.item .p i{display:block;height:100%;background:hsl(var(--green))}
+.item .p i.mid{background:hsl(var(--amber))}.item .p i.low{background:hsl(var(--red))}
+.item .n{font-family:var(--mono);font-size:11px;color:hsl(var(--muted));text-align:right}
+.log{padding:10px 16px;border-bottom:1px solid hsl(var(--rule));font-size:12.5px;color:hsl(var(--body))}
+.log:last-child{border-bottom:0}
+.log .d{font-family:var(--mono);font-size:10px;color:hsl(var(--tertiary));letter-spacing:.04em}
+
+/* tenants */
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px}
+.pcard{display:block;width:100%;padding:16px;border:1px solid hsl(var(--rule));border-radius:10px;background:hsl(var(--panel));text-align:left;cursor:pointer;position:relative}
+.pcard:hover{border-color:hsl(var(--rule-heavy))}
+.pcard .k{font-size:9.5px;font-weight:500;letter-spacing:.16em;text-transform:uppercase;color:hsl(var(--tertiary))}
+.pcard b{display:block;margin-top:4px;font-size:15px;font-weight:500}
+.pcard dl{display:grid;grid-template-columns:90px 1fr;gap:5px 8px;margin:12px 0 0;font-size:12px}
+.pcard dt{color:hsl(var(--tertiary));font-family:var(--mono);font-size:10px;padding-top:2px}
+.pcard dd{margin:0}
+
+/* modal */
+.modal{position:fixed;inset:0;z-index:100;display:flex;align-items:flex-start;justify-content:center;padding:min(12vh,100px) 16px 20px;background:hsl(220 20% 2%/.62);backdrop-filter:blur(3px)}
+.dialog{width:min(580px,100%);max-height:80vh;overflow:auto;border:1px solid hsl(var(--rule-strong));border-radius:14px;background:hsl(var(--panel));box-shadow:0 22px 70px hsl(220 20% 1%/.6);animation:pop .16s ease-out both}
+.dialog .dh{padding:16px 20px 12px;border-bottom:1px solid hsl(var(--rule))}
+.dialog .dh h3{margin:0;font-size:15px;font-weight:500}
+.dialog .dh p{margin:4px 0 0;color:hsl(var(--body));font-size:12px}
+.dialog .db{padding:6px 20px 18px}
+.dialog .df{display:flex;gap:8px;padding:12px 20px;border-top:1px solid hsl(var(--rule));position:sticky;bottom:0;background:hsl(var(--panel))}
+@keyframes pop{from{opacity:0;transform:translateY(-3px)}to{opacity:1;transform:none}}
+.login{min-height:100dvh;display:grid;place-items:center;padding:16px}
+.login .box{width:min(360px,100%);border:1px solid hsl(var(--rule-strong));border-radius:14px;background:hsl(var(--panel));padding:24px}
+.login h1{margin:14px 0 4px;font-size:20px;font-weight:500;letter-spacing:-.02em}
+.enter{animation:enter .3s cubic-bezier(.2,.7,.2,1) both}
+@keyframes enter{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+@media (max-width:1100px){.live{grid-template-columns:260px minmax(0,1fr)}.live>section:last-child{display:none}.tree,.sim{grid-template-columns:1fr}.insp,.sim>section:last-child{display:none}.cols{grid-template-columns:1fr}}
+@media (max-width:760px){.side{display:none}.live{grid-template-columns:1fr}.live>section:first-child{max-height:200px}.strip{grid-template-columns:repeat(2,1fr)}.pad{padding:20px 16px 40px}.topbar{padding:0 16px}}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+(() => {
+'use strict';
+const $ = (q) => document.querySelector(q);
+const flat = (a) => a.flat(Infinity).filter((k) => k != null && k !== false);
+function h(tag, attrs, ...kids) {
+  const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs || {})) {
+    if (v == null || v === false) continue;
+    if (k === 'class') e.className = v;
+    else if (k === 'style') e.style.cssText = v;
+    else if (k.startsWith('on')) e.addEventListener(k.slice(2), v);
+    else if (k === 'value') e.value = v;
+    else e.setAttribute(k, v === true ? '' : v);
+  }
+  for (const k of flat(kids)) e.append(k.nodeType ? k : document.createTextNode(String(k)));
+  return e;
+}
+const NS = 'http://www.w3.org/2000/svg';
+function sv(tag, attrs, ...kids) {
+  const e = document.createElementNS(NS, tag);
+  for (const [k, v] of Object.entries(attrs || {})) if (v != null) e.setAttribute(k, v);
+  for (const k of flat(kids)) e.append(k);
+  return e;
+}
+/* lucide-style icons */
+const ICONS = {
+  phone: 'M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L8 9.9a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2z',
+  chat: 'M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z',
+  tree: 'M6 3v12M18 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM6 21a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM18 9a9 9 0 0 1-9 9',
+  building: 'M3 21h18M5 21V7l8-4v18M19 21V11l-6-4M9 9v.01M9 12v.01M9 15v.01M9 18v.01',
+  activity: 'M22 12h-4l-3 9L9 3l-3 9H2',
+  sun: 'M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4',
+  moon: 'M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9z',
+  plus: 'M12 5v14M5 12h14',
+  spark: 'M12 3l1.9 5.8L20 10l-6.1 1.2L12 17l-1.9-5.8L4 10l6.1-1.2zM19 17l.8 2.2L22 20l-2.2.8L19 23l-.8-2.2L16 20l2.2-.8z',
+  save: 'M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2zM17 21v-8H7v8M7 3v5h8',
+  refresh: 'M21 12a9 9 0 1 1-3-6.7L21 8M21 3v5h-5',
+  chev: 'M7 15l5 5 5-5M7 9l5-5 5 5',
+  hang: 'M10.7 13.3a16 16 0 0 0 3.4 2.6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2v3a2 2 0 0 1-2.2 2A19.8 19.8 0 0 1 2 4.2 2 2 0 0 1 4 2h3M22 2L2 22',
+  play: 'M6 3l14 9-14 9z',
+  send: 'M22 2L11 13M22 2l-7 20-4-9-9-4z',
+  trash: 'M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6',
+  fit: 'M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3',
+};
+const ic = (n, cls) => sv('svg', { class: 'i' + (cls ? ' ' + cls : ''), viewBox: '0 0 24 24' }, sv('path', { d: ICONS[n] }));
+
+async function api(path, opts) {
+  const r = await fetch(path, { headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin', ...(opts || {}) });
+  if (r.status === 401) { S.authed = false; render(); throw new Error('Please sign in'); }
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.detail || r.statusText);
+  return j;
+}
+const store = { get(k, d) { try { return localStorage.getItem(k) ?? d; } catch { return d; } }, set(k, v) { try { localStorage.setItem(k, v); } catch {} } };
+const ago = (t) => { if (!t) return ''; const d = Date.now() / 1000 - t; return d < 60 ? Math.round(d) + 's ago' : d < 3600 ? Math.round(d / 60) + 'm ago' : d < 86400 ? Math.round(d / 3600) + 'h ago' : new Date(t * 1000).toLocaleDateString(); };
+const mask = (n) => (n && n.length > 4 ? '•••• ' + n.slice(-4) : n || '');
+const pct = (x) => Math.round((x || 0) * 100);
+const GATE_TONE = { safety: 'red', compliance: 'blue', unclear: 'amber', close: 'green', conversation: 'sig' };
+
+const S = {
+  authed: null, page: store.get('sg_page', 'live'), tenants: [], tenant: store.get('sg_tenant', ''), products: {}, calls: [], sel: null, gates: [], conn: 'off', menu: false,
+  tree: { pid: null, pb: null, dirty: false, sel: null, hot: {}, follow: true, view: null },
+  progress: null, sim: { sid: null, turns: [], busy: false, pid: null, lang: 'hinglish', age: '', model: 'gemini' },
+};
+if (store.get('sg_theme', 'dark') === 'light') document.documentElement.classList.add('light');
+
+/* ---------------------------------------------------------------- data */
+async function boot() {
+  const me = await fetch('/api/me', { credentials: 'same-origin' }).then((r) => r.json()).catch(() => ({ authed: false }));
+  S.authed = !!me.authed; S.from = me.from_number;
+  if (!S.authed) return render();
+  await Promise.all([loadTenants(), loadProducts(), loadCalls(), api('/api/tree/gates').then((j) => { S.gates = j.gates; })]);
+  if (!S.tenants.find((t) => t.id === S.tenant)) S.tenant = S.tenants[0]?.id || '';
+  render(); listen();
+  setInterval(() => loadCalls().then(() => { if (S.page === 'live') renderPage(); updateNavCount(); }).catch(() => {}), 8000);
+}
+const loadTenants = async () => { S.tenants = (await api('/api/tenants')).tenants; };
+const loadProducts = async () => { const j = await api('/api/products'); S.products = Object.fromEntries((j.products || []).map((p) => [p.id, p])); };
+const loadCalls = async () => { S.calls = (await api('/api/calls')).calls || []; };
+const tenantProducts = () => Object.values(S.products).filter((p) => (p.tenant || 'default') === S.tenant);
+const tenantOf = (c) => S.products[c.campaign]?.tenant || 'default';
+const tenantCalls = () => S.calls.filter((c) => tenantOf(c) === S.tenant);
+const pname = (id) => S.products[id]?.product_name || id;
+const lastAgent = (c) => c && [...(c.turns || [])].reverse().find((t) => t.role === 'agent' && t.trace);
+
+function listen() {
+  const es = new EventSource('/api/events');
+  es.onopen = () => setConn('ok');
+  es.onerror = () => setConn('bad');
+  es.onmessage = (e) => {
+    let ev; try { ev = JSON.parse(e.data); } catch { return; }
+    if (ev.type === 'status' && ev.call) {
+      const i = S.calls.findIndex((x) => x.call_id === ev.call.call_id);
+      if (i >= 0) S.calls[i] = { ...S.calls[i], ...ev.call }; else S.calls.unshift(ev.call);
+      const cur = S.calls.find((x) => x.call_id === S.sel);
+      if (ev.call.status === 'live' && tenantOf(ev.call) === S.tenant && !(cur && cur.status === 'live')) S.sel = ev.call.call_id;
+      if (S.page === 'live') renderPage();
+      updateNavCount();
+      return;
+    }
+    const c = S.calls.find((x) => x.call_id === ev.call_id);
+    if (!c) { loadCalls().then(() => { if (S.page === 'live') renderPage(); }).catch(() => {}); return; }
+    if (ev.type === 'turn') {
+      const { type, call_id, ...turn } = ev;
+      c.turns = c.turns || []; c.turns.push(turn); if (c.status !== 'ended') c.status = 'live';
+      if (turn.role === 'agent' && turn.trace && S.tree.follow && c.campaign === S.tree.pid) {
+        S.tree.hot = { gate: turn.trace.gate, node: turn.trace.pb_node, call: c.call_id };
+        if (S.page === 'tree') drawCanvas();
+      }
+      if (S.page === 'live' && S.sel === c.call_id) renderPage();
+    }
+  };
+}
+function setConn(s) { S.conn = s; const e = $('#conn'); if (e) { e.className = 'conn ' + s; e.lastChild.textContent = s === 'ok' ? 'LIVE' : 'RECONNECTING'; } }
+function updateNavCount() { const e = $('#livecnt'); if (e) { const n = tenantCalls().filter((c) => ['live', 'ringing', 'dialing'].includes(c.status)).length; e.textContent = n ? n + ' live' : ''; } }
+
+/* ---------------------------------------------------------------- shell */
+const NAV = [
+  ['Operate', [['live', 'Live calls', 'phone'], ['sim', 'Simulator', 'chat']]],
+  ['Build', [['tree', 'Decision tree', 'tree'], ['tenants', 'Tenants & products', 'building']]],
+  ['Track', [['progress', 'Progress', 'activity']]],
+];
+const TITLES = { live: 'Live calls', sim: 'Simulator', tree: 'Decision tree', tenants: 'Tenants & products', progress: 'Progress' };
+function go(p) { S.page = p; store.set('sg_page', p); render(); }
+function render() {
+  const app = $('#app'); app.innerHTML = '';
+  if (S.authed === false) { app.append(loginView()); return; }
+  if (S.authed === null) return;
+  const t = S.tenants.find((x) => x.id === S.tenant) || { name: '—', color: '#888' };
+  const dark = !document.documentElement.classList.contains('light');
+  app.append(h('div', { class: 'gs' },
+    h('aside', { class: 'side' },
+      h('div', { class: 'brand' }, h('span', { class: 'mk' }, h('i')), h('b', {}, 'SalesGod'), h('small', {}, 'Voice')),
+      h('nav', { class: 'nav' }, NAV.map(([g, items]) => [h('div', { class: 'group' }, g),
+        items.map(([id, label, icon]) => h('button', { class: 'nav-item' + (S.page === id ? ' on' : ''), onclick: () => go(id) }, ic(icon), h('span', {}, label), id === 'live' ? h('span', { class: 'cnt', id: 'livecnt' }) : null))])),
+      h('div', { class: 'side-foot' },
+        S.menu ? h('div', { class: 'menu' },
+          h('div', { class: 'group', style: 'padding:6px 9px 6px' }, 'Switch tenant'),
+          S.tenants.map((x) => h('button', { onclick: () => { S.tenant = x.id; store.set('sg_tenant', x.id); S.menu = false; S.sel = null; S.tree.pid = null; S.sim.sid = null; S.sim.turns = []; render(); } },
+            h('span', { style: `width:8px;height:8px;border-radius:2px;flex:none;background:${x.color}` }), x.name, x.id === S.tenant ? h('span', { class: 'hint', style: 'margin-left:auto' }, 'current') : null)),
+          h('div', { class: 'sep' }),
+          h('button', { onclick: () => { S.menu = false; render(); addTenant(); } }, ic('plus', 'sm'), 'New tenant')) : null,
+        h('button', { class: 'org', onclick: () => { S.menu = !S.menu; render(); } },
+          h('span', { class: 'dot', style: `background:${t.color}` }), h('span', { style: 'min-width:0;flex:1' }, h('b', {}, t.name), h('small', {}, (t.products || []).length + ' product' + ((t.products || []).length === 1 ? '' : 's'))), ic('chev', 'sm')))),
+    h('div', { class: 'main' },
+      h('header', { class: 'topbar' },
+        h('div', { class: 'crumbs' }, h('span', {}, 'SalesGod'), h('i', {}, '/'), h('span', {}, t.name), h('i', {}, '/'), h('b', {}, TITLES[S.page] || '')),
+        h('span', { class: 'conn ' + S.conn, id: 'conn', title: 'Live event stream' }, h('i'), h('span', {}, S.conn === 'ok' ? 'LIVE' : S.conn === 'bad' ? 'RECONNECTING' : 'CONNECTING')),
+        h('a', { class: 'btn ghost sm', href: '/classic' }, 'Classic view'),
+        h('button', { class: 'icon-btn', title: dark ? 'Light theme' : 'Dark theme', onclick: () => { const l = document.documentElement.classList.toggle('light'); store.set('sg_theme', l ? 'light' : 'dark'); render(); } }, ic(dark ? 'sun' : 'moon'))),
+      h('main', { class: 'content', id: 'page' }))));
+  renderPage(); updateNavCount();
+}
+function renderPage() { const p = $('#page'); if (!p) return; ({ live: pageLive, tree: pageTree, sim: pageSim, tenants: pageTenants, progress: pageProgress }[S.page] || pageLive)(p); }
+function head(title, desc, ...acts) { return h('div', { class: 'head' + (desc ? '' : ' compact') }, h('div', {}, h('h1', {}, title), desc ? h('p', {}, desc) : null), h('span', { class: 'sp' }), h('div', { class: 'acts' }, acts)); }
+function loginView() {
+  let pw, err;
+  const goIn = async () => { err.textContent = ''; try { await api('/api/login', { method: 'POST', body: JSON.stringify({ password: pw.value }) }); boot(); } catch (e) { err.textContent = e.message; } };
+  return h('div', { class: 'login' }, h('div', { class: 'box enter' },
+    h('div', { class: 'brand', style: 'padding:0;height:auto;border:0' }, h('span', { class: 'mk' }, h('i')), h('b', {}, 'SalesGod'), h('small', {}, 'Voice')),
+    h('h1', {}, 'Sign in'), h('p', { class: 'hint', style: 'margin:0 0 14px' }, 'Operator console for the voice sales agent.'),
+    h('label', { class: 'lbl' }, 'Password'), pw = h('input', { type: 'password', autocomplete: 'current-password', onkeydown: (e) => { if (e.key === 'Enter') goIn(); } }),
+    h('div', { style: 'height:14px' }), h('button', { class: 'btn pri', style: 'width:100%;justify-content:center', onclick: goIn }, 'Sign in'), err = h('div', { class: 'err' })));
+}
+function modal(title, desc, build) {
+  const m = h('div', { class: 'modal', onclick: (e) => { if (e.target === m) m.remove(); } });
+  const body = h('div', { class: 'db' }), foot = h('div', { class: 'df' });
+  m.append(h('div', { class: 'dialog' }, h('div', { class: 'dh' }, h('h3', {}, title), desc ? h('p', {}, desc) : null), body, foot));
+  const close = () => m.remove();
+  build(body, foot, close);
+  document.body.append(m);
+  const f = m.querySelector('textarea,input'); if (f) f.focus();
+}
+function notice(msg) { modal('Something went wrong', null, (b, f, close) => { b.append(h('p', { class: 'err' }, msg)); f.append(h('button', { class: 'btn', onclick: close }, 'Close')); }); }
+
+/* ---------------------------------------------------------------- decision display */
+function decisionCard(turn, backend) {
+  const tr = turn.trace || {}, n = turn.nlu || {}, st = turn.state || {}, lat = turn.latency_ms;
+  const g = S.gates.find((x) => x.id === tr.gate);
+  const fa = lat && typeof lat === 'object' ? lat.first_audio_after_speech_end : typeof lat === 'number' ? lat : null;
+  const m = (label, v, cls) => h('div', {}, h('div', { class: 'meter' }, h('span', {}, label), h('b', {}, pct(v))), h('div', { class: 'bar ' + (cls || '') }, h('i', { style: `width:${pct(v)}%` })));
+  return h('div', { class: 'dec' },
+    h('div', { class: 'r1' },
+      g ? h('span', { class: 'tag ' + (GATE_TONE[g.id] || '') }, 'gate ', h('b', {}, g.title)) : null,
+      tr.pb_title ? h('span', { class: 'tag sig' }, 'situation ', h('b', {}, tr.pb_title)) : null,
+      h('span', { class: 'tag' }, 'plan ', h('b', {}, turn.intent || '—')),
+      n.intent ? h('span', { class: 'tag' }, 'heard ', h('b', {}, n.intent)) : null,
+      n.objection && n.objection !== 'none' ? h('span', { class: 'tag amber' }, 'objection ', h('b', {}, n.objection)) : null,
+      tr.lead ? h('span', { class: 'tag green' }, 'exact line') : null,
+      tr.llm === false ? h('span', { class: 'tag' }, 'scripted') : tr.llm ? h('span', { class: 'tag blue' }, backend || 'llm') : null,
+      tr.fallback ? h('span', { class: 'tag amber' }, 'fallback') : null,
+      tr.end_call ? h('span', { class: 'tag red' }, 'ends call') : null,
+      fa ? h('span', { class: 'tag' }, h('b', {}, (fa / 1000).toFixed(1) + 's'), ' to audio') : null),
+    h('div', { class: 'r2' }, m('Buying', n.buying_signal), m('Frustration', st.frustration, 'red'), m('Confusion', st.confusion, 'amber'), m('Engagement', st.engagement, 'blue')),
+    n.gist ? h('div', { class: 'r3' }, h('em', {}, 'understood'), n.gist) : null,
+    tr.decision ? h('div', { class: 'r3', style: 'padding-top:0' }, h('em', {}, 'decision'), tr.decision) : null,
+    tr.issues && tr.issues.length ? h('details', {}, h('summary', {}, 'Reply checker: ' + tr.issues.length + ' note' + (tr.issues.length > 1 ? 's' : '')), h('pre', {}, tr.issues.join('\n'))) : null);
+}
+function pathView(turn) {
+  const tr = (turn && turn.trace) || {};
+  const idx = S.gates.findIndex((g) => g.id === tr.gate);
+  return h('div', { class: 'path' }, S.gates.map((g, i) => [
+    h('div', { class: 'step' + (i === idx ? ' hot' : i < idx ? ' passed' : ''), title: g.rule }, h('span', { class: 'n' }, String(i + 1).padStart(2, '0')), h('span', {}, g.title),
+      i < idx ? h('span', { class: 'hint', style: 'margin-left:auto;font-size:10.5px' }, 'passed') : i === idx ? h('span', { class: 'tag sig', style: 'margin-left:auto' }, 'decided') : null),
+    i === idx && tr.gate === 'conversation' ? h('div', { class: 'leaf' }, h('div', { class: 'k' }, tr.pb_title ? 'Situation picked' : 'No situation matched'), tr.pb_title || 'Free answer from product knowledge') : null]));
+}
+function turnView(t, backend) {
+  if (t.role === 'customer') return h('div', { class: 'turn c' }, h('div', { class: 'who' }, 'Customer'), h('div', {}, h('div', { class: 'txt' }, t.text),
+    h('div', { class: 'sub' }, [t.duration_s ? t.duration_s + 's speech' : null, t.stt_lang, t.barge_in ? 'interrupted agent' : null].filter(Boolean).join(' · '))));
+  return h('div', { class: 'turn a' }, h('div', { class: 'who' }, 'Agent'), h('div', {},
+    (t.interim || []).map((x) => h('div', { class: 'txt', style: 'color:hsl(var(--tertiary))' }, x)),
+    h('div', { class: 'txt' }, t.text || t.agent || ''), t.trace || t.nlu ? decisionCard(t, backend) : h('div', { class: 'sub' }, t.intent || '')));
+}
+
+/* ---------------------------------------------------------------- live */
+function pageLive(p) {
+  const old = p.querySelector('#tx');
+  const keep = old ? old.scrollTop : 0, atBottom = !old || old.scrollHeight - old.scrollTop - old.clientHeight < 80;
+  const oldList = p.querySelector('#clist'), keepList = oldList ? oldList.scrollTop : 0;
+  p.innerHTML = '';
+  const calls = tenantCalls();
+  if (!S.sel || !calls.find((x) => x.call_id === S.sel)) S.sel = calls[0]?.call_id || null;
+  const c = calls.find((x) => x.call_id === S.sel);
+  const last = lastAgent(c);
+  const active = (s) => ['live', 'ringing', 'dialing'].includes(s);
+  const list = h('section', { id: 'clist' },
+    h('div', { class: 'pane-head' }, h('span', { class: 'sec-lbl' }, 'Calls'), h('span', { class: 'hint' }, calls.length), h('span', { style: 'flex:1' }), h('button', { class: 'btn pri sm', onclick: newCall }, ic('plus', 'sm'), 'New call')),
+    calls.length ? calls.map((x) => h('button', { class: 'ci' + (x.call_id === S.sel ? ' on' : ''), onclick: () => { S.sel = x.call_id; renderPage(); } },
+      h('div', { class: 't' }, x.status === 'live' ? h('span', { class: 'pulse' }) : null, h('span', {}, x.customer_name || mask(x.to)), h('span', { class: 'st ' + x.status }, x.status)),
+      h('div', { class: 'm' }, [pname(x.campaign), x.backend, x.language, ago(x.created_at)].filter(Boolean).join(' · ')),
+      x.end_reason ? h('div', { class: 'm' }, x.end_reason.replaceAll('_', ' ')) : null))
+      : h('div', { class: 'empty' }, h('b', {}, 'No calls yet'), 'Start one with New call.'));
+  const tx = h('section', { id: 'tx' },
+    h('div', { class: 'pane-head' }, c ? [c.status === 'live' ? h('span', { class: 'pulse' }) : null, h('b', { style: 'font-weight:500' }, c.customer_name || mask(c.to)),
+      h('span', { class: 'hint' }, pname(c.campaign) + (c.customer_age ? ' · age ' + c.customer_age : '') + ' · ' + (c.turns || []).filter((t) => t.role === 'customer').length + ' customer turns'), h('span', { style: 'flex:1' }),
+      c.status === 'live' ? h('button', { class: 'btn sm danger', onclick: () => api(`/api/calls/${c.call_id}/hangup`, { method: 'POST' }).catch((e) => notice(e.message)) }, ic('hang', 'sm'), 'Hang up') : null,
+      c.status === 'ended' && c.answered_at ? h('a', { class: 'btn sm', href: `/api/calls/${c.call_id}/recording`, target: '_blank' }, ic('play', 'sm'), 'Recording') : null] : h('span', { class: 'sec-lbl' }, 'Transcript')),
+    c ? h('div', { class: 'tx' }, (c.turns || []).length ? (c.turns || []).map((t) => turnView(t, c.backend)) : h('div', { class: 'empty' }, h('b', {}, active(c.status) ? 'Waiting for the first words' : 'Nothing was said'), c.status),
+        active(c.status) && (c.turns || []).length ? h('div', { class: 'hint', style: 'padding-left:88px' }, 'listening…') : null)
+      : h('div', { class: 'empty' }, h('b', {}, 'Select a call'), 'Turns and decisions appear here as they happen.'));
+  const side = h('section', {},
+    h('div', { class: 'pane-head' }, h('span', { class: 'sec-lbl' }, 'Decision path'), h('span', { class: 'hint' }, 'latest turn')),
+    last ? [pathView(last),
+      h('dl', { class: 'kv' },
+        h('dt', {}, 'objective'), h('dd', {}, (last.trace.objective || '—').slice(0, 220) + ((last.trace.objective || '').length > 220 ? '…' : '')),
+        h('dt', {}, 'waiting on'), h('dd', {}, last.trace.pending || '—'),
+        h('dt', {}, 'rule match'), h('dd', {}, last.trace.rule_intent || '—')),
+      h('div', { style: 'padding:0 16px 16px' }, h('button', { class: 'btn sm', onclick: () => { S.tree.pid = c.campaign; S.tree.pb = null; S.tree.hot = { gate: last.trace.gate, node: last.trace.pb_node }; go('tree'); } }, ic('tree', 'sm'), 'Open in decision tree'))]
+      : h('div', { class: 'empty' }, 'The path lights up after the agent\'s first reply.'));
+  p.append(h('div', { class: 'flush' }, h('div', { class: 'live' }, list, tx, side)));
+  tx.scrollTop = atBottom ? tx.scrollHeight : keep;
+  list.scrollTop = keepList;
+}
+function newCall() {
+  const ps = tenantProducts();
+  if (!ps.length) return notice('This tenant has no products yet. Add one under Tenants & products.');
+  modal('New call', 'Calls from ' + (S.from || 'the Plivo number') + '. One number per line.', (b, f, close) => {
+    let pid, num, name, age, lang, model, err;
+    b.append(
+      h('label', { class: 'lbl' }, 'Product'), pid = h('select', {}, ps.map((x) => h('option', { value: x.id }, x.product_name))),
+      h('label', { class: 'lbl' }, 'Numbers'), num = h('textarea', { rows: 2, placeholder: '+91 98765 43210' }),
+      h('div', { class: 'grid2' }, h('div', {}, h('label', { class: 'lbl' }, 'Customer name'), name = h('input', { placeholder: 'optional' })),
+        h('div', {}, h('label', { class: 'lbl' }, 'Customer age'), age = h('input', { type: 'number', min: 10, max: 110, placeholder: 'sets the tone' }))),
+      h('div', { class: 'grid2' }, h('div', {}, h('label', { class: 'lbl' }, 'Opening language'), lang = h('select', {}, h('option', { value: 'hi' }, 'Hindi'), h('option', { value: 'hinglish' }, 'Hinglish'), h('option', { value: 'en' }, 'English'))),
+        h('div', {}, h('label', { class: 'lbl' }, 'Reply model'), model = h('select', {}, h('option', { value: 'gemini' }, 'Gemini 3.5 Flash'), h('option', { value: 'qwen' }, 'Qwen3-14B (local)'), h('option', { value: 'template' }, 'Templates only')))),
+      err = h('div', { class: 'err' }));
+    const call = async () => {
+      err.textContent = '';
+      try {
+        const d = await api('/api/calls', { method: 'POST', body: JSON.stringify({ numbers: num.value, campaign: pid.value, customer_name: name.value, customer_age: age.value || null, language: lang.value, backend: model.value }) });
+        const bad = (d.calls || []).filter((x) => x.error);
+        if (bad.length) { err.textContent = bad.map((x) => (x.number || x.to) + ': ' + x.error).join('\n'); return; }
+        close(); await loadCalls(); S.sel = (d.calls || [])[0]?.call_id || S.sel; renderPage();
+      } catch (e) { err.textContent = e.message; }
+    };
+    f.append(h('button', { class: 'btn pri', onclick: call }, ic('phone', 'sm'), 'Call'), h('button', { class: 'btn ghost', onclick: close }, 'Cancel'));
+  });
+}
+
+/* ---------------------------------------------------------------- decision tree */
+const NW = 212, NH = 62;
+async function pageTree(p) {
+  const ps = tenantProducts();
+  if (!S.tree.pid || !ps.find((x) => x.id === S.tree.pid)) { S.tree.pid = ps[0]?.id || null; S.tree.pb = null; }
+  p.innerHTML = '';
+  if (!S.tree.pid) { p.append(h('div', { class: 'pad' }, head('Decision tree', null), h('div', { class: 'empty' }, h('b', {}, 'No products for this tenant'), 'Add one under Tenants & products.'))); return; }
+  if (!S.tree.pb || S.tree.pb.product_id !== S.tree.pid) {
+    p.append(h('div', { class: 'empty' }, 'Loading tree…'));
+    try {
+      const j = await api('/api/playbooks/' + S.tree.pid);
+      S.tree.pb = j.playbook || { product_id: S.tree.pid, nodes: [] }; S.tree.pb.product_id = S.tree.pid; S.tree.dirty = false; S.tree.view = null;
+    } catch (e) { p.innerHTML = ''; p.append(h('div', { class: 'empty' }, h('b', {}, 'Could not load the tree'), e.message)); return; }
+    p.innerHTML = '';
+  }
+  const pb = S.tree.pb;
+  p.append(h('div', { class: 'flush' },
+    head('Decision tree', null,
+      h('select', { class: 'inline', onchange: (e) => { if (S.tree.dirty && !confirm('Discard unsaved changes?')) { e.target.value = S.tree.pid; return; } S.tree.pid = e.target.value; S.tree.pb = null; S.tree.sel = null; pageTree(p); } }, ps.map((x) => h('option', { value: x.id, selected: x.id === S.tree.pid }, x.product_name))),
+      h('span', { class: 'tag' }, pb.nodes.length + ' situations'), h('span', { class: 'tag' }, 'by ' + (pb.generated_by || 'manual'))),
+    h('div', { class: 'tree' }, h('div', { class: 'canvas', id: 'canvas' }), h('aside', { class: 'insp', id: 'insp' }))));
+  drawCanvas(); drawInspector();
+}
+function layout() {
+  const G = S.gates, nodes = S.tree.pb.nodes, L = {};
+  const gh = (G.length - 1) * 74 + NH;
+  G.forEach((g, i) => { L['g:' + g.id] = { x: 290, y: 60 + i * 74 }; });
+  L.root = { x: 20, y: 60 + (gh - NH) / 2 };
+  const perCol = Math.max(6, Math.ceil(Math.sqrt((nodes.length + 1) * 1.6)));
+  const rows = Math.min(perCol, nodes.length + 1);
+  const top = Math.max(60, 60 + gh / 2 - (rows * 74 - 12) / 2);
+  nodes.forEach((n, i) => { L['n:' + n.id] = { x: 570 + Math.floor(i / perCol) * 234, y: top + (i % perCol) * 74 }; });
+  const fi = nodes.length; L.free = { x: 570 + Math.floor(fi / perCol) * 234, y: top + (fi % perCol) * 74 };
+  return L;
+}
+function drawCanvas() {
+  const el = $('#canvas'); if (!el) return;
+  el.innerHTML = '';
+  const pb = S.tree.pb, L = layout(), hot = S.tree.hot || {}, sel = S.tree.sel;
+  const live = !!(hot.gate && S.tree.follow);
+  const layer = h('div', { class: 'layer' });
+  const edges = sv('svg', { width: 10, height: 10 });
+  const mid = (a, side) => [side === 'r' ? a.x + NW : a.x, a.y + NH / 2];
+  const edge = (a, b, isHot) => { const [x1, y1] = mid(a, 'r'), [x2, y2] = mid(b, 'l'), dx = Math.max(40, (x2 - x1) / 2); edges.append(sv('path', { class: 'edge' + (isHot ? ' hot' : ''), d: `M${x1},${y1} C${x1 + dx},${y1} ${x2 - dx},${y2} ${x2},${y2}` })); };
+  S.gates.forEach((g) => edge(L.root, L['g:' + g.id], live && hot.gate === g.id));
+  const conv = L['g:conversation'];
+  if (conv) { pb.nodes.forEach((n) => edge(conv, L['n:' + n.id], live && hot.node === n.id)); edge(conv, L.free, live && hot.gate === 'conversation' && !hot.node); }
+  layer.append(edges);
+  const firstN = pb.nodes[0] ? L['n:' + pb.nodes[0].id] : L.free;
+  layer.append(h('div', { class: 'col-lbl', style: `left:${L.root.x}px;top:${L.root.y - 24}px` }, 'Input'),
+    h('div', { class: 'col-lbl', style: 'left:290px;top:36px' }, 'Policy gates · in order'),
+    h('div', { class: 'col-lbl', style: `left:570px;top:${firstN.y - 24}px` }, 'Situations · ' + pname(S.tree.pid)));
+  const box = (key, kind, kcls, title, meta, isHot, info, extra) => {
+    const b = L[key];
+    const on = sel && sel.key === key;
+    layer.append(h('div', { class: `nd ${kcls}${on ? ' sel' : ''}${isHot ? ' hot' : ''}${extra || ''}`, style: `left:${b.x}px;top:${b.y}px`, title,
+      onclick: (e) => { e.stopPropagation(); S.tree.sel = { key, ...info }; drawCanvas(); drawInspector(); } },
+      h('div', { class: 'k' }, kind, isHot ? h('span', { style: 'margin-left:auto;color:hsl(var(--signal))' }, '● live') : null), h('div', { class: 't' }, title), h('div', { class: 'm' }, meta)));
+  };
+  box('root', 'Input', 'k-root', 'Customer turn', 'speech → text → signals', live, { kind: 'root' });
+  S.gates.forEach((g, i) => box('g:' + g.id, 'Gate ' + (i + 1), 'k-gate k-gate-' + g.id, g.title, g.intents.slice(0, 3).join(' · ') || g.rule, live && hot.gate === g.id, { kind: 'gate', id: g.id }));
+  pb.nodes.forEach((n) => box('n:' + n.id, 'Situation', 'k-node', n.title, `${(n.when?.keywords || []).length} cues · ${(n.points || []).length} points`, live && hot.node === n.id, { kind: 'node', id: n.id }, (n._new ? ' new' : '') + (n._dirty ? ' dirty' : '')));
+  box('free', 'Fallback', 'k-free', 'Free answer', 'no situation scored ≥ 2', live && hot.gate === 'conversation' && !hot.node, { kind: 'free' });
+  el.append(layer);
+  el.append(h('div', { class: 'tools' },
+    h('button', { class: 'btn pri sm', onclick: aiAddCase }, ic('spark', 'sm'), 'Add case with AI'),
+    h('button', { class: 'btn sm', onclick: addManual }, ic('plus', 'sm'), 'Add case'),
+    h('button', { class: 'btn sm', onclick: aiRegenerate }, ic('refresh', 'sm'), 'Regenerate with AI'),
+    h('button', { class: 'btn sm' + (S.tree.dirty ? ' pri' : ''), disabled: !S.tree.dirty, onclick: saveTree, id: 'savebtn' }, ic('save', 'sm'), h('span', {}, S.tree.dirty ? 'Save changes' : 'Saved')),
+    h('span', { style: 'flex:1' }),
+    h('label', { class: 'btn sm', style: 'cursor:pointer' }, h('input', { type: 'checkbox', style: 'width:auto;height:auto;margin:0', checked: S.tree.follow, onchange: (e) => { S.tree.follow = e.target.checked; drawCanvas(); } }), 'Follow live calls')));
+  el.append(h('div', { class: 'legend' }, h('span', {}, h('i', { style: 'background:hsl(var(--slate))' }), 'gate'), h('span', {}, h('i', { style: 'background:hsl(var(--violet))' }), 'situation'), h('span', {}, h('i', { style: 'background:hsl(var(--signal))' }), 'live path')));
+  if (!S.tree.view) S.tree.view = fitView(el, L);
+  const v = S.tree.view;
+  const apply = () => { layer.style.transform = `translate(${v.x}px,${v.y}px) scale(${v.k})`; };
+  const zoomBy = (f, cx, cy) => { const r = el.getBoundingClientRect(); if (cx == null) { cx = r.width / 2; cy = r.height / 2; } const k2 = Math.min(2, Math.max(0.3, v.k * f)); v.x = cx - (cx - v.x) * k2 / v.k; v.y = cy - (cy - v.y) * k2 / v.k; v.k = k2; apply(); };
+  el.append(h('div', { class: 'zoom' }, h('button', { title: 'Zoom in', onclick: () => zoomBy(1.2) }, '+'), h('button', { title: 'Zoom out', onclick: () => zoomBy(1 / 1.2) }, '−'), h('button', { title: 'Fit to screen', onclick: () => { Object.assign(v, fitView(el, L)); apply(); } }, ic('fit', 'sm'))));
+  apply();
+  let drag = null, moved = false;
+  const ui = (t) => t.closest('.nd,.tools,.zoom,.legend');
+  el.onpointerdown = (e) => { if (ui(e.target)) return; drag = { x: e.clientX - v.x, y: e.clientY - v.y }; moved = false; el.classList.add('drag'); el.setPointerCapture(e.pointerId); };
+  el.onpointermove = (e) => { if (!drag) return; moved = true; v.x = e.clientX - drag.x; v.y = e.clientY - drag.y; apply(); };
+  el.onpointerup = (e) => { if (drag && !moved && S.tree.sel && !ui(e.target)) { S.tree.sel = null; drag = null; el.classList.remove('drag'); drawCanvas(); drawInspector(); return; } drag = null; el.classList.remove('drag'); };
+  el.onwheel = (e) => { e.preventDefault(); const r = el.getBoundingClientRect(); zoomBy(e.deltaY < 0 ? 1.1 : 1 / 1.1, e.clientX - r.left, e.clientY - r.top); };
+}
+function fitView(el, L) {
+  const pts = Object.values(L);
+  const minX = Math.min(...pts.map((p) => p.x)), maxX = Math.max(...pts.map((p) => p.x)) + NW, minY = Math.min(...pts.map((p) => p.y)) - 30, maxY = Math.max(...pts.map((p) => p.y)) + NH;
+  const r = el.getBoundingClientRect(); const W = r.width || 900, H = (r.height || 600) - 50;
+  const k = Math.min(1.1, Math.max(0.3, Math.min((W - 60) / (maxX - minX), (H - 40) / (maxY - minY))));
+  return { k, x: (W - (maxX - minX) * k) / 2 - minX * k, y: 50 + (H - (maxY - minY) * k) / 2 - minY * k };
+}
+function markDirty(n) {
+  S.tree.dirty = true; if (n) n._dirty = true;
+  const b = $('#savebtn'); if (b) { b.disabled = false; b.classList.add('pri'); b.lastChild.textContent = 'Save changes'; }
+  const b2 = $('#savebtn2'); if (b2) b2.disabled = false;
+}
+function drawInspector() {
+  const el = $('#insp'); if (!el) return; el.innerHTML = '';
+  const sel = S.tree.sel, pb = S.tree.pb;
+  const hd = (kcls, kind, title, desc) => h('div', { class: 'insp-head ' + kcls }, h('div', { class: 'k' }, kind), h('h3', {}, title), desc ? h('p', {}, desc) : null);
+  if (!sel) {
+    el.append(hd('k-root', 'Overview', 'How a turn is decided', 'Click any box to inspect or edit it. Gemini Pro writes the situations per tenant and product before any call. You can edit them, add new ones with AI, or regenerate the whole set.'),
+      h('div', { class: 'insp-body' },
+        h('label', { class: 'lbl' }, 'Pipeline'),
+        h('ul', { class: 'pts' }, ['Whisper turns speech into text; noise and silence are dropped', 'Rules + Qwen read intent, objection, buying signal, frustration, confusion', 'Gates run in order; the first that applies decides', 'Conversation: the picker scores every situation and takes the best (≥ 2)', 'The reply model paraphrases 1–2 unused points; a checker validates numbers, language and offer wording'].map((x) => h('li', {}, x))),
+        h('label', { class: 'lbl' }, 'Picker scoring'),
+        h('dl', { class: 'kv', style: 'padding:6px 0;border:0' }, h('dt', {}, 'cue word'), h('dd', {}, '+2.5'), h('dt', {}, 'objection'), h('dd', {}, '+2.0'), h('dt', {}, 'signal holds'), h('dd', {}, '+1.5'), h('dt', {}, 'intent'), h('dd', {}, '+1.0'), h('dt', {}, 'topic'), h('dd', {}, '+0.5'))));
+    return;
+  }
+  if (sel.kind === 'root') { el.append(hd('k-root', 'Input', 'Customer turn', 'Speech → Whisper large-v3 → rules and Qwen3-14B understanding → policy gates. Background noise (quiet audio with a high no-speech score) never reaches this point.')); return; }
+  if (sel.kind === 'free') { el.append(hd('k-free', 'Fallback', 'Free answer', 'No situation scored 2 or more. The reply model answers from the product knowledge and approved answers alone, with the same checker.')); return; }
+  if (sel.kind === 'gate') {
+    const g = S.gates.find((x) => x.id === sel.id), i = S.gates.indexOf(g);
+    el.append(hd('k-gate k-gate-' + g.id, 'Gate ' + (i + 1), g.title, g.rule),
+      h('div', { class: 'insp-body' }, h('label', { class: 'lbl' }, 'Plans this gate can produce'), h('div', { class: 'row', style: 'flex-wrap:wrap;gap:5px' }, g.intents.map((x) => h('span', { class: 'tag' }, x))),
+        h('p', { class: 'hint', style: 'margin-top:16px' }, 'Gates are the safety and compliance floor, the same for every tenant. Their wording (tone, re-offers, terms) is set per product under Tenants & products.')));
+    return;
+  }
+  const n = pb.nodes.find((x) => x.id === sel.id); if (!n) return;
+  n.when = n.when || {};
+  const c = (a) => (a || []).join(', '), l = (a) => (a || []).join('\n');
+  const sc = (v) => v.split(',').map((x) => x.trim()).filter(Boolean), sl = (v) => v.split('\n').map((x) => x.trim()).filter(Boolean);
+  const fld = (label, val, set, rows) => [h('label', { class: 'lbl' }, label), rows ? h('textarea', { rows, oninput: (e) => { set(e.target.value); markDirty(n); } }, val) : h('input', { value: val, oninput: (e) => { set(e.target.value); markDirty(n); } })];
+  const num = (v) => (v === '' ? null : Math.max(0, Math.min(1, +v)));
+  el.append(hd('k-node', 'Situation · ' + n.id, n.title, n.goal || null),
+    h('div', { class: 'insp-body' },
+      fld('Situation', n.title, (v) => { n.title = v; }),
+      fld('Goal of the reply', n.goal || '', (v) => { n.goal = v; }),
+      fld('Cue words · regex ok · English, Roman Hindi, Devanagari', c(n.when.keywords), (v) => { n.when.keywords = sc(v); }, 3),
+      h('div', { class: 'grid2' }, h('div', {}, fld('Intents', c(n.when.intents), (v) => { n.when.intents = sc(v); })), h('div', {}, fld('Objections', c(n.when.objections), (v) => { n.when.objections = sc(v); }))),
+      h('div', { class: 'grid2' }, h('div', {}, fld('Min buying 0–1', n.when.min_buying ?? '', (v) => { n.when.min_buying = num(v); })), h('div', {}, fld('Min frustration 0–1', n.when.min_frustration ?? '', (v) => { n.when.min_frustration = num(v); }))),
+      fld('Talking points · one per line · product facts only', l(n.points), (v) => { n.points = sl(v); }, 6),
+      fld('Question to end on', n.ask || '', (v) => { n.ask = v; }),
+      fld('Talking points in Hindi · same order', l(n.points_hi), (v) => { n.points_hi = sl(v); }, 6),
+      fld('Question in Hindi', n.ask_hi || '', (v) => { n.ask_hi = v; })),
+    h('div', { class: 'insp-foot' },
+      h('button', { class: 'btn sm pri', id: 'savebtn2', disabled: !S.tree.dirty, onclick: saveTree }, ic('save', 'sm'), 'Save'),
+      h('button', { class: 'btn sm', onclick: () => drawCanvas() }, 'Update canvas'),
+      h('span', { style: 'flex:1' }),
+      h('button', { class: 'btn sm danger', onclick: () => { pb.nodes = pb.nodes.filter((x) => x !== n); S.tree.sel = null; markDirty(); drawCanvas(); drawInspector(); } }, ic('trash', 'sm'), 'Delete')));
+}
+function addManual() {
+  const n = { id: 'case_' + Date.now().toString(36), title: 'New situation', when: { keywords: [], intents: [], objections: [], topics: [] }, points: [], ask: '', goal: '', points_hi: [], ask_hi: '', _new: true };
+  S.tree.pb.nodes.push(n); S.tree.sel = { key: 'n:' + n.id, kind: 'node', id: n.id }; markDirty(); drawCanvas(); drawInspector();
+}
+async function saveTree() {
+  const pb = S.tree.pb;
+  const nodes = pb.nodes.map(({ _new, _dirty, ...n }) => n);
+  try {
+    await api('/api/playbooks/' + S.tree.pid, { method: 'PUT', body: JSON.stringify({ nodes, generated_by: pb.generated_by || 'console' }) });
+    pb.nodes.forEach((n) => { delete n._new; delete n._dirty; }); S.tree.dirty = false; drawCanvas(); drawInspector();
+  } catch (e) { notice(e.message); }
+}
+function aiAddCase() {
+  modal('Add a case with AI', 'Describe a situation the agent should be ready for. Gemini Pro writes the cue words, talking points (from this product\'s facts only) and closing question, in English and Hindi.', (b, f, close) => {
+    let d, out, btn, node = null;
+    b.append(h('label', { class: 'lbl' }, 'Situation'), d = h('textarea', { rows: 4, placeholder: 'e.g. The customer says they joined a gym before and never went, so it was a waste of money.' }), out = h('div', {}));
+    const add = h('button', { class: 'btn pri', style: 'display:none', onclick: () => {
+      if (S.tree.pb.nodes.find((x) => x.id === node.id)) node.id += '_' + Date.now().toString(36);
+      node._new = true; S.tree.pb.nodes.push(node); S.tree.sel = { key: 'n:' + node.id, kind: 'node', id: node.id }; markDirty(); close(); drawCanvas(); drawInspector();
+    } }, ic('plus', 'sm'), 'Add to tree');
+    const gen = async () => {
+      if (!d.value.trim()) return;
+      btn.disabled = true; btn.lastChild.textContent = 'Writing…'; out.innerHTML = ''; add.style.display = 'none';
+      try {
+        node = (await api(`/api/playbooks/${S.tree.pid}/suggest`, { method: 'POST', body: JSON.stringify({ description: d.value }) })).node;
+        out.append(h('div', { class: 'panel', style: 'margin-top:14px' },
+          h('div', { class: 'panel-head' }, h('b', {}, node.title), h('span', { class: 'tag' }, node.id)),
+          h('div', { style: 'padding:4px 16px 12px' },
+            h('label', { class: 'lbl' }, 'Cue words'), h('div', { class: 'hint' }, (node.when?.keywords || []).slice(0, 12).join(' · ')),
+            h('label', { class: 'lbl' }, 'Talking points'), h('ul', { class: 'pts' }, (node.points || []).map((x) => h('li', {}, x))),
+            h('label', { class: 'lbl' }, 'Ends with'), h('div', {}, node.ask || '—'))));
+        add.style.display = '';
+      } catch (e) { out.append(h('div', { class: 'err' }, e.message)); }
+      btn.disabled = false; btn.lastChild.textContent = node ? 'Write again' : 'Generate';
+    };
+    f.append(btn = h('button', { class: 'btn', onclick: gen }, ic('spark', 'sm'), h('span', {}, 'Generate')), add, h('span', { style: 'flex:1' }), h('button', { class: 'btn ghost', onclick: close }, 'Cancel'));
+  });
+}
+function aiRegenerate() {
+  modal('Regenerate the whole tree?', 'Gemini Pro reads this product\'s configuration and writes 14–20 situations from scratch, replacing the current ones. Takes up to a minute.', (b, f, close) => {
+    let btn, err;
+    b.append(err = h('div', { class: 'err' }));
+    const run = async () => {
+      btn.disabled = true; btn.lastChild.textContent = 'Generating…';
+      try { await api(`/api/playbooks/${S.tree.pid}/generate`, { method: 'POST' }); S.tree.pb = null; S.tree.sel = null; close(); pageTree($('#page')); }
+      catch (e) { err.textContent = e.message; btn.disabled = false; btn.lastChild.textContent = 'Try again'; }
+    };
+    f.append(btn = h('button', { class: 'btn pri', onclick: run }, ic('refresh', 'sm'), h('span', {}, 'Regenerate')), h('button', { class: 'btn ghost', onclick: close }, 'Cancel'));
+  });
+}
+
+/* ---------------------------------------------------------------- simulator */
+function pageSim(p) {
+  const ps = tenantProducts();
+  if (!S.sim.pid || !ps.find((x) => x.id === S.sim.pid)) S.sim.pid = ps[0]?.id || null;
+  p.innerHTML = '';
+  let inp;
+  const last = [...S.sim.turns].reverse().find((t) => t.role === 'agent' && t.trace);
+  const start = async () => {
+    S.sim.turns = []; S.sim.sid = null; S.sim.busy = true; pageSim(p);
+    try {
+      const j = await api('/api/sim/start', { method: 'POST', body: JSON.stringify({ persona: 'console', campaign: S.sim.pid, language: S.sim.lang, customer_age: S.sim.age || null, backend: S.sim.model }) });
+      S.sim.sid = j.sim_id; S.sim.turns = [{ role: 'agent', text: j.agent, intent: 'opening' }];
+    } catch (e) { notice(e.message); }
+    S.sim.busy = false; if (S.page === 'sim') pageSim(p);
+  };
+  const say = async () => {
+    const text = inp.value.trim(); if (!text || S.sim.busy || !S.sim.sid) return;
+    S.sim.busy = true; S.sim.turns.push({ role: 'customer', text }); pageSim(p);
+    try { const j = await api('/api/sim/' + S.sim.sid, { method: 'POST', body: JSON.stringify({ text }) }); S.sim.turns.push({ role: 'agent', ...j, text: j.agent }); }
+    catch (e) { S.sim.turns.push({ role: 'agent', text: '⚠ ' + e.message }); }
+    S.sim.busy = false; if (S.page === 'sim') pageSim(p);
+  };
+  const sel = (key, opts) => h('select', { class: 'inline', onchange: (e) => { S.sim[key] = e.target.value; } }, opts.map(([v, n]) => h('option', { value: v, selected: v === S.sim[key] }, n)));
+  const scroll = h('div', { class: 'scroll' }, S.sim.turns.length ? h('div', { class: 'tx' }, S.sim.turns.map((t) => turnView(t, S.sim.model)), S.sim.busy ? h('div', { class: 'hint', style: 'padding-left:88px' }, 'agent is thinking…') : null)
+    : h('div', { class: 'empty' }, h('b', {}, S.sim.busy ? 'Starting…' : 'Talk to the agent by text'), 'Same pipeline as a phone call (understanding, gates, decision tree, reply model, checker), without audio.'));
+  p.append(h('div', { class: 'flush' },
+    head('Simulator', 'Type as the customer. Each reply shows the decision behind it.'),
+    h('div', { class: 'sim' },
+      h('section', {},
+        h('div', { class: 'bar-top' },
+          sel('pid', ps.map((x) => [x.id, x.product_name])), sel('lang', [['hinglish', 'Hinglish'], ['hi', 'Hindi'], ['en', 'English']]),
+          h('input', { type: 'number', placeholder: 'age', style: 'width:84px', value: S.sim.age, oninput: (e) => { S.sim.age = e.target.value; } }),
+          sel('model', [['gemini', 'Gemini 3.5 Flash'], ['qwen', 'Qwen3-14B'], ['template', 'Templates']]),
+          h('span', { style: 'flex:1' }), h('button', { class: 'btn pri sm', disabled: S.sim.busy || !S.sim.pid, onclick: start }, ic('play', 'sm'), S.sim.sid ? 'Restart' : 'Start')),
+        scroll,
+        h('div', { class: 'composer' }, inp = h('input', { placeholder: S.sim.sid ? 'Say something as the customer…' : 'Start a conversation first', disabled: !S.sim.sid, onkeydown: (e) => { if (e.key === 'Enter') say(); } }),
+          h('button', { class: 'btn pri', disabled: !S.sim.sid || S.sim.busy, onclick: say }, ic('send', 'sm'), 'Send'))),
+      h('section', {}, h('div', { class: 'pane-head', style: 'background:transparent' }, h('span', { class: 'sec-lbl' }, 'Decision path'), h('span', { class: 'hint' }, 'latest turn')),
+        last ? pathView(last) : h('div', { class: 'empty' }, 'Appears after the first reply.')))));
+  scroll.scrollTop = scroll.scrollHeight;
+  if (S.sim.sid && !S.sim.busy) inp.focus();
+}
+
+/* ---------------------------------------------------------------- tenants & products */
+function pageTenants(p) {
+  p.innerHTML = '';
+  const t = S.tenants.find((x) => x.id === S.tenant) || {};
+  const ps = tenantProducts();
+  p.append(h('div', { class: 'pad' },
+    head('Tenants & products', 'Each tenant has its own products, and each product its own offer, knowledge and decision tree.',
+      h('button', { class: 'btn', onclick: addTenant }, ic('plus', 'sm'), 'New tenant'), h('button', { class: 'btn pri', onclick: () => editProduct(null) }, ic('plus', 'sm'), 'New product')),
+    h('div', { class: 'sec-lbl', style: 'margin-bottom:10px' }, 'Tenants'),
+    h('div', { class: 'cards', style: 'margin-bottom:28px' }, S.tenants.map((x) => h('button', { class: 'pcard', style: x.id === S.tenant ? 'box-shadow:inset 0 0 0 1px hsl(var(--signal)/.5)' : '', onclick: () => { S.tenant = x.id; store.set('sg_tenant', x.id); S.tree.pid = null; S.sel = null; render(); } },
+      h('div', { class: 'k', style: `color:${x.color}` }, x.id === S.tenant ? 'Current tenant' : 'Tenant'), h('b', {}, x.name),
+      h('dl', {}, h('dt', {}, 'id'), h('dd', { class: 'mono' }, x.id), h('dt', {}, 'products'), h('dd', {}, (x.products || []).map(pname).join(', ') || '—'))))),
+    h('div', { class: 'sec-lbl', style: 'margin-bottom:10px' }, 'Products · ' + (t.name || '')),
+    ps.length ? h('div', { class: 'cards' }, ps.map((x) => h('button', { class: 'pcard', onclick: () => editProduct(x.id) },
+      h('div', { class: 'k' }, x.seller_name || 'Product'), h('b', {}, x.product_name),
+      h('dl', {}, h('dt', {}, 'offer'), h('dd', {}, `${x.offer_price} · ${x.discount}`), h('dt', {}, 'normal'), h('dd', {}, x.original_price), h('dt', {}, 'validity'), h('dd', {}, x.offer_validity || '—'),
+        h('dt', {}, 'agent'), h('dd', {}, x.agent_name || '—'), h('dt', {}, 'can call'), h('dd', {}, (x.allowed_numbers || []).length ? (x.allowed_numbers.length + ' test numbers only') : 'any number')))))
+      : h('div', { class: 'empty' }, h('b', {}, 'No products'), 'Create one with New product.')));
+}
+function addTenant() {
+  modal('New tenant', 'A company that sells through the agent.', (b, f, close) => {
+    let id, name, color, err;
+    b.append(h('label', { class: 'lbl' }, 'Name'), name = h('input', { oninput: () => { id.value = name.value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''); } }),
+      h('label', { class: 'lbl' }, 'Id'), id = h('input', { class: 'mono' }),
+      h('label', { class: 'lbl' }, 'Colour'), color = h('input', { type: 'color', value: '#4f7cff', style: 'width:64px;padding:2px' }), err = h('div', { class: 'err' }));
+    f.append(h('button', { class: 'btn pri', onclick: async () => { try { await api('/api/tenants/' + id.value.trim(), { method: 'PUT', body: JSON.stringify({ name: name.value, color: color.value }) }); await loadTenants(); S.tenant = id.value.trim(); store.set('sg_tenant', S.tenant); close(); render(); } catch (e) { err.textContent = e.message; } } }, 'Create'), h('button', { class: 'btn ghost', onclick: close }, 'Cancel'));
+  });
+}
+function editProduct(pid) {
+  const base = pid ? JSON.parse(JSON.stringify(S.products[pid])) : { id: '', tenant: S.tenant, product_name: '', seller_name: S.tenants.find((t) => t.id === S.tenant)?.name || '', agent_name: 'Arjun', original_price: '', offer_price: '', discount: '', offer_validity: '', benefits: [], knowledge: '', pitch_en: '', pitch_hi: '', pitch_hinglish: '', faqs: [], allowed_numbers: [], price_note: '', rupee_terms: {}, renewal_note: {}, annual_note: {}, sms_text: '' };
+  modal(pid ? base.product_name : 'New product', pid ? 'Changes apply to the next call.' : 'What the agent sells, and the facts it may use.', (b, f, close) => {
+    const F = {}; let err;
+    const fld = (k, label, type) => {
+      const v = base[k]; let el;
+      if (type === 'lines') el = h('textarea', { rows: 3 }, (v || []).join('\n'));
+      else if (type === 'area') el = h('textarea', { rows: 5 }, v || '');
+      else if (type === 'lang') el = h('textarea', { rows: 3, class: 'mono', style: 'font-size:11.5px' }, ['en', 'hi', 'hinglish'].map((x) => x + ': ' + ((v || {})[x] || '')).join('\n'));
+      else el = h('input', { value: v ?? '' });
+      F[k] = [el, type]; return [h('label', { class: 'lbl' }, label), el];
+    };
+    const tsel = h('select', {}, S.tenants.map((t) => h('option', { value: t.id, selected: t.id === (base.tenant || S.tenant) }, t.name)));
+    F.tenant = [tsel, 'text'];
+    b.append(
+      !pid ? fld('id', 'Id · letters, digits, -') : null,
+      h('label', { class: 'lbl' }, 'Tenant'), tsel,
+      h('div', { class: 'grid2' }, h('div', {}, fld('product_name', 'Product name')), h('div', {}, fld('seller_name', 'Calling for (company)'))),
+      h('div', { class: 'grid2' }, h('div', {}, fld('agent_name', 'Agent name')), h('div', {}, fld('discount', 'Discount label'))),
+      h('div', { class: 'grid2' }, h('div', {}, fld('original_price', 'Normal price')), h('div', {}, fld('offer_price', 'Offer price'))),
+      fld('offer_validity', 'Offer validity'),
+      fld('terms', 'Full offer phrase per language · optional', 'lang'),
+      fld('discovery_question', 'Question after the price, per language', 'lang'),
+      fld('pitch_en', 'Pitch · English'), fld('pitch_hi', 'Pitch · Hindi'), fld('pitch_hinglish', 'Pitch · Hinglish'),
+      fld('benefits', 'Benefits · one per line', 'lines'),
+      fld('knowledge', 'Knowledge the agent may use · facts only', 'area'),
+      fld('tone', 'Tone'), fld('allowed_numbers', 'Only call these numbers · one per line · empty = any', 'lines'),
+      err = h('div', { class: 'err' }));
+    const save = async () => {
+      const out = { ...base };
+      for (const [k, [el, type]] of Object.entries(F)) {
+        const v = el.value;
+        if (type === 'lines') out[k] = v.split('\n').map((x) => x.trim()).filter(Boolean);
+        else if (type === 'lang') { const o = {}; v.split('\n').forEach((line) => { const m = line.match(/^(en|hi|hinglish):\s*(.*)$/); if (m && m[2].trim()) o[m[1]] = m[2].trim(); }); out[k] = o; }
+        else out[k] = v;
+      }
+      const id = pid || out.id; if (!id) { err.textContent = 'Id is required'; return; }
+      try { await api('/api/products/' + id, { method: 'PUT', body: JSON.stringify(out) }); await Promise.all([loadProducts(), loadTenants()]); close(); render(); } catch (e) { err.textContent = e.message; }
+    };
+    f.append(h('button', { class: 'btn pri', onclick: save }, ic('save', 'sm'), 'Save'), h('button', { class: 'btn ghost', onclick: close }, 'Cancel'));
+  });
+}
+
+/* ---------------------------------------------------------------- progress */
+async function pageProgress(p) {
+  const draw = () => {
+    if (S.page !== 'progress') return;
+    p.innerHTML = '';
+    const P = S.progress;
+    if (!P) { p.append(h('div', { class: 'empty' }, 'Loading…')); return; }
+    const r = P.roadmap, st = P.stats;
+    const sec = (ms) => (ms ? (ms / 1000).toFixed(2) + 's' : '—');
+    p.append(h('div', { class: 'pad' },
+      head('Progress', 'What the tooling can do so far, and lifetime results. Refreshes every 10 seconds.', h('span', { class: 'tag green' }, r.tests + ' tests passing'), h('span', { class: 'tag' }, 'updated ' + r.updated)),
+      h('div', { class: 'hero' }, h('div', { class: 'v' }, String(r.overall_pct), h('small', {}, '%')),
+        h('div', {}, h('div', { class: 'sec-lbl', style: 'margin-bottom:8px' }, 'Overall tooling complete'), h('div', { class: 'big' }, h('i', { style: `width:${r.overall_pct}%` })),
+          h('div', { class: 'hint', style: 'margin-top:8px' }, r.areas.length + ' areas · ' + r.areas.reduce((s, a) => s + a.items.length, 0) + ' capabilities' + (st.first_call ? ' · first call ' + new Date(st.first_call * 1000).toLocaleDateString() : '')))),
+      h('div', { class: 'strip' }, [['Calls placed', st.calls], ['Answered', st.connected], ['Payment links sent', st.sold], ['Opt-outs honoured', st.opt_outs], ['Customer turns', st.customer_turns], ['Avg time to audio', sec(st.avg_first_audio_ms)], ['Median time to audio', sec(st.p50_first_audio_ms)], ['Simulated conversations', st.sim_conversations]]
+        .map(([k, v]) => h('div', {}, h('div', { class: 'v' }, String(v ?? '—')), h('div', { class: 'k' }, k)))),
+      h('div', { class: 'cols' },
+        h('div', {}, r.areas.map((a) => { const avg = Math.round(a.items.reduce((s, i) => s + i.pct, 0) / a.items.length); return h('div', { class: 'panel' }, h('div', { class: 'panel-head' }, h('b', {}, a.name), h('span', { class: 'tag ' + (avg >= 80 ? 'green' : avg >= 40 ? 'amber' : 'red') }, avg + '%')),
+          a.items.map((i) => h('div', { class: 'item' }, h('span', {}, i.name), h('div', { class: 'p' }, h('i', { class: i.pct >= 80 ? '' : i.pct >= 40 ? 'mid' : 'low', style: `width:${i.pct}%` })), h('span', { class: 'n' }, i.pct + '%')))); })),
+        h('div', {},
+          h('div', { class: 'panel' }, h('div', { class: 'panel-head' }, h('b', {}, 'Calls by product')), Object.entries(st.by_campaign || {}).map(([k, v]) => h('div', { class: 'item', style: 'grid-template-columns:1fr 100px 40px' }, h('span', {}, pname(k)), h('div', { class: 'p' }, h('i', { style: `width:${Math.round(100 * v / Math.max(1, st.calls))}%;background:hsl(var(--signal))` })), h('span', { class: 'n' }, String(v))))),
+          h('div', { class: 'panel' }, h('div', { class: 'panel-head' }, h('b', {}, 'Changelog')), (r.log || []).map((x) => h('div', { class: 'log' }, h('div', { class: 'd' }, x.date), x.text)))))));
+  };
+  const load = async () => { try { S.progress = await api('/api/progress'); } catch {} draw(); };
+  draw(); await load();
+  clearInterval(S.progTimer);
+  S.progTimer = setInterval(() => { if (S.page === 'progress') load(); else clearInterval(S.progTimer); }, 10000);
+}
+
+document.addEventListener('click', (e) => { if (S.menu && !e.target.closest('.side-foot')) { S.menu = false; render(); } });
+window.addEventListener('resize', () => { if (S.page === 'tree' && S.tree.pb) { S.tree.view = null; drawCanvas(); } });
+boot();
+})();
+</script>
+</body>
+</html>

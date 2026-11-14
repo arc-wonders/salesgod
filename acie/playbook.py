@@ -111,6 +111,10 @@ def playbook_dir(data: Path) -> Path:
     return data / "playbooks"
 
 
+INTENTS = {"affirm", "deny", "tell_more", "price", "benefits", "callback", "clarify", "goodbye", "personal", "small_talk"}
+OBJECTIONS = {"trust", "price", "need", "timing", "language", "other"}
+TOPICS = {"product", "offer_terms", "general", "conversation"}
+
 SEED = Path(__file__).resolve().parent.parent / "playbooks"  # versioned playbooks shipped with the repo
 
 
@@ -183,3 +187,42 @@ async def generate(product, tenant: str = "default", timeout_s: float = 180.0) -
     raw = raw[raw.find("{"): raw.rfind("}") + 1]
     nodes = [Node.model_validate(n) for n in json.loads(raw)["nodes"]]
     return Playbook(tenant=tenant, product_id=product.id, generated_by=model, nodes=nodes)
+
+
+NODE_PROMPT = """You are a top sales coach. Add ONE new situation to this outbound phone agent's playbook.
+The operator describes the case below. Write the node the same way as the existing ones: when-signals (keywords as short
+regex fragments in English, Roman Hindi AND Devanagari; intents ONLY from: affirm, deny, tell_more, price, benefits,
+callback, clarify, goodbye, personal, small_talk; objections ONLY from: trust, price, need, timing, language, other; topics
+ONLY from: product, offer_terms, general, conversation), 3-5 concrete talking points using
+ONLY facts from the product config (never invent prices or features), the question to end on, the goal, and
+points_hi / ask_hi in natural spoken Hindi (Devanagari, keeping common English words). Give it a new snake_case id.
+
+Return JSON only: {"id", "title", "when": {...}, "points": [...], "ask", "goal", "points_hi": [...], "ask_hi"}
+
+OPERATOR'S CASE: """
+
+
+async def generate_node(product, playbook: "Playbook | None", description: str, timeout_s: float = 120.0) -> Node:
+    """One new situation from a plain-language description ("customer says their friend got scammed by a gym")."""
+    base = os.getenv("ACIE_PLANNER_BASE_URL", "").rstrip("/")
+    model = os.getenv("ACIE_PLANNER_MODEL", "")
+    if not base or not model:
+        raise RuntimeError("set ACIE_PLANNER_BASE_URL and ACIE_PLANNER_MODEL")
+    cfg = product.model_dump(exclude={"allowed_numbers", "pronunciations", "sms_text", "payment_link"})
+    existing = [{"id": n.id, "title": n.title} for n in (playbook.nodes if playbook else [])]
+    content = (NODE_PROMPT + description + "\n\nEXISTING SITUATIONS (don't duplicate): "
+               + json.dumps(existing, ensure_ascii=False) + "\n\nPRODUCT CONFIG:\n" + json.dumps(cfg, ensure_ascii=False))
+    body = {"model": model, "temperature": 0.4, "response_format": {"type": "json_object"},
+            "messages": [{"role": "user", "content": content}]}
+    headers = {"Authorization": f"Bearer {os.getenv('ACIE_PLANNER_API_KEY', 'EMPTY')}"}
+    async with httpx.AsyncClient(timeout=timeout_s) as c:
+        r = await c.post(f"{base}/chat/completions", json=body, headers=headers)
+        r.raise_for_status()
+        raw = r.json()["choices"][0]["message"]["content"]
+    raw = raw[raw.find("{"): raw.rfind("}") + 1]
+    node = Node.model_validate(json.loads(raw))
+    w = node.when  # drop labels the picker can never see
+    w.intents = [i for i in w.intents if i in INTENTS]
+    w.objections = [o for o in w.objections if o in OBJECTIONS]
+    w.topics = [t for t in w.topics if t in TOPICS]
+    return node

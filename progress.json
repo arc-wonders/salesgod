@@ -1,0 +1,196 @@
+{
+ "updated": "2026-11-14",
+ "tests": 292,
+ "areas": [
+  {
+   "name": "Telephony & audio",
+   "items": [
+    {
+     "name": "Plivo outbound calls, media streams, recordings",
+     "pct": 100
+    },
+    {
+     "name": "Whisper large-v3 STT with Hindi re-check",
+     "pct": 95
+    },
+    {
+     "name": "Noise rejection (quiet + no-speech filter, echo filter)",
+     "pct": 85
+    },
+    {
+     "name": "Barge-in with protected opening",
+     "pct": 85
+    },
+    {
+     "name": "Fish Audio TTS (free model), Hindi respelling",
+     "pct": 95
+    },
+    {
+     "name": "Answering-machine detection (advisory)",
+     "pct": 70
+    }
+   ]
+  },
+  {
+   "name": "Understanding",
+   "items": [
+    {
+     "name": "Rule classifier + lexicon estimator",
+     "pct": 100
+    },
+    {
+     "name": "LLM understanding (Qwen, guided JSON) fused 50/50",
+     "pct": 90
+    },
+    {
+     "name": "Prosody / pitch signals (kept off by request)",
+     "pct": 60
+    }
+   ]
+  },
+  {
+   "name": "Decision",
+   "items": [
+    {
+     "name": "Policy gates: safety, compliance, consent, routing",
+     "pct": 95
+    },
+    {
+     "name": "Consent: explicit yes + full terms read back",
+     "pct": 95
+    },
+    {
+     "name": "Pre-call playbook decision tree + picker",
+     "pct": 80
+    },
+    {
+     "name": "Per-tenant / per-product playbooks",
+     "pct": 75
+    },
+    {
+     "name": "AI-generated playbooks and cases (Gemini Pro)",
+     "pct": 70
+    }
+   ]
+  },
+  {
+   "name": "Expression",
+   "items": [
+    {
+     "name": "Reply model choice: Gemini 3.5 Flash / Qwen3-14B / templates",
+     "pct": 100
+    },
+    {
+     "name": "Streaming validator, exact price and FAQ lines",
+     "pct": 90
+    },
+    {
+     "name": "Age-aware tone, language switching (hi / hinglish / en)",
+     "pct": 85
+    }
+   ]
+  },
+  {
+   "name": "Memory & knowledge",
+   "items": [
+    {
+     "name": "Whole-call context ledger",
+     "pct": 90
+    },
+    {
+     "name": "World knowledge: time, weather, Wikipedia",
+     "pct": 80
+    }
+   ]
+  },
+  {
+   "name": "Quality loop",
+   "items": [
+    {
+     "name": "Persona simulator (production pipeline, no audio)",
+     "pct": 100
+    },
+    {
+     "name": "6-persona review loop (round 6: 12/12 correct outcomes)",
+     "pct": 85
+    },
+    {
+     "name": "Gemini vs Qwen paraphraser comparison on live calls",
+     "pct": 40
+    }
+   ]
+  },
+  {
+   "name": "Console",
+   "items": [
+    {
+     "name": "Live calls with per-turn decisions",
+     "pct": 90
+    },
+    {
+     "name": "Decision-tree canvas, editable, AI add-case",
+     "pct": 80
+    },
+    {
+     "name": "Tenants & products",
+     "pct": 75
+    },
+    {
+     "name": "Progress tracking",
+     "pct": 80
+    }
+   ]
+  },
+  {
+   "name": "Not started / deferred",
+   "items": [
+    {
+     "name": "SMS payment links (disabled for the hackathon)",
+     "pct": 10
+    },
+    {
+     "name": "CRM / lead import",
+     "pct": 0
+    },
+    {
+     "name": "Per-tenant logins",
+     "pct": 0
+    },
+    {
+     "name": "Learning playbooks from call outcomes",
+     "pct": 0
+    }
+   ]
+  }
+ ],
+ "log": [
+  {
+   "date": "2026-11-14",
+   "text": "Console: live decision cards, decision-tree canvas with AI-added cases, tenants (Anthropic, FitZone Gyms), live progress"
+  },
+  {
+   "date": "2026-11-14",
+   "text": "Console with live decisions, decision-tree canvas, tenants, progress"
+  },
+  {
+   "date": "2026-11-14",
+   "text": "Gemini 3.5 Flash reply model; per-call model choice"
+  },
+  {
+   "date": "2026-11-14",
+   "text": "Pre-call playbooks (decision tree) for Claude Pro and FitZone"
+  },
+  {
+   "date": "2026-11-14",
+   "text": "Noise rejection from recorded audio, configurable customer age"
+  },
+  {
+   "date": "2026-11-14",
+   "text": "Persona loop rounds 2-6: from 5 wrong outcomes to 0 of 12"
+  },
+  {
+   "date": "2026-11-13",
+   "text": "Context ledger, world knowledge, NLU layer, compliance floor"
+  }
+ ]
+}

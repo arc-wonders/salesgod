@@ -213,3 +213,83 @@ async def test_callback_and_human():
     assert out[-1] == "callback" and last.plan.end_call
     out, last, _ = await run(["mujhe kisi insaan se baat karni hai"])
     assert out[-1] == "human_agent"
+
+
+# ---------------------------------------------------------------- persona round 2
+
+async def test_filler_after_price_confirms_and_unsure_yes_is_checked():
+    out, _, _ = await run(["हाँ बोलिए", "कितने का है", "हाँ हाँ"])
+    assert out[-1] == "confirm_close"
+    h = "हाँ हाँ"
+    out, last, _ = await run(["हाँ बोलिए", "कितने का है", h, h],
+                             nlu=FakeNLU({h: dict(intent="affirm", buying_signal=0.5, gist="filler, not a clear purchase")}))
+    assert out[-1] == "confirm_buy" and not last.plan.end_call
+
+
+async def test_i_never_said_yes_cancels_the_link():
+    out, last, pipe = await run(["yes tell me", "how much", "yes send the link", "कौन सा लिंक? हमने तो कुछ लेने को कहा ही नहीं"])
+    assert out[-1] == "link_cancelled" and not last.plan.end_call
+    assert not pipe.sessions["s"].context.has("payment_link")
+
+
+async def test_yes_after_confirm_with_a_question_sends_and_answers():
+    out, last, _ = await run(["yes tell me", "sure let's do it", "haan isi number pe. aur cancel kaise karte hain?"])
+    assert out[-1] == "link_sent" and last.plan.llm_allowed
+
+
+async def test_confirmed_terms_then_question_then_yes_sends():
+    out, _, _ = await run(["yes tell me", "sure let's do it", "is it fake?", "okay send it"])
+    assert out[-2:] == ["answer", "link_sent"]
+
+
+async def test_asking_about_otp_is_not_sharing_it():
+    out, _, _ = await run(["हाँ बोलिए", "link पर OTP तो बैंक का आएगा ना? cancel कहाँ से करूँ?"])
+    assert out[-1] != "sensitive_stop"
+
+
+async def test_who_is_it_identifies():
+    out, last, _ = await run(["फिर से कॉल? कौन है?"])
+    assert out[-1] == "identify" and "AI" in last.text
+
+
+async def test_question_about_models_is_not_the_scripted_pitch():
+    out, _, _ = await run(["Which models do I actually get? And what are the usage limits?"])
+    assert out[-1] != "pitch"
+    out, _, _ = await run(["haan bolo, kya offer hai?"])
+    assert out[-1] == "pitch"
+
+
+# ---------------------------------------------------------------- persona round 3
+
+async def test_price_questions_get_the_exact_terms_word_for_word():
+    out, last, _ = await run(["हाँ बोलिए", "डॉलर क्या होता है? रुपये में कितना?"])
+    assert last.plan.lead and "700" in last.text and "$8" in last.text and "offer" not in last.plan.facts
+    out, last, _ = await run(["yes tell me", "how much", "is the eight dollars permanent? will it auto charge 20 later?"])
+    assert "renews automatically" in last.text
+
+
+async def test_callback_time_is_confirmed_on_follow_up():
+    out, last, _ = await run(["I'm busy, call me tomorrow evening around 7", "wait, did you note the time?"])
+    assert out[-2:] == ["callback", "callback"] and "noted" in last.text
+
+
+async def test_filler_after_a_side_answer_is_not_a_yes():
+    out, _, _ = await run(["हाँ बोलिए", "कितने का है", "मौसम कैसा है?", "हाँ हाँ"])
+    assert out[-1] not in ("confirm_close", "link_sent")
+
+
+async def test_already_pro_is_not_pitched():
+    out, last, _ = await run(["हाँ बोलो, पर मैं तो already Claude Pro use करता हूँ"])
+    assert out[-1] != "pitch" and "नए" in last.text
+
+
+async def test_asking_for_hindi_switches_language_not_handoff():
+    out, last, _ = await run(["yes tell me", "how much", "I feel like talking to someone who can speak Hindi."])
+    assert out[-1] == "language_switch" and not last.plan.end_call
+
+
+def test_other_product_does_not_inherit_claude_hinglish_pitch():
+    from acie.decision.domains.product_sales import Product, ProductSalesDomain
+    p = Product(id="gym", product_name="FitZone", seller_name="FitZone", offer_price="₹2,999",
+                original_price="₹6,000", pitch_hi="FitZone एक जिम है।", pitch_en="FitZone is a gym.")
+    assert ProductSalesDomain(p).p.pitch_hinglish == ""

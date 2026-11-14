@@ -20,6 +20,7 @@ from urllib.parse import parse_qs
 from fastapi import FastAPI, HTTPException, Request, WebSocket
 from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, Response, StreamingResponse
 
+from acie.trace import GATES, trace
 from acie.decision.domains.bank_demo import BankDemoDomain
 from acie.decision.domains.product_sales import Product, ProductSalesDomain
 from acie.decision.engine import DecisionEngine
@@ -289,6 +290,10 @@ def build_app() -> tuple[FastAPI, App]:
 
     @api.get("/")
     async def index() -> FileResponse:
+        return FileResponse(STATIC / "console.html", headers={"Cache-Control": "no-cache"})
+
+    @api.get("/classic")
+    async def classic() -> FileResponse:
         return FileResponse(STATIC / "index.html")
 
     @api.get("/api/me")
@@ -400,7 +405,8 @@ def build_app() -> tuple[FastAPI, App]:
         interim = [x for x in spoken if x not in r.text]
         out = {"agent": r.text, "interim": interim, "intent": r.plan.intent, "end_call": r.plan.end_call,
                "latency_ms": ms, "nlu": nlu, "issues": r.validation.issues, "state": r.state.model_dump(exclude={"signals"}),
-               "language": r.expression.language, "fallback": r.validation.used_fallback}
+               "language": r.expression.language, "fallback": r.validation.used_fallback,
+               "trace": trace(r, sess.dialog if sess else None)}
         rec["turns"] += [{"role": "customer", "text": text}, {"role": "agent", **out}]
         (DATA / "sims").mkdir(exist_ok=True)
         (DATA / "sims" / f"{sid}.json").write_text(json.dumps(rec, ensure_ascii=False, indent=1))
@@ -463,6 +469,89 @@ def build_app() -> tuple[FastAPI, App]:
             raise HTTPException(502, f"planner failed: {type(e).__name__}: {e}")
         pbm.save(DATA, pb)
         return {"ok": True, "nodes": len(pb.nodes), "generated_by": pb.generated_by}
+
+    # ------------------------------------------------------------------ tenants, tree, progress (console)
+
+    def _tenants() -> list[dict]:
+        path = DATA / "tenants.json"
+        if not path.exists():
+            path.write_text(json.dumps([
+                {"id": "anthropic", "name": "Anthropic", "color": "#d97757"},
+                {"id": "fitzone", "name": "FitZone Gyms", "color": "#2f9e6b"}], indent=1))
+        return json.loads(path.read_text())
+
+    @api.get("/api/tenants")
+    async def get_tenants(request: Request) -> dict:
+        _require(request)
+        prods = state.products()
+        return {"tenants": [{**t, "products": [p.id for p in prods.values() if p.tenant == t["id"]]} for t in _tenants()]}
+
+    @api.put("/api/tenants/{tenant_id}")
+    async def put_tenant(tenant_id: str, request: Request) -> dict:
+        _require(request)
+        if not tenant_id.replace("-", "").replace("_", "").isalnum() or len(tenant_id) > 40:
+            raise HTTPException(400, "id: letters, digits, - and _ only")
+        body = await request.json()
+        ts = [t for t in _tenants() if t["id"] != tenant_id]
+        ts.append({"id": tenant_id, "name": str(body.get("name", tenant_id))[:60], "color": str(body.get("color", "#888"))[:20]})
+        (DATA / "tenants.json").write_text(json.dumps(ts, indent=1))
+        return {"ok": True}
+
+    @api.get("/api/tree/gates")
+    async def tree_gates(request: Request) -> dict:
+        _require(request)
+        return {"gates": GATES}
+
+    @api.post("/api/playbooks/{product_id}/suggest")
+    async def suggest_node(product_id: str, request: Request) -> dict:
+        _require(request)
+        from acie import playbook as pbm
+        p = state.products().get(product_id)
+        if p is None:
+            raise HTTPException(404, "unknown product")
+        desc = str((await request.json()).get("description", "")).strip()[:600]
+        if not desc:
+            raise HTTPException(400, "describe the case")
+        try:
+            node = await pbm.generate_node(p, pbm.load(DATA, p.tenant, product_id), desc)
+        except Exception as e:
+            raise HTTPException(502, f"planner failed: {type(e).__name__}: {e}")
+        return {"node": node.model_dump()}
+
+    @api.get("/api/progress")
+    async def progress(request: Request) -> dict:
+        _require(request)
+        roadmap = json.loads((Path(__file__).resolve().parent.parent / "progress.json").read_text())
+        calls = []
+        for f in CALLS_DIR.glob("*.json"):
+            try:
+                calls.append(json.loads(f.read_text()))
+            except json.JSONDecodeError:
+                pass
+        seen = {c.get("call_id") for c in calls}
+        calls += [c.public() for cid, c in state.calls.items() if cid not in seen]
+        intents = lambda c: [t.get("intent") for t in c.get("turns", []) if t.get("role") == "agent"]
+        lat = [t["latency_ms"]["first_audio_after_speech_end"] for c in calls for t in c.get("turns", [])
+               if isinstance(t.get("latency_ms"), dict) and t["latency_ms"].get("first_audio_after_speech_end")]
+        sims = list((DATA / "sims").glob("*.json")) if (DATA / "sims").exists() else []
+        by_campaign: dict[str, int] = {}
+        for c in calls:
+            by_campaign[c.get("campaign") or "bank_demo"] = by_campaign.get(c.get("campaign") or "bank_demo", 0) + 1
+        stats = {
+            "calls": len(calls),
+            "connected": sum(1 for c in calls if any(t.get("role") == "customer" for t in c.get("turns", []))),
+            "sold": sum(1 for c in calls if "link_sent" in intents(c)),
+            "opt_outs": sum(1 for c in calls if "opt_out" in intents(c)),
+            "customer_turns": sum(1 for c in calls for t in c.get("turns", []) if t.get("role") == "customer"),
+            "avg_first_audio_ms": round(sum(lat) / len(lat)) if lat else None,
+            "p50_first_audio_ms": sorted(lat)[len(lat) // 2] if lat else None,
+            "sim_conversations": len(sims),
+            "by_campaign": by_campaign,
+            "first_call": min((c.get("created_at") or 0 for c in calls), default=None),
+        }
+        items = [i for a in roadmap["areas"] for i in a["items"]]
+        roadmap["overall_pct"] = round(sum(i["pct"] for i in items) / len(items)) if items else 0
+        return {"roadmap": roadmap, "stats": stats}
 
     @api.delete("/api/products/{product_id}")
     async def delete_product(product_id: str, request: Request) -> dict:

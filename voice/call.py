@@ -24,6 +24,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
+from acie.trace import trace
 from acie.text import detect_language
 from acie.schemas import ExpressionParams, TurnInput, TurnTiming, Utterance
 from acie.validator import StreamingValidator
@@ -98,7 +99,7 @@ class CallRecord:
 
     def public(self) -> dict:
         return {k: getattr(self, k) for k in ("call_id", "to", "customer_id", "language", "backend", "campaign",
-                                              "customer_name", "status",
+                                              "customer_name", "customer_age", "status",
                                               "created_at", "answered_at", "ended_at", "end_reason", "turns", "events", "sms", "context")}
 
 
@@ -535,6 +536,7 @@ class CallSession:
             "interrupted": epoch != self.speaking_epoch,
             "nlu": json.loads(sess.dialog["_nlu"]) if sess and sess.dialog.get("_nlu") else None,
             "rule_intent": sess.dialog.get("_rule_intent") if sess else None,
+            "trace": trace(result, sess.dialog if sess else None),
         }
         self.call.turns += [cust, agent]
         self.event("turn", cust)
