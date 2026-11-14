@@ -226,3 +226,51 @@ async def test_barge_in_gets_another_look_as_the_interruption_grows():
     voice(cs, 0.40)
     await cs.check_barge_in()
     assert cs.barge_in_pending
+
+
+async def test_degraded_caller_voice_is_not_dropped_as_background():
+    """Live 2c4ec7a4ff: the caller's own turns at 0.29-0.40 were dropped as 'different voice'."""
+    from voice.speaker import SpeakerLock
+    assert SpeakerLock().drop_below <= 0.25
+    cs, _ = session()
+    cs.speaker.score = lambda audio: (np.ones(256) / 16, True, 0.33)  # 0.33 >= 0.25: the caller
+    type(cs.speaker).confirmed = property(lambda self: True)
+    cs.app.stt.next = ("वहाँ तो डबल तरफ करूंगे", "")
+    await cs.handle_utterance(speech(), time.monotonic(), False)
+    assert [t["text"] for t in cs.call.turns if t["role"] == "customer"] == ["वहाँ तो डबल तरफ करूंगे"]
+
+
+def test_two_agreeing_rejected_turns_mean_the_callers_voice_changed():
+    from voice.speaker import SpeakerLock
+    lock = SpeakerLock()
+    a = np.zeros(256); a[0] = 1.0
+    b = np.zeros(256); b[0] = 0.9; b[1] = 0.436  # cos(a, b) ~ 0.9
+    assert not lock.voice_changed(a, 24000)
+    assert lock.voice_changed(b, 24000)  # sounds like the earlier rejected turn: re-learn, keep it
+    assert any(float(x @ a) > 0.99 for x in lock.embs)
+
+
+async def test_unusable_caller_speech_gets_repeat_request_not_hangup():
+    """Live 2c4ec7a4ff: six 'can you hear me?' and a hang-up while the caller was talking."""
+    cs, _ = session()
+    spoken = []
+
+    async def fake_speak(sentences, lang, *a, **k):
+        spoken.extend(sentences)
+    cs.speak = fake_speak
+    cs.last_dropped_speech = time.monotonic()  # we dropped / could not use what the caller said
+    await cs.no_response()
+    assert spoken and ("फिर से" in spoken[-1] or "फिर बोलेंगे" in spoken[-1] or "once more" in spoken[-1])
+    assert cs.call.turns[-1]["intent"] == "repeat_request" and not cs.hangup_after_speaking
+    # silence after that, but speech was heard within 20 s: still never a hang-up as "no response"
+    for _ in range(3):
+        await cs.no_response()
+    assert not cs.hangup_after_speaking
+
+
+def test_noise_phrase_variants():
+    from voice.call import CallSession as C
+    for t in ["कर दो कि अ", "कर दो कर दो कर दो कर दो", "करते हैं।", "हुआ है ना"]:
+        assert C.stock_noise(t), t
+    for t in ["कर दो, बताइए price", "जी हाँ कर दो link", "मुझे join करना है"]:
+        assert not C.stock_noise(t), t

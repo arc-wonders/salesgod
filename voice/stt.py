@@ -33,7 +33,17 @@ class WhisperSTT:
             # transcribes it (Latin or Devanagari, which ACIE reads as English). So "en" needs to be clear.
             need = 0.5 if prefer == "en" else 0.92
             lang = "en" if share_en >= need else "hi"
+        else:
+            share_en = None
         segs = self._run(audio, lang, prompt)
+        if lang == "hi" and hint is None and prefer == "en" and share_en is not None and share_en >= 0.15:
+            # the mirror case: an ENGLISH call where the detector leaned Hindi on an unclear turn (live 2c4ec7a4ff:
+            # the first English reply came out as "पूर्ण लोग"). Unless it is clearly Hindi, transcribe both and keep
+            # English when it is at least as likely (it is the call's language).
+            en_segs = self._run(audio, "en", prompt)
+            score = lambda ss: float(np.mean([x.avg_logprob for x in ss])) if ss else -9.0
+            if score(en_segs) >= score(segs):
+                segs, lang = en_segs, "en"
         if lang == "en" and hint is None and prefer != "en":
             # a Hindi call where the detector said English: call a7152cdb0a turned "क्यूं इतना सस्ता किया,
             # असली है?" into "Thank you. It was just a given a clear." Transcribe both, keep the likelier
