@@ -110,6 +110,8 @@ class OpenAICompatLLM:
         self.retries = retries if retries is not None else int(_env("PRODUCTGEN_RETRIES", default="3"))
         self.max_tokens = int(_env("PRODUCTGEN_MAX_TOKENS", default="16000"))
         self.json_mode = _env("PRODUCTGEN_JSON_MODE", default="1") != "0"
+        seed = _env("PRODUCTGEN_SEED", default="")
+        self.seed = int(seed) if seed.strip() else None
         if not self.base or not self.model:
             raise LLMError("set PRODUCTGEN_BASE_URL and PRODUCTGEN_MODEL (or ACIE_EXPR_BASE_URL and ACIE_EXPR_MODEL)")
 
@@ -117,8 +119,10 @@ class OpenAICompatLLM:
         return f"OpenAICompatLLM(model={self.model!r})"
 
     async def json(self, stage: str, payload: dict) -> dict:
-        body: dict[str, Any] = {"model": self.model, "temperature": 0, "max_tokens": self.max_tokens, "seed": 7,
+        body: dict[str, Any] = {"model": self.model, "temperature": 0, "max_tokens": self.max_tokens,
                                 "messages": build_messages(stage, payload)}
+        if self.seed is not None:  # Gemini's OpenAI endpoint rejects "seed" (HTTP 400): only sent when PRODUCTGEN_SEED is set
+            body["seed"] = self.seed
         if self.json_mode:
             body["response_format"] = {"type": "json_object"}
         body.update(self.extra)
@@ -134,8 +138,9 @@ class OpenAICompatLLM:
                     return parse_json(r.json()["choices"][0]["message"]["content"])
             except (httpx.TransportError, ValueError, KeyError) as e:  # no key in these messages
                 last = f"{type(e).__name__}: {str(e)[:120]}"
-            except httpx.HTTPStatusError as e:
-                raise LLMError(f"{stage}: HTTP {e.response.status_code}") from None
+            except httpx.HTTPStatusError as e:  # include the provider's message (never contains the key; scrubbed anyway)
+                msg = e.response.text[:200].replace(self._key, "<key>") if self._key else e.response.text[:200]
+                raise LLMError(f"{stage}: HTTP {e.response.status_code}: {msg}") from None
             log.warning("productgen %s attempt %d failed: %s", stage, attempt + 1, last)
             await asyncio.sleep(min(2 ** attempt, 8))
         raise LLMError(f"{stage}: gave up after {self.retries + 1} tries ({last})")
