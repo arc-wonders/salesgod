@@ -56,6 +56,8 @@ class ACIEPipeline:
         self.policy = policy or make_default_policy()
         self.compiler = compiler or PromptCompiler()
         self.feedback = feedback or FeedbackEngine()
+        if getattr(self.feedback, "policy", 1) is None:
+            self.feedback.policy = self.policy  # learned policies get observe(...) rewards
         self.sessions: dict[str, SessionState] = {}  # -> Redis in production
 
     def session(self, turn: TurnInput) -> SessionState:
@@ -107,6 +109,8 @@ class ACIEPipeline:
 
         session = self.session(turn)
         SESSION_KEY.set(session.session_id)  # sticky A/B variant per session (acie/expression.py)
+        if session.turn_index == 0 and hasattr(self.feedback, "recall"):
+            await self.feedback.recall(session, turn.text)  # semantic memory (ACIE_MEMORY=1), else a no-op
         (intent, state), profile = await asyncio.gather(self._stream_a(turn, session), self.store.load(turn.customer_id))
         mark("understand")
 
@@ -272,9 +276,11 @@ class ACIEPipeline:
             session.prosody_history = (session.prosody_history + [turn.prosody])[-20:]
         session.turn_index += 1
 
-        self.feedback.after_turn(profile, turn.text, explicit, prev_expr, state, plan)
+        self.feedback.after_turn(profile, turn.text, explicit, prev_expr, state, plan, session=session, expr=expr,
+                                 validation=validator.report(), barge_in=turn.timing.barge_in)
         if plan.end_call:
-            self.feedback.end_session(profile)
+            self.feedback.end_session(profile, session)
+            await self.feedback.remember(session, profile)
         await self.store.save(profile)
 
         return TurnResult(text=text, plan=plan, state=state, expression=expr,
