@@ -100,7 +100,8 @@ class OpenAICompatibleBackend:
         self.base_url = (base_url or env("BASE_URL", "http://localhost:8000/v1")).rstrip("/")
         self.model = model or env("MODEL", "acie-expression")
         self.api_key = api_key or env("API_KEY", "EMPTY")
-        self.temperature = temperature
+        # ACIE_PSYCHE=1: temperature 0, so the same plan gets the same words as far as the server allows
+        self.temperature = 0.0 if os.getenv("ACIE_PSYCHE", "") in ("1", "true", "yes", "on") else temperature
         self.max_tokens = max_tokens or int(env("MAX_TOKENS", "320"))  # Devanagari is token-heavy
         # e.g. '{"chat_template_kwargs": {"enable_thinking": false}}' for Qwen3 on vLLM,
         # '{"reasoning_effort": "low"}' for Gemini

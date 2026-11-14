@@ -14,6 +14,7 @@ import asyncio
 import difflib
 import re
 import inspect
+import os
 import json
 import os
 import time
@@ -26,7 +27,12 @@ from .feedback import FeedbackEngine
 from .personalization.policy import AdaptationPolicy, detect_explicit_requests, make_default_policy
 from .personalization.profile_store import MemoryProfileStore, ProfileStore
 from .context import is_question
-from .safety import distress_followup_plan, distress_plan, is_distress
+from .safety import distress_followup_plan, distress_plan
+from . import psyche
+from .psyche import emotion_policy
+from .psyche.ledger import SaidLedger
+from .psyche.moves import Move, MoveContext, choose_move, repeat_move
+from .psyche.needs import NeedInput, estimate_need
 from .schemas import HumanState, SessionState, TurnInput, TurnResult, Utterance
 from .state.estimator import HumanStateEstimator
 from .validator import StreamingValidator
@@ -35,6 +41,11 @@ _FILLER_OPEN = re.compile(r"^(aapke sawal ka jawab (yeh |ye )?(hai )?(ki |hai ki
                           r"आपके सवाल का जवाब देते हुए,? |to answer your question,? |the answer to your question is,? )", re.I)
 _ABOUT_IT = re.compile(r"(karta|karti|kar sakta|kar sakti|sakta|sakti|samajhta|samjhta) (hai|h)\b|करता है|करती है|कर सकता|"
                        r"सकता है|समझता है|\b(does|can|will) (it|claude)\b|support|\b(usse|isse|usme|isme|use|ise)\b|उससे|इससे|इसमें|उसमें", re.IGNORECASE)
+
+# plan intents whose wording must never be a near copy of an earlier reply (compliance lines such as the
+# confirmation with full terms and the opt-out confirmation are required wording and stay as they are)
+_REPEATABLE = frozenset({"pitch", "price", "answer", "faq", "not_understood", "off_topic", "clarify", "hello", "reoffer", "recover",
+                         "small_talk", "personal", "goodbye", "link_sent", "open_question", "price_floor", "acknowledge"})
 
 SentenceSink = Callable[[str], Awaitable[None] | None]
 
@@ -96,6 +107,74 @@ class ACIEPipeline:
                 intent = nlu.intent
         return intent, self.estimator.estimate(turn, session, nlu)
 
+    # ------------------------------------------------------------------ psyche (need -> move) and the repeat guard
+
+    def _move_context(self, session: SessionState, need, ledger: SaidLedger, lang: str, state, text: str):
+        dom = self.decision.domain
+        return MoveContext(need=need, lang=lang, product=getattr(dom, "p", None), ledger=ledger, text=text,
+                           turn_index=session.turn_index, frustration=state.frustration, engagement=state.engagement,
+                           decided=session.context.decision, has_link=session.context.has("payment_link"),
+                           refused=session.context.decision in ("declined", "later"))
+
+    def _psyche_move(self, turn: TurnInput, session: SessionState, state: HumanState, intent: str, strat,
+                     ledger: SaidLedger, lang: str):
+        from .state.dims import state_dims
+        ctx = session.context
+        need = estimate_need(NeedInput(text=turn.text, state=state_dims(state), intent=intent,
+                                       has_link=ctx.has("payment_link"), decided=ctx.decision,
+                                       turn_index=session.turn_index,
+                                       prev_agent=next((u.text for u in reversed(session.history) if u.role == "agent"), "")))
+        if need.need == "information" and not strat.continue_business:  # the emotion row outranks plain curiosity
+            need.need = {"suspicious": "reassurance", "anxious": "reassurance", "sad": "connection", "busy": "space"}.get(strat.row, "be_heard")
+            need.rule += "+" + strat.row
+        ledger.add_move("need:" + need.need)
+        mv = choose_move(self._move_context(session, need, ledger, lang, state, turn.text))
+        session.dialog["_need"] = need.need
+        return mv
+
+    def _no_repeat(self, plan, expr, session: SessionState, ledger: SaidLedger, state: HumanState, intent: str):
+        """Plain bug fix, always on: a deterministic reply that is a near copy (ratio > 0.6) of an earlier whole
+        reply is replaced by something that helps (live calls: the same price line four times, "link sent" twice)."""
+        if os.getenv("ACIE_REPEAT_GUARD", "1") == "0" or getattr(self.decision.domain, "name", "") != "product_sales" or plan.intent not in _REPEATABLE or plan.intent in ("opening", "language_switch") or not ledger.replies:
+            return plan
+        template_only = not plan.llm_allowed or isinstance(self.backend, TemplateBackend)
+        if not template_only:
+            return plan
+        lang = expr.language
+        parts = []
+        if plan.lead:
+            parts.append(plan.lead.get(lang) or plan.lead.get("en") or "")
+        parts.append(plan.fallback.get(lang) or plan.fallback.get("en") or "")
+        probe = StreamingValidator(plan, expr, trusted=True, customer_text="")
+        cand = " ".join(probe.fill(x) for x in parts if x)
+        if not ledger.reply_repeats(cand):
+            return plan
+        from .state.dims import state_dims
+        need = estimate_need(NeedInput(text=session.dialog.get("last_customer", ""), state=state_dims(state)), use_model=False)
+        mv = repeat_move(self._move_context(session, need, ledger, lang, state, session.dialog.get("last_customer", "")), plan.intent)
+        session.dialog["_repeat_guard"] = str(int(session.dialog.get("_repeat_guard", "0")) + 1)
+        intent_out = "goodbye" if mv.end_call else "clarify" if mv.name in ("ask_repeat", "offer_stop", "simplify", "ask_unclear") else "nothing_new"
+        session.dialog["_pm"] = mv.to_json()
+        return plan.model_copy(update={"intent": intent_out, "llm_allowed": False, "end_call": mv.end_call or plan.end_call and plan.intent in ("goodbye", "declined"),
+                                       "decision": "psyche_move", "fallback": dict(mv.text), "lead": None, "facts": {},
+                                       "objective": mv.note or "Say something new"})
+
+    def _learn_said(self, ledger: SaidLedger, session: SessionState, plan, move, text: str) -> None:
+        ledger.add_text(text)
+        ledger.add_intent(plan.intent)
+        raw = session.dialog.pop("_pm", None)
+        mv = Move.from_json(raw) if raw else None
+        if plan.decision == "psyche_move":
+            m = mv or move
+            if m is not None:
+                ledger.add_slot(m.slot)
+                ledger.add_move(m.name)
+                if m.sells:
+                    ledger.offers += 1
+        if plan.intent in ("declined", "callback"):
+            ledger.refused = True
+        ledger.save(session.dialog)
+
     async def _regenerate(self, plan, expr, session, text: str, note: str) -> list[str] | None:
         """One more generation with a correction note; None if it also fails validation."""
         retry = self.compiler.compile(plan, expr, session, text)
@@ -136,20 +215,32 @@ class ACIEPipeline:
             explicit.pop("language")
         prev_expr = session.expression if session.turn_index > 0 else None
         expr = self.policy.decide(turn.text, state, profile, session, explicit, intent)
+        # the emotion table (acie/psyche/emotion_policy.py): one deterministic row per turn from the 14 state dims.
+        # The crisis row is always active (it is the old distress override, now a row); the others need ACIE_PSYCHE=1
+        strat = emotion_policy.decide(state, turn.text, turn.voice, flagged=bool(session.dialog.get("safety_flag")))
+        if psyche.enabled() and strat.row != "crisis":
+            expr = emotion_policy.apply_to_expression(expr, strat)
         mark("adapt")
+        ledger = SaidLedger.load(session.dialog)
+        move = None
 
-        if session.dialog.get("safety_flag"):  # sticky: once in crisis, never back to business
-            plan = distress_followup_plan(turn.text)
-        elif is_distress(turn.text):  # safety override: never sell to someone in crisis
-            plan = distress_plan()
-            session.dialog["safety_flag"] = "1"
-            session.dialog.pop("pending", None)
-            profile.outcomes.append("safety_distress")
+        if strat.row == "crisis":  # sticky: once in crisis, never back to business
+            if session.dialog.get("safety_flag"):
+                plan = distress_followup_plan(turn.text)
+            else:  # never sell to someone in crisis
+                plan = distress_plan()
+                session.dialog["safety_flag"] = "1"
+                session.dialog.pop("pending", None)
+                profile.outcomes.append("safety_distress")
         else:
             # the domain may react to how the caller feels right now (e.g. recover when annoyed)
             session.dialog["_frustration"] = f"{state.frustration:.2f}"
             session.dialog["_language_request"] = explicit.get("language", "")
             session.dialog["_lang"] = expr.language  # the reply language, for language-specific facts
+            session.dialog.pop("_move", None)
+            if psyche.enabled():
+                move = self._psyche_move(turn, session, state, intent, strat, ledger, expr.language)
+                session.dialog["_move"] = move.to_json()
             dom = self.decision.domain
             if hasattr(dom, "interim"):
                 # a slow step (world lookup) can say "one second, let me check" right away; spoken at once,
@@ -161,6 +252,7 @@ class ACIEPipeline:
                             await r
                 dom.interim = interim
             plan = await self.decision.decide(intent, turn, session)
+            plan = self._no_repeat(plan, expr, session, ledger, state, intent)
         mark("decide")
         # whole-call memory: what was promised / quoted / asked survives beyond the prompt window
         session.context.record_turn(session.turn_index, turn.text, plan.intent, is_question(turn.text),
@@ -289,6 +381,7 @@ class ACIEPipeline:
         if plan.llm_allowed and (plan.intent == "answer" and plan.lead or "offer" in plan.facts and plan.facts["offer"].value in text) \
                 and "offer_price" not in session.context.quoted:
             session.context.quoted.append("offer_price")  # the price was told inside an answer: don't offer it again
+        self._learn_said(ledger, session, plan, move, text)
         session.history += [Utterance(role="customer", text=turn.text), Utterance(role="agent", text=text)]
         session.state, session.expression = state, expr
         if turn.prosody is not None:  # this turn becomes part of the caller's voice baseline
