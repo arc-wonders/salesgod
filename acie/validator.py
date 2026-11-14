@@ -16,6 +16,7 @@ from __future__ import annotations
 import re
 
 from .expression import render_fallback
+from .rules import load_packs
 from .text import detect_language
 from .schemas import ExpressionParams, TurnPlan, ValidationReport
 
@@ -38,8 +39,19 @@ _OFFER_PAD = re.compile(
     r"|(?<=\{offer\})( for the first (3|three) months| (पहले )?(3|तीन) महीन(े|ों) (के लिए|तक))", re.IGNORECASE)
 
 
+# problem text (as returned by _check) -> machine-readable code; first matching prefix wins
+_CODES = (("invented placeholder", "invented_slot"), ("price repeated", "price_repeated"),
+          ("offer phrase repeated", "offer_repeated"), ("offer phrase padded", "offer_padded"),
+          ("money written", "money_in_general_answer"), ("raw number", "raw_number"),
+          ("wrong language", "wrong_script"), ("rule pack", "rulepack"))
+
+
 class StreamingValidator:
-    def __init__(self, plan: TurnPlan, expr: ExpressionParams, trusted: bool = False, customer_text: str = ""):
+    def __init__(self, plan: TurnPlan, expr: ExpressionParams, trusted: bool = False, customer_text: str = "",
+                 rule_packs=None):
+        # rule packs: explicit list (names or objects) or the plan's own; none = unchanged behaviour
+        self.rule_packs = load_packs(rule_packs if rule_packs is not None else getattr(plan, "rule_packs", []))
+        self.issue_codes: list[str] = []
         # trusted: operator-written template text (llm_allowed=False) - "first 3 months" in a reviewed
         # FAQ answer is not an LLM inventing a number (live call 194d15aef7 spoke only "Fair question.")
         self.trusted = trusted
@@ -69,7 +81,7 @@ class StreamingValidator:
         tail = self.buf.strip()
         if tail and self.emitted and not re.search(r"[.!?।]$", tail):
             # cut off mid-sentence (max_tokens): speaking half a sentence sounds broken, drop it
-            self.issues.append(f"dropped unfinished sentence: {tail[:40]!r}")
+            self.add_issue(f"dropped unfinished sentence: {tail[:40]!r}", "unfinished")
             tail = ""
         out = [] if self.failed else self._accept([tail])
         self.buf = ""
@@ -78,14 +90,25 @@ class StreamingValidator:
         missing = [k for k, f in self.plan.facts.items()
                    if f.must_mention and f.verbatim and not f.hidden and k not in self.mentioned and f.value not in spoken]
         if missing:
-            self.issues.append(f"missing facts: {missing}")
+            self.add_issue(f"missing facts: {missing}", "missing_fact")
         if missing or self.failed or not (self.emitted or out):
             self.used_fallback = True
             out.append(self.fill(render_fallback(self.plan, self.expr)))
         return out
 
     def report(self) -> ValidationReport:
-        return ValidationReport(ok=not self.issues, used_fallback=self.used_fallback, issues=self.issues)
+        codes = list(self.issue_codes)
+        if self.used_fallback:
+            codes.append("fallback")
+        signals: dict[str, int] = {}
+        for c in codes:
+            signals[c] = signals.get(c, 0) + 1
+        return ValidationReport(ok=not self.issues, used_fallback=self.used_fallback, issues=self.issues,
+                                issue_codes=codes, signals=signals)
+
+    def add_issue(self, message: str, code: str) -> None:
+        self.issues.append(message)
+        self.issue_codes.append(code)
 
     def fill(self, text: str) -> str:
         out = _SLOT.sub(lambda m: self.plan.facts[m.group(1)].value if m.group(1) in self.plan.facts else "", text)
@@ -103,7 +126,7 @@ class StreamingValidator:
                 continue
             problem = self._check(s)
             if problem:
-                self.issues.append(f"{problem}: {s!r}")
+                self.add_issue(f"{problem}: {s!r}", self._code_for(problem))
                 self.failed = True  # stop trusting this generation
                 break
             self.mentioned.update(_SLOT.findall(s))
@@ -111,6 +134,12 @@ class StreamingValidator:
             self.emitted.append(filled)
             out.append(filled)
         return out
+
+    @staticmethod
+    def _code_for(problem: str) -> str:
+        if problem.startswith("rule pack "):
+            return "rulepack:" + problem.split()[2].rstrip(":")
+        return next((c for p, c in _CODES if problem.startswith(p)), "other")
 
     def _numbers_left(self, bare: str) -> bool:
         """A number the LLM wrote itself. Numbers inside operator-written talking points ("for the first
@@ -159,4 +188,8 @@ class StreamingValidator:
             return "wrong language: no Devanagari in a Hindi reply"
         if lang == "hinglish" and len(_DEVA.findall(bare)) > 0.6 * max(1, len(re.sub(r"\s", "", bare))):
             return "wrong language: Devanagari in a Hinglish reply"  # a Devanagari word or two is fine
+        for pack in self.rule_packs:
+            why = pack.check(s, self.plan, self.expr)
+            if why:
+                return f"rule pack {getattr(pack, 'name', type(pack).__name__)}: {why}"
         return None
