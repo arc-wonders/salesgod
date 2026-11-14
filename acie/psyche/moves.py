@@ -19,8 +19,8 @@ import re
 from dataclasses import asdict, dataclass, field
 
 from ..decision import honest
-from .ledger import SaidLedger
-from .needs import NeedResult
+from .ledger import SaidLedger, ratio
+from .needs import FIRM_NO, NeedResult, garbled, mid_explanation, resolve_signals
 
 LANGS = ("en", "hi", "hinglish")
 NO_SELL = ("autonomy", "space", "reassurance", "be_heard", "connection", "closure", "clarity")
@@ -71,8 +71,8 @@ HEARD_REPEAT = [
 ]
 HEARD_GENERIC = [
     T("I'm sorry, I can hear this is frustrating. What would help you most right now?",
-      "माफ़ कीजिए, मैं समझ सकता हूँ कि आपको परेशानी हुई। अभी आपकी सबसे ज़्यादा क्या मदद हो सकती है?",
-      "Sorry, main samajh sakta hoon ki aapko pareshani hui. Abhi aapki sabse zyada kya madad ho sakti hai?"),
+      "माफ़ कीजिए, मैं समझ सकता हूँ कि आपको परेशानी हुई। अभी मैं आपकी क्या मदद करूँ?",
+      "Sorry, main samajh sakta hoon ki aapko pareshani hui. Abhi main aapki kya madad karoon?"),
     T("Thank you for telling me, that's fair. Tell me what you'd like me to do.",
       "बताने के लिए शुक्रिया, आपकी बात सही है। आप बताइए मैं क्या करूँ।",
       "Batane ke liye shukriya, aapki baat sahi hai. Aap bataiye main kya karoon."),
@@ -118,6 +118,11 @@ RESPECT = [
       "बिल्कुल, कोई बात नहीं। आपके समय के लिए धन्यवाद, ध्यान रखिए।",
       "Bilkul, koi baat nahi. Aapke time ke liye thank you, dhyan rakhiye."),
 ]
+CALLBACK_OK = [
+    T("Sure, I will call you around then. Thank you, take care.",
+      "ठीक है, मैं उसी समय आपको कॉल करूँगा। धन्यवाद, ध्यान रखिए।",
+      "Theek hai, main usi time aapko call karunga. Thank you, dhyan rakhiye."),
+]
 CONNECT = [
     T("That's nice to hear, thank you for sharing it. I'll leave the offer aside; ask me anything, or I can let you go.",
       "ये जानकर अच्छा लगा, बताने के लिए शुक्रिया। ऑफर की बात मैं अभी छोड़ देता हूँ; कुछ पूछना हो तो पूछिए, या मैं आपको जाने दूँ।",
@@ -161,6 +166,15 @@ SOFT_CHECK = T("No problem at all. Would another time suit you better, or shall 
                "Koi baat nahi. Kya kisi aur time baat karna theek rahega, ya main yahin chhod doon?")
 SWITCH_EN = ["Sorry about that, I'll speak English from now on. What would you like to know?"]
 SWITCH_HI = ["माफ़ कीजिए, अब मैं हिंदी में बात करूँगा। आप क्या जानना चाहेंगे?"]
+# closing asks: no link / SMS / payment words (the ask is "shall we start?", the link comes only after a yes). Four forms per
+# language, rotated by how many were used, so the same ask never comes twice in a row.
+CLOSE_ASKS = [
+    T("Shall I get you started on it?", "तो क्या मैं आपके लिए इसे शुरू कर दूँ?", "Toh kya main aapke liye ise shuru kar doon?"),
+    T("Sounds like it could suit you. Want to go ahead?", "लगता है ये आपके काम आएगा। आगे बढ़ें?", "Lagta hai ye aapke kaam aayega. Aage badhein?"),
+    T("Would you like to give it a try?", "क्या आप इसे एक बार आज़माना चाहेंगे?", "Kya aap ise ek baar try karna chahenge?"),
+    T("Want me to set it up for you now?", "क्या मैं अभी आपके लिए इसे चालू कर दूँ?", "Kya main abhi aapke liye ise chalu kar doon?"),
+]
+MAX_CLOSE_ASKS = 3  # per call: more than that is pushing
 GENTLE_OFFER = T("If you'd like it, I can send the link by SMS; only if you want it.",
                  "अगर आप चाहें तो मैं SMS से लिंक भेज सकता हूँ; सिर्फ़ तभी जब आप चाहें।",
                  "Agar aap chahein to main SMS se link bhej sakta hoon; sirf tabhi jab aap chahein.")
@@ -179,6 +193,7 @@ class Item:
     text: dict[str, str]      # only the languages the product really has text for ("en" always); never an English paste
     keywords: list[str] = field(default_factory=list)
     rx: list[str] = field(default_factory=list)  # regex keywords ("re:" entries of an FAQ)
+    core: dict[str, str] = field(default_factory=dict)  # a benefit's bare wording per language (no lead-in), for restating
 
     def line(self, lang: str) -> str | None:
         return self.text.get(lang)
@@ -213,17 +228,20 @@ def build_catalog(p) -> list[Item]:
     ben_hi, ben_hl = list(getattr(p, "benefits_hi", []) or []), list(getattr(p, "benefits_hinglish", []) or [])
     for i, b in enumerate(p.benefits):
         be = _esc(b)
-        text = {"en": f"One thing you get: {be}."}
+        text = {"en": f"It also comes with {be}."}
+        core = {"en": be}
         if i < len(ben_hi) and ben_hi[i].strip():
-            text["hi"] = f"एक चीज़ जो मिलती है: {_esc(ben_hi[i])}।"
+            core["hi"] = _esc(ben_hi[i])
+            text["hi"] = f"इसके साथ {core['hi']} भी मिलता है।"
         if i < len(ben_hl) and ben_hl[i].strip():
-            text["hinglish"] = f"Ek cheez jo milti hai: {_esc(ben_hl[i])}."
+            core["hinglish"] = _esc(ben_hl[i])
+            text["hinglish"] = f"Saath mein {core['hinglish']} bhi milta hai."
         kws = sorted({w for w, bb in words.items() if bb == b} | _derived_words(b, p))
-        items.append(Item(f"benefit_{i + 1}", "benefit", text, kws))
+        items.append(Item(f"benefit_{i + 1}", "benefit", text, kws, core=core))
     d, o, ov, op = _esc(p.discount), _esc(p.offer_price), _esc(p.offer_validity), _esc(p.original_price)
     items.append(Item("offer", "fact", T(f"The offer is {d}: {o} {ov}, normally {op}.",
-                                         f"ऑफर है {d}: {o} {ov}, वैसे {op}।",
-                                         f"Offer hai {d}: {o} {ov}, waise {op}."),
+                                         f"ऑफर है {d}: {_esc(honest.terms_text(p, 'hi'))}।",
+                                         f"Offer hai {d}: {_esc(honest.terms_text(p, 'hinglish'))}."),
                       ["price", "cost", "how much", "kitn", "कितन", "कीमत", "दाम", "रुपए", "रुपये", "रुपया", "rupee", "rupaye", "dollar", "डॉलर", "discount",
                        "छूट", "offer", "ऑफर", "expensive", "महंगा", "months", "महीने", "mahine", "3 month", "after that", "uske baad", "उसके बाद"]))
     if honest.can_cancel(p):
@@ -259,6 +277,14 @@ class MoveContext:
     has_link: bool = False
     refused: bool = False          # said no / later / stop earlier in this call
     hold: bool = False             # sad / money trouble earlier in the call: selling is paused until they re-open it
+    signals: object = None         # acie.signals.TurnSignals (or a session.dialog / legacy NLU, resolved here); None = rules only
+
+    def __post_init__(self):
+        self.signals = resolve_signals(self.signals)
+        sg = self.signals
+        if sg is not None and sg.learned:  # the fused reading outranks the raw numbers the caller passed
+            self.engagement = max(self.engagement, float(sg.state.get("engagement", self.engagement))) if "engagement" in sg.state else self.engagement
+            self.frustration = max(self.frustration, float(sg.state.get("frustration", 0.0)))
 
 
 def _fill(s: str, p) -> str:
@@ -328,6 +354,44 @@ def _by_lang(fn) -> dict[str, list[str]]:
     return {l: fn(l) for l in LANGS}
 
 
+def _close_asks_made(L: SaidLedger) -> int:
+    return sum(v for k, v in L.moves.items() if k.split(":")[0] == "close_ask")
+
+
+def closing_ok(mc: MoveContext) -> bool:
+    """A close may be asked now: the need table flagged an interested caller with nothing open, and the call has no hold:
+    no no / later / stop earlier, no hardship, no link or decision yet, the caller is not mid-sentence, and the ask limit is not used up."""
+    L = mc.ledger
+    return bool(mc.need.flags.get("closing") and not mc.hold and not L.refused and not mc.refused and mc.decided == "undecided"
+                and not mc.has_link and not mid_explanation(mc.text) and _close_asks_made(L) < MAX_CLOSE_ASKS
+                and not mc.need.flags.get("sad") and mc.frustration < 0.4)
+
+
+def close_ask_text(mc: MoveContext) -> dict[str, str] | None:
+    """The next closing-ask form, never the one asked last (rotated by the move counter, skipping any near-copy of a said
+    sentence). None when every form was used."""
+    L = mc.ledger
+    n = len(CLOSE_ASKS)
+    start = _close_asks_made(L)
+    last = L.asks[-1] if L.asks else ""
+    for k in range(n):
+        v = CLOSE_ASKS[(start + k) % n]
+        text = {l: _fill(v[l], mc.product) for l in LANGS}
+        line = text.get(mc.lang) or text["en"]
+        if not L.repeats(line) and not (last and ratio(line, last) > 0.6):
+            return text
+    return None
+
+
+def _close_ask(mc: MoveContext, lead: dict[str, str] | None = None, slot: str | None = None, name: str = "close_ask") -> Move | None:
+    ask = close_ask_text(mc)
+    if ask is None:
+        return None
+    text = {l: ((lead[l] + " ") if lead and l in lead else "") + ask[l] for l in LANGS}
+    return Move(name=name, need=mc.need.need, text=text, slot=slot, sells=True, brief=True,
+                note="A natural, short closing ask after interest: one question, no pressure, no link yet; a no is respected.")
+
+
 def _say(mc: MoveContext, name: str, variants: dict[str, list[str]], slot: str | None = None, note: str = "") -> Move:
     """One honest/answering move from per-language variant lists. The variant is chosen by how many times THIS answer was
     already given (the ledger counts moves named "<name>:<slot>"), so asking the same thing again gives the next wording and
@@ -364,12 +428,12 @@ def _restate(it: Item, p, lang: str) -> list[str]:
         return honest.price_variants(p, lang)
     base = it.text.get(lang) or ""
     if it.kind == "benefit" and base:
-        core = base.split(":", 1)[-1].strip(" .।")
+        core = (it.core.get(lang) or base).strip(" .।")
         return {"en": [f"{honest.cap(core)} is part of it.", f"It includes {core}."],
                 "hi": [f"{core} इसमें शामिल है।", f"इसमें {core} भी मिलता है।"],
                 "hinglish": [f"{honest.cap(core)} isme shamil hai.", f"Isme {core} bhi milta hai."]}[lang]
-    lead = {"en": ["Once more, in short: ", "To say it again: "], "hi": ["छोटे में फिर से: ", "दोबारा बता देता हूँ: "],
-            "hinglish": ["Chhote mein phir se: ", "Dobara bata deta hoon: "]}[lang]
+    lead = {"en": ["In short, ", "Simply put, "], "hi": ["छोटे में, ", "आसान शब्दों में, "],
+            "hinglish": ["Chhote mein, ", "Aasan shabdon mein, "]}[lang]
     return [l + base for l in lead] if base else []
 
 
@@ -385,9 +449,9 @@ def answer_again(mc: MoveContext, why: str = "") -> Move:
     topics = honest.find_topics(p, t)
     if topics and (topics[0].beats_faq or not honest.covered_by_faq(p, t)):
         return _unknown(mc, topics[0])
-    ip = item_price_answer(p, t, lang)
+    ip = item_price_all(p, t)
     if ip is not None:
-        bl = {l: item_price_answer(p, t, l)[0] if l == "en" else _benefit_in(p, item_price_answer(p, t, "en")[0], l) for l in LANGS}
+        bl = {l: ip[0] if l == "en" else _benefit_in(p, ip[0], l) for l in LANGS}
         again = {"en": f"So it is included: {bl['en']}. There is no separate charge for it.",
                  "hi": f"तो वो शामिल है: {bl['hi']}। उसका अलग से कोई चार्ज नहीं है।",
                  "hinglish": f"Toh wo shamil hai: {bl['hinglish']}. Uska alag se koi charge nahi hai."}
@@ -424,7 +488,12 @@ def _do_clarity(mc: MoveContext) -> Move:
                 note="Switch to the caller's language, apologise briefly, and ask what they would like to know.")
         if m:
             return m
-    if f.get("garbled") or not L.sentences:
+    clear = len(t.split()) >= 4 and not garbled(t)  # clear words are never answered with "I didn't catch that" / "the line is bad"
+    if f.get("garbled") and not clear:
+        ladder = [("ask_repeat", ASK_REPEAT), ("offer_stop", LINE_POOR), ("keep_listening", KEEP_LISTENING)]
+    elif clear:
+        ladder = [("simplify", None), ("simplify2", None), ("ask_unclear", ASK_UNCLEAR), ("keep_listening", KEEP_LISTENING)]
+    elif not L.sentences:
         ladder = [("ask_repeat", ASK_REPEAT), ("offer_stop", LINE_POOR), ("keep_listening", KEEP_LISTENING)]
     else:
         ladder = [("simplify", None), ("simplify2", None), ("ask_unclear", ASK_UNCLEAR), ("offer_stop", LINE_POOR), ("keep_listening", KEEP_LISTENING)]
@@ -484,6 +553,14 @@ def _benefit_in(p, b: str, lang: str) -> str:
     return (lst[i] if lst and i < len(lst) else "") or ""
 
 
+def item_price_all(p, text: str):
+    """(benefit_en, {lang: text}) when the item answer exists in every language, else None (never a half answer)."""
+    per = {l: item_price_answer(p, text, l) for l in ("en", "hi", "hinglish")}
+    if any(v is None for v in per.values()):
+        return None
+    return per["en"][0], {l: v[1] for l, v in per.items()}
+
+
 def item_price_answer(p, text: str, lang: str) -> tuple[str, str] | None:
     """A price question that names something already described ("personal trainer कितने का?") is answered from
     the product facts (it is included), not with the membership price. Returns (benefit, text) or None. The benefit is
@@ -521,10 +598,10 @@ def _do_answer(mc: MoveContext) -> Move:
     if honest.health_question(t):
         return _say(mc, "answer_health", _by_lang(lambda l: honest.health_variants(p, l)), slot="health",
                     note="Never promise what is safe for a health condition; send them to their doctor; no selling.")
-    ip = item_price_answer(p, t, lang)
+    ip = item_price_all(p, t)
     if ip is not None:
         slot = "item:" + re.sub(r"\W+", "_", ip[0].lower())[:30]
-        full = {l: item_price_answer(p, t, l)[1] for l in LANGS}
+        full = ip[1]
         if not L.has_slot(slot) and not L.repeats(full.get(lang) or full["en"]):
             return Move(name="answer_fact", need="answer", text=full, slot=slot, brief=True,
                         note="Answer what they asked about this included item from the facts; no selling question.")
@@ -564,6 +641,11 @@ def _do_answer(mc: MoveContext) -> Move:
     fresh = [i for i in have if not L.has_slot(i.slot) and not L.repeats(i.text[lang])]
     if fresh:
         it = fresh[0]
+        if it.slot == "offer" and closing_ok(mc) and _close_asks_made(L) == 0:  # the price answered first, then one natural ask
+            ask = close_ask_text(mc)
+            if ask is not None:
+                return Move(name="answer_fact", need="answer", text={l: it.text[l] + " " + ask[l] for l in LANGS if l in it.text}, slot=it.slot,
+                            sells=True, brief=True, note="Answer the price first, then one natural closing ask; no link yet.")
         return Move(name="answer_fact", need="answer", text=it.text, slot=it.slot, brief=mc.frustration >= 0.4,
                     note="Answer the question first and fully from the product facts; do not add a selling question.")
     if cands and not have:  # the fact exists but has no text in this language: the LLM paraphrases it (never pasted in English)
@@ -578,6 +660,25 @@ def _do_answer(mc: MoveContext) -> Move:
 def _do_information(mc: MoveContext) -> Move:
     L = mc.ledger
     items = _info_items(mc)
+    if closing_ok(mc):
+        # an interested caller is led to a close within a few turns: what it is -> the offer WITH the ask -> the ask again in a new form
+        if not L.has_slot("what"):
+            first = [i for i in items if i.slot == "what"]
+            if first:
+                return Move(name="inform", need="information", text=dict(first[0].text), slot="what",
+                            note="Say in one or two short sentences what it is, tied to what they said they need.")
+        if not L.has_slot("offer"):
+            offer = [i for i in items if i.slot == "offer"]
+            if offer:
+                m = _close_ask(mc, slot="offer", name="close_ask:offer")
+                if m is not None:
+                    m.text = {l: offer[0].text[l] + " " + m.text[l] for l in LANGS if l in offer[0].text}
+                    m.note = "Give the offer in one sentence, then one natural closing ask; no link yet."
+                    return m
+        else:
+            m = _close_ask(mc)
+            if m is not None:
+                return m
     if not items:
         return _exhausted(mc, "nothing new to tell")
     it = items[0]
@@ -585,8 +686,8 @@ def _do_information(mc: MoveContext) -> Move:
     sells = False
     interest = (mc.need.flags.get("go_on") or mc.need.flags.get("sale")) and mc.engagement >= 0.4
     if (interest and not mc.hold and L.offers == 0 and not L.refused and not mc.refused and mc.decided == "undecided" and not mc.has_link
-            and L.has_slot("offer") and L.has_slot(it.slot) is False and it.slot != "offer"):
-        text = {l: it.text[l] + " " + GENTLE_OFFER[l] for l in LANGS if l in it.text}
+            and L.has_slot("offer") and L.has_slot(it.slot) is False and it.slot != "offer" and _close_asks_made(L) == 0):
+        text = {l: it.text[l] + " " + GENTLE_OFFER[l] for l in LANGS if l in it.text}  # (no flagged close: the old single gentle offer)
         sells = True
     return Move(name="inform", need="information", text=text, slot=it.slot, sells=sells,
                 note="Give the next useful fact in one or two short sentences; only one gentle offer per call.")
@@ -603,6 +704,11 @@ def _simple(name: str, bank, mc: MoveContext, need_name: str, **kw) -> Move:
 def choose_move(mc: MoveContext) -> Move:
     """The policy. Deterministic: same context -> same move."""
     need = mc.need.need
+    if need in ("closure", "autonomy") and (mc.need.flags.get("mid_explanation") or mid_explanation(mc.text)) and not FIRM_NO.search(mc.text) \
+            and not mc.has_link:
+        # still explaining: never end the call or cut in; a short listening cue, the next sentence decides
+        return _mk("listen", mc, _rotate(LISTEN_CUES, mc.ledger, "listen", mc.product, mc.lang), brief=True, note="They are mid-sentence: let them finish.") \
+            or Move(name="listen", need=need, text=dict(LISTEN_CUES[mc.ledger.count_move("listen") % len(LISTEN_CUES)]), brief=True)
     if need == "closure":
         return _simple("close", CLOSE, mc, need, end_call=True, note="Close politely.")
     if need == "autonomy":
@@ -612,6 +718,10 @@ def choose_move(mc: MoveContext) -> Move:
             # "not now" is not "never": one gentle check (a better time?), then the next no closes
             return Move(name="soft_check", need=need, text=_by_lang_one(SOFT_CHECK), brief=True,
                         note="They said not now: one gentle check about a better time; no pitch, no price.")
+        if f.get("callback_time") and not FIRM_NO.search(mc.text):  # a callback with a time: confirm it, then close (not a cold goodbye)
+            mc.ledger.refused = True
+            return _simple("respect_close", CALLBACK_OK + RESPECT, mc, need, end_call=True,
+                           note="They asked to be called at a time: confirm it in a few words and close; no pitch.")
         mc.ledger.refused = True
         return _simple("respect_close", RESPECT, mc, need, end_call=True,
                        note="Respect the no or the later; close politely; never offer again.")
@@ -653,6 +763,8 @@ def repeat_move(mc: MoveContext, intent: str) -> Move:
     if (honest.is_question(mc.text) or honest.info_request(mc.text)) and mc.product is not None:  # a question, asked again: answer it in other words
         return answer_again(mc, "the reply would have repeated an earlier one")
     if intent in ("not_understood", "clarify", "hello", "off_topic"):
+        if len(mc.text.split()) >= 4 and not garbled(mc.text):  # clear words: never "I didn't catch that"
+            return _exhausted(mc, "the reply would have repeated an earlier one")
         mc.need.flags["garbled"] = True
         return _do_clarity(mc)
     return _exhausted(mc, "the reply would have repeated an earlier one")

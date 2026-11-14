@@ -105,6 +105,9 @@ def evaluate(fx: dict, recs: list[dict], prods_raw: dict) -> list[dict]:
     camp = fx["campaign"]
     prod = prods_raw[camp]
     allowed = C.numbers_in_product(prod)
+    kbf = ROOT / "data" / "voice" / "knowledge" / "default" / f"{camp}.json"
+    if os.environ.get("ACIE_KB") == "1" and kbf.exists():  # facts the knowledge base carries are product facts too
+        allowed |= set(re.findall(r"\d+", C.flat(kbf.read_text())))
     others = [v["product_name"] for k, v in prods_raw.items() if k != camp and v["product_name"] != prod["product_name"]]
     fails: list[dict] = []
     prior_replies = [recs[0]["reply"]]

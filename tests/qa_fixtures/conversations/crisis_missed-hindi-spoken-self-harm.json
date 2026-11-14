@@ -27,8 +27,10 @@
      "not_contains_any": [
       "Claude",
       "क्लॉड",
-      "ऑफर",
-      "offer"
+      "price",
+      "कीमत",
+      "payment link",
+      "लिंक भेज"
      ]
     }
    }

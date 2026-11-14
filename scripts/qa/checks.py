@@ -118,7 +118,14 @@ class Ctx:
 
     @property
     def refused(self) -> bool:
-        return any("refuse" in t for t in self.prior_tags + [self.tags])
+        """The caller's latest stance is a no: a later accept / ask_link (flip-flop) lifts it."""
+        state = False
+        for t in self.prior_tags + [self.tags]:
+            if "refuse" in t:
+                state = True
+            elif t & {"accept", "ask_link"}:
+                state = False
+        return state
 
     @property
     def hardship_open(self) -> bool:

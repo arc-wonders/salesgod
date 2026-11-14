@@ -22,6 +22,7 @@ from ...business import Customer, MockBusinessAPI
 from ...context import _OUTCOMES
 from ...schemas import Fact, SessionState, TurnInput, TurnPlan
 from .. import constraints as cons
+from .. import garble
 from .. import honest
 from .. import negotiation
 from .. import nba
@@ -464,6 +465,14 @@ _COMPARE_Q = re.compile(r"kaun (sa )?(better|behtar|achha|accha|bada)|कौन 
                         r"\bwhy\b|kaise (better|alag)|kya khaas|क्या खास|isse kya|इससे क्या", re.I)
 _NOISE_TOK = {"kar", "do", "कर", "दो", "hua", "hai", "हुआ", "है", "ho", "gaya", "हो", "गया", "bolo", "बोलो", "haan", "हाँ", "हां", "hmm", "हम्म"}
 _HESITANT = re.compile(r"^\W*(hmm+|hm+|um+|uh+|acha|achha|accha|अच्छा|हम्म|हम्मम)\b", re.I)
+_AUDIO_Q = re.compile(r"\b(am i|are you|is my voice) (audible|clear)|can (you|u) hear( me)?|do you hear|is there (any )?sound|hear me|(मेरी|meri) (आवाज़|आवाज|awaaz|awaz) (आ|aa|sun|सुन)|"
+                      r"(आवाज़|आवाज|awaaz|awaz) (आ रही|aa rahi|साफ़|साफ|saaf)|सुनाई (दे|de)|sunai (de|dega)|(क्या|kya) (तुम्हें|आपको|aapko|tumhe) .{0,12}(मेरी|meri) (बात|baat|आवाज़|आवाज|awaaz)|"
+                      r"आवाज़ आ रही है|आवाज आ रही है", re.I)
+_NO_OBLIGATION = re.compile(r"what if i (do ?n.?t|do not|don.?t) (want|like|buy|take)|if i (do ?n.?t|do not) (want|buy|like|take)|no obligation|am i (forced|obliged|bound)|compulsory|"
+                            r"(agar|अगर) .{0,25}(nahi|नहीं) .{0,12}(liya|lena|लिया|लेना|chahiye|चाहिए|khareed|खरीद)|(लेना|lena|buy|kharidna|खरीदना) (zaroori|ज़रूरी|जरूरी|compulsory)|(zaroori|ज़रूरी|जरूरी) (hai|है) (kya|क्या)", re.I)
+_WEAK_BUY = re.compile(r"kar ?do|कर ?दो", re.I)
+_STRONG_BUY = re.compile(r"\bsend\b|bhej|भेज|le (lunga|lenge|leta|leti|lo)|ले (लूंगा|लूँगा|लेंगे|लेता|लेती|लो)|interested|chahiye|चाहिए|\bbuy\b|kharid|खरीद|subscribe|सब्सक्राइब|sign me up|"
+                         r"i.?ll take it|join (karna|kar|krna)|जॉइन (करना|कर)|join करना|join कर|lena hai|लेना है|le leta|sign up|\bdeal\b|yes please|go for it", re.I)
 _NOT_NOW_LINK = re.compile(r"(link|लिंक) (abhi )?(mat|मत|ना|nahi|नहीं)|(abhi|अभी) (mat|मत) bhej|मत भेजो|mat bhejo|don.?t send|"
                            r"not now|abhi nahi|अभी नहीं|i don.?t click|नहीं भेजना|nahi bhejna|मत भेजना|mat bhejna|कुछ नहीं भेज", re.I)
 # a price question with a twist goes to the conversation turn, not the price line ("is there an annual plan?")
@@ -760,9 +769,11 @@ class ProductSalesDomain:
         if toks and len(toks) <= 4 and set(toks) <= _NOISE_TOK and not just_asked and not honest.SEND_REQ.search(text):
             return None  # whisper noise ("कर दो कर दो", "हुआ है") with no closing question before it is never consent
         if _BUY.search(text) and intent != "deny" and not _CANCEL.search(text):
+            if len(toks) <= 6 and _WEAK_BUY.search(text) and not _STRONG_BUY.search(text) and not just_asked:
+                return None  # a short "kar do ..." with no buying signal before it is a fragment, never consent
             return "explicit"
         if _clean_yes(text) and intent in ("affirm", "tell_more", "unknown", "goodbye"):
-            if _HESITANT.match(text) and len(toks) >= 2:
+            if _HESITANT.match(text):
                 return None  # "hmm ok" / "acha ok": hesitation plus a filler is not a yes to the link
             return "explicit"
         u = self._nlu(d)
@@ -771,6 +782,8 @@ class ProductSalesDomain:
         return None
 
     def _no(self, text: str, intent: str, d: dict) -> bool:
+        if _NO_OBLIGATION.search(text) and not _STRONG_NO.search(text):
+            return False  # "what if I don't want to buy?" is a question, never a decline
         if _FIRM_NO.search(text) and not _PRICE_ASK.search(text) and self._faq_match(text) is None:
             return True  # "बोला ना नहीं चाहिए! समझ नहीं आता?" is a refusal, even with a question mark
         if self._asks(text, d) or _COMPARE_Q.search(text):
@@ -809,7 +822,7 @@ class ProductSalesDomain:
                 f"You ({self.p.agent_name}) are {'a man' if male else 'a woman'}: in Hindi always speak about yourself in the "
                 f"{'masculine' if male else 'feminine'} form (e.g. "
                 f"{'चाहता हूँ, कर सकता हूँ, बताऊँगा, माफ़ी चाहता हूँ' if male else 'चाहती हूँ, कर सकती हूँ, बताऊँगी, माफ़ी चाहती हूँ'}). ")
-            plan.rule_packs = ["sales_compliance", "claims", "agent_male" if male else "agent_female"]
+            plan.rule_packs = ["sales_compliance", "claims", "respectful_register", "agent_male" if male else "agent_female"]
         d["last_intent"] = plan.intent
         d["last_customer"] = turn.text
         self._outcome(plan, session)
@@ -996,13 +1009,33 @@ class ProductSalesDomain:
         if u_ is not None and u_.garbled:
             d["unclear"] = str(int(d.get("unclear", "0")) + 1)  # a bad line / noise: never close without a read-back
         after_confirm = pending == "confirm" or d.get("last_intent") in ("confirm_close", "confirm_buy")
-        if u_ is not None and u_.garbled \
-                and u_.heard("unknown", "clarify", "tell_more", "affirm", "small_talk") and not _BUY.search(text):
-            # a noisy line: don't build an answer (or a sale) on words the caller probably never said
-            return TurnPlan(intent="clarify", llm_allowed=False, objective="Ask them to repeat",
-                            fallback=_tpl("Sorry, the line isn't clear. Could you say that again?",
-                                          "माफ़ कीजिए, आवाज़ साफ़ नहीं आई। एक बार फिर बोलेंगे?",
-                                          "Sorry, awaaz saaf nahi aayi. Ek baar phir bolenge?"))
+        if _AUDIO_Q.search(text) and not _PRICE_ASK.search(text):
+            bad = int(d.get("garbled_n", "0")) > 0
+            return TurnPlan(intent="clarify", llm_allowed=False, decision="audio check: a short honest answer, no pitch",
+                            objective="Say honestly whether you can hear them; if the line is poor ask them to speak a little louder; no pitch",
+                            fallback=(_tpl("Yes, I can hear you, though the line is a bit poor. Could you speak a little louder?",
+                                           "हाँ, आपकी आवाज़ आ रही है, पर लाइन थोड़ी खराब है। क्या आप थोड़ा तेज़ बोलेंगे?",
+                                           "Haan, aapki awaaz aa rahi hai, par line thodi kharab hai. Kya aap thoda tez bolenge?") if bad else
+                                      _tpl("Yes, I can hear you clearly. If my voice breaks up on your side, just tell me and I'll repeat.",
+                                           "हाँ, आपकी आवाज़ आ रही है। मेरी आवाज़ कटे तो बता दीजिए, मैं दोबारा बोल दूँगा।",
+                                           "Haan, aapki awaaz aa rahi hai. Meri awaaz kate to bata dijiye, main dobara bol dunga.")))
+        sig_garbled = bool(u_ is not None and u_.garbled and u_.heard("unknown", "clarify", "tell_more", "affirm", "small_talk"))
+        if (sig_garbled or garble.looks_garbled(text, self._known_words(), turn)) and not _BUY.search(text) and not honest.SEND_REQ.search(text) \
+                and not _GOODBYE_NOW.search(text) and not _FIRM_NO.search(text):
+            g = int(d.get("garbled_n", "0")) + 1  # a noisy line: never build an answer (or a sale) on words the caller probably never said
+            d["garbled_n"] = str(g)
+            tot = int(d.get("garbled_total", "0"))
+            d["garbled_total"] = str(tot + 1)
+            d["unclear"] = str(int(d.get("unclear", "0")) + 1)
+            return self._garbled_plan(g, tot)
+        d["garbled_n"] = "0"
+        if _NO_OBLIGATION.search(text) and not _STRONG_NO.search(text) and not _OPT_OUT.search(text):
+            d["pending"] = d.get("pending") or "close"
+            return TurnPlan(intent="answer", llm_allowed=False, decision="no obligation: answer, keep talking",
+                            objective="Say there is no obligation and nothing is charged on the call; they decide only if they like it; keep the door open",
+                            fallback=_tpl("No obligation at all: nothing is charged on this call, and you only join if you like it. Would you like to hear what you get?",
+                                          "कोई बाध्यता नहीं है: इस कॉल पर कुछ नहीं कटता, और आप तभी जुड़ेंगे जब आपको पसंद आए। क्या आप सुनना चाहेंगे कि क्या मिलता है?",
+                                          "Koi baadhyata nahi hai: is call par kuch nahi katta, aur aap tabhi judenge jab aapko pasand aaye. Kya aap sunna chahenge ki kya milta hai?"))
         if after_confirm and ctx is not None and (_LEAD_YES.match(text) or honest.SEND_REQ.search(text)) and _is_question(text) \
                 and not _NOT_NOW_LINK.search(text) and not _HYPOTHETICAL.search(text) \
                 and not re.search(r"mat bhej|मत भेज|nahi chahiye|नहीं चाहिए|don.?t send|rehne do|रहने दो|changed my mind", text, re.I):
@@ -1047,7 +1080,8 @@ class ProductSalesDomain:
 
         timed = bool(_CB_TIME.search(text))
         callback_reply = d.get("pending") == "callback_time" and timed and not _FIRM_NO.search(text)  # their answer to "when should I call?"
-        if callback_reply or (intent == "callback" and not _FIRM_NO.search(text) and (not self._asks(text, d) or (re.search(r"call|कॉल|phone|फ़ोन|फोन", text, re.I)
+        asks_cb = timed and bool(re.search(r"call (me )?(back|later)|ring me|वापस (कॉल|फोन)|wapas (call|phone)|call karna|कॉल करना|phone karna|baad mein call|बाद में कॉल", text, re.I)) and not _FIRM_NO.search(text)
+        if callback_reply or asks_cb or (intent == "callback" and not _FIRM_NO.search(text) and (not self._asks(text, d) or (re.search(r"call|कॉल|phone|फ़ोन|फोन", text, re.I)
                                                              and (_LATER.search(text) or _TIME_WORDS.search(text))))):
             d.pop("pending", None)
             if timed or not d.get("callback_note"):
@@ -1129,7 +1163,10 @@ class ProductSalesDomain:
                                           "Bilkul, aaram se sochiye. Koi sawal ho to abhi pooch lijiye, ya main kisi aur din call kar loonga."))
         if self._no(text, intent, d):
             reoffers = int(d.get("reoffers", "0"))
-            if mv is None and d.get("reason_asked") != "1" and reoffers == 0 and not _STRONG_NO.search(text) and frustration < 0.5 \
+            ro_blocked = False
+            if p.constraints:  # an operator rule that forbids any re-offer also forbids the "why not?" nudge: the first no is final
+                ro_blocked = cons.evaluate(p.constraints, self._constraint_ctx({**d, "reoffers": str(reoffers + 1)}, session), types=("max_reoffers",)) is not None
+            if mv is None and not ro_blocked and d.get("reason_asked") != "1" and reoffers == 0 and not _STRONG_NO.search(text) and frustration < 0.5 \
                     and pending in ("intro", "pitch", "close", "confirm") and negotiation.NegState.load(d).rounds == 0 \
                     and d.get("existing_user") != "1" and d.get("no_link") != "1" and not _CB_TIME.search(text):
                 d["reason_asked"] = "1"  # a first soft "not interested": ask why, kindly, once; no price line
@@ -1309,6 +1346,12 @@ class ProductSalesDomain:
                          + honest.source(p, "en") + "); never guess or invent a value, a yes or a no for them: " + "; ".join(gaps)
                          + ". You also cannot say what is safe or good for anyone's health, and you never claim a facility, policy or "
                          "cancellation/refund term that is not in the background above.")
+        try:
+            from ...tree import kb_knowledge
+            if (extra := kb_knowledge(p, text, lang)):
+                knowledge.append(extra)
+        except Exception:  # noqa: BLE001
+            logging.getLogger("acie.decision").exception("kb_knowledge failed")
         if u is not None and u.gist:
             knowledge.append(f"What the customer most likely means: {u.gist}")
         if d.get("callback_note"):
@@ -1368,6 +1411,8 @@ class ProductSalesDomain:
             from ...psyche.moves import build_catalog, _matches
             hit = next((i for i in build_catalog(p) if i.kind != "faq" and _matches(i, text)), None)
             generic = self._tpl3(lambda l: (hit.text.get(l) if hit is not None else None) or self._unknown_answer(text, d, l))
+        elif os.environ.get("ACIE_KB") == "1" and len(text.split()) >= 3 and self._kb_line(text, "en") and not (u is not None and u.garbled):
+            generic = self._tpl3(lambda l: self._kb_line(text, l) or self._unknown_answer(text, d, l))  # a statement about their interest: the KB talks about it
         else:
             generic = _tpl("Sorry, I didn't quite get that. Could you say it once more?",
                            "माफ़ कीजिए, मैं ठीक से समझ नहीं पाया। एक बार फिर से बताएँगे?",
@@ -1491,10 +1536,52 @@ class ProductSalesDomain:
         """The ONE place where the product has nothing to say about a question: the honest-but-helpful line (rotating wording).
         The knowledge-base lane swaps this function for its lookup; nothing else in this domain writes an "I don't have that" line."""
         p = self.p
+        if os.environ.get("ACIE_KB") == "1":  # the knowledge base answers first (nearest entry in the reply language, never "contact the owner")
+            try:
+                from ...knowledge.retrieve import retrieve
+                res = retrieve(p, text, lang, k=1)
+                if res.confident and res.hits and res.hits[0].text.strip():
+                    return res.hits[0].text.strip()
+            except Exception:  # noqa: BLE001 - a KB problem must never fail the turn
+                logging.getLogger("acie.decision").exception("KB retrieval failed")
         topics = honest.find_topics(p, text)
         if topics:
             return honest.unknown_combo(p, lang, topics, min(n, 2))
         return honest.unknown_variants(p, lang)[min(n, 2)]
+
+    def _known_words(self) -> set[str]:
+        p = self.p
+        words = {w.lower() for w in re.findall(r"[ऀ-ॿ]+|[A-Za-z']+", " ".join([p.product_name, p.seller_name, " ".join(p.topic_words), " ".join(p.benefits),
+                                                                                 " ".join(p.benefits_hi or []), " ".join(p.benefits_hinglish or [])]))}
+        return words
+
+    def _garbled_plan(self, g: int, total: int = 0) -> TurnPlan:
+        """Garbled input: ask to repeat in a varied, warm way; from the second in a row offer a callback or another language. Never a guess."""
+        first = [_tpl("Sorry, I couldn't catch that clearly. Could you say it once more?", "माफ़ कीजिए, ठीक से सुनाई नहीं दिया। क्या आप एक बार फिर बोलेंगे?",
+                      "Sorry, theek se sunai nahi diya. Kya aap ek baar phir bolenge?"),
+                 _tpl("The line broke up a little on my side. Could you repeat that for me?", "मेरी तरफ़ लाइन थोड़ी कट गई। क्या आप दोबारा बता देंगे?",
+                      "Meri taraf line thodi kat gayi. Kya aap dobara bata denge?"),
+                 _tpl("I want to get this right. Could you say it again, a little slower?", "मैं सही समझना चाहता हूँ। क्या आप थोड़ा धीरे, फिर से बोलेंगे?",
+                      "Main sahi samajhna chahta hoon. Kya aap thoda dheere, phir se bolenge?")]
+        later = [_tpl("The line seems poor. Shall I call you back a little later, or would talking in another language be easier?",
+                      "लाइन ठीक नहीं लग रही। क्या मैं थोड़ी देर बाद कॉल करूँ, या किसी और भाषा में बात करना आसान रहेगा?",
+                      "Line theek nahi lag rahi. Kya main thodi der baad call karoon, ya kisi aur bhasha mein baat karna aasaan rahega?"),
+                 _tpl("I'm still not hearing you well. I can call you back at a better time, or we can switch language. What would you prefer?",
+                      "अभी भी मुझे आपकी बात साफ़ नहीं आ रही। मैं बेहतर समय पर कॉल कर सकता हूँ, या हम भाषा बदल सकते हैं। आप क्या चाहेंगे?",
+                      "Abhi bhi mujhe aapki baat saaf nahi aa rahi. Main behtar time par call kar sakta hoon, ya hum bhasha badal sakte hain. Aap kya chahenge?")]
+        line = first[total % len(first)] if g == 1 else later[(g - 2) % len(later)]
+        return TurnPlan(intent="clarify", llm_allowed=False, decision="garbled input: ask to repeat, never guess",
+                        objective="The line is unclear: ask them to repeat, warmly; after two in a row offer a callback or another language; no guess, no pitch",
+                        fallback=line)
+
+    def _kb_line(self, text: str, lang: str) -> str:
+        """The knowledge base's confident answer for this line in this language, else ''."""
+        try:
+            from ...knowledge.retrieve import retrieve
+            res = retrieve(self.p, text, lang, k=1)
+            return res.hits[0].text.strip() if res.confident and res.hits else ""
+        except Exception:  # noqa: BLE001
+            return ""
 
     def _answer_text(self, text: str, lang: str, n: int = 0) -> str | None:
         """What the agent says to this question when the facts decide it: the operator's approved FAQ answer, or the honest
@@ -1650,8 +1737,8 @@ class ProductSalesDomain:
         if _GOODBYE_NOW.search(text) or _FIRM_NO.search(text) or _OPT_OUT.search(text) or (
                 not now and intent in ("deny", "goodbye", "callback", "human_agent")):
             return None  # the caller is closing: the normal goodbye (never a re-offer) handles it
-        if honest.is_question(text) and not now:
-            return None  # a real question: the conversation answers it (its stage says: no selling)
+        if honest.is_question(text) and not now and (self._faq_match(text) or _PRICE_ASK.search(text) or self._on_topic(text)):
+            return None  # a real question about the product: the conversation answers it (its stage says: no selling)
         n = int(d.get("sad_n", "0"))
         d["sad_n"] = str(n + 1)
         variants = [self._tpl3(lambda l: honest.empathy_variants(self.p, l, True)[0])] + \

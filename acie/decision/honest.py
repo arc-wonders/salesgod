@@ -365,9 +365,9 @@ def info_request_variants(p, kind: str, lang: str) -> list[str]:
 SAD = re.compile(
     r"lost my job|job (nahi|chali|gayi|gai|chhut|chut)|naukri (nahi|chali|gayi|chhut|chut)|jobless|unemployed|no job|laid off|got fired|"
     r"(abhi |ab )?(paise|paisa|pese) (nahi|nhi)|no money|can.?t afford|cannot afford|afford nahi|i.?m broke|paise ki (tangi|dikkat|kami)|money (problem|trouble|issue)|"
-    r"kuch (accha|achha) nahi chal|sab kharab|depress|udaas|udas|feeling low|thak (gaya|gayi)|tired of everything|tension mein|stress mein|"
+    r"kuch (accha|achha) nahi chal|sab kharab|money (is )?(very |really )?tight|tight on money|(really|very) low|paise ki (kami|tangi|dikkat)|ghar mein (bimari|bimaar)|pata nahi kya karun|depress|udaas|udas|feeling low|thak (gaya|gayi)|tired of everything|tension mein|stress mein|"
     r"mushkil (waqt|time|din)|going through a (hard|tough|bad)|"
-    r"नौकरी (नहीं|चली|छूट)|जॉब (नहीं|चली|छूट)|(अभी )?पैसे नहीं|पैसा नहीं|पैसों की (तंगी|दिक्कत|कमी)|उदास|थक (गया|गई|गयी)|मुश्किल (समय|वक्त|दिन)|"
+    r"नौकरी (नहीं|चली|छूट)|जॉब (नहीं|चली|छूट)|(अभी )?पैसे नहीं|पैसा नहीं|पैसों की (तंगी|दिक्कत|कमी)|पैसे की (तंगी|दिक्कत|कमी)|घर में (बीमारी|बीमार)|बीमारी चल|पता नहीं क्या करूँ|पता नहीं क्या करूं|उदास|थक (गया|गई|गयी)|मुश्किल (समय|वक्त|दिन)|"
     r"कुछ अच्छा नहीं चल|सब खराब|डिप्रेस", _I)
 
 

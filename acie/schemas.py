@@ -72,6 +72,8 @@ class TurnInput(BaseModel):
     timing: TurnTiming = Field(default_factory=TurnTiming)
     prosody: Prosody | None = None
     voice: VoiceReading | None = None  # set by the voice calibrator; preferred over raw prosody history
+    stt_avg_logprob: float | None = None  # speech-to-text confidence from the call record, when it has them (low = garbled)
+    stt_no_speech: float | None = None
 
 
 # --------------------------------------------------------------------------- layer 2: human state

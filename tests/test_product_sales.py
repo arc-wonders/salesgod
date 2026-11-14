@@ -75,8 +75,9 @@ async def test_model_heard_yes_is_confirmed_once():
 
 
 async def test_one_soft_reoffer_then_respect_no():
-    out, last, _ = await run(["yes tell me", "no not interested", "nahi chahiye"])
-    assert out[-2:] == ["reoffer", "declined"] and last.plan.end_call
+    # OWNER UPDATE 2: the first soft no gets a friendly "what is holding you back?", then ONE re-offer, then the no is respected
+    out, last, _ = await run(["yes tell me", "no not interested", "nahi chahiye", "nahi chahiye"])
+    assert out[-3:] == ["reason_ask", "reoffer", "declined"] and last.plan.end_call
 
 
 async def test_questions_are_not_refusals():
