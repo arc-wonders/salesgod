@@ -41,7 +41,7 @@ _OFFER_PAD = re.compile(
 
 # "अगर आप इस हफ़्ते join करते हैं तो {offer}": the offer phrase already says "if you join this week" (persona test: said twice in one sentence)
 _THIS_WEEK_PAD = re.compile(
-    r"(अगर आप |यदि आप |if you |agar aap )?(इस (हफ्ते|हफ़्ते|सप्ताह)|this week|is hafte) ?(join|जॉइन|जुड़ते|जुड़ें|जुड़ने|karte|करते|करें|karein)( करते| करने| karte| karne)?( हैं| hain| पर| par)?,? ?(तो |to |then )?(?=\{offer\})",
+    r"(अगर आप |यदि आप |if you |agar aap )?(इस (हफ्ते|हफ़्ते|सप्ताह)|this week|is hafte) ?(join|जॉइन|जुड़ते|जुड़ें|जुड़ने|karte|करते|करें|karein|karne|करने)( करते| करने| karte| karne)?( हैं| hain| पर| par)?,? ?(आपको |aapko |you get |you'll get )?(तो |to |then )?(?=\{offer\})",
     re.IGNORECASE)
 
 

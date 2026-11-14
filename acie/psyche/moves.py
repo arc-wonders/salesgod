@@ -349,8 +349,12 @@ def _unknown(mc: MoveContext, topic=None) -> Move:
         return Move(name=f"answer_unknown:topic:{topic.id}", need=mc.need.need, slot="topic:" + topic.id, brief=True,
                     text={l: honest.unknown_combo(p, l, topics, n) for l in LANGS},
                     note="Say honestly you do not have those details; do not guess.")
-    return _say(mc, "no_detail" if topic is None else "answer_unknown", _by_lang(lambda l: honest.unknown_variants(p, l, topic)),
-                slot="topic:" + (topic.id if topic is not None else "generic"),
+    total = sum(v for k, v in mc.ledger.moves.items() if k.startswith(("answer_unknown", "no_detail")))  # the wording rotates across the whole call
+    name = ("no_detail" if topic is None else "answer_unknown") + ":topic:" + (topic.id if topic is not None else "generic")
+    vs = _by_lang(lambda l: honest.unknown_variants(p, l, topic))
+    idx = min(total, 2)
+    return Move(name=name, need=mc.need.need, slot="topic:" + (topic.id if topic is not None else "generic"), brief=True,
+                text={l: v[min(idx, len(v) - 1)] for l, v in vs.items()},
                 note="Say honestly you do not have that detail and where they will find it; do not guess.")
 
 
@@ -526,6 +530,8 @@ def _do_answer(mc: MoveContext) -> Move:
                         note="Answer what they asked about this included item from the facts; no selling question.")
         return answer_again(mc, "already answered this item question")
     topics = honest.find_topics(p, t)
+    if topics and topics[0].id == "payer":
+        return _say(mc, "answer_fact", _by_lang(lambda l: honest.payer_variants(p, l)), slot="payer", note="Anyone can pay; nothing is taken on the call.")
     if topics and (topics[0].beats_faq or not honest.covered_by_faq(p, t)):
         return _unknown(mc, topics[0])
     if re.search(r"kab tak|कब तक|how long|valid", t, re.I) and re.search(r"offer|ऑफर|discount|डिस्काउंट|price|कीमत", t, re.I) and not honest.covered_by_faq(p, t):
@@ -621,7 +627,7 @@ def choose_move(mc: MoveContext) -> Move:
                             note="Give honest facts, no pressure, no selling question.")
         return _simple("reassure", REASSURE, mc, need, note="Give honest facts, no pressure, no selling question.")
     if need == "clarity":
-        if (honest.is_question(mc.text) and len(mc.text.split()) >= 4 and mc.product is not None
+        if (honest.is_question(mc.text) and len(mc.text.split()) >= 3 and mc.product is not None
                 and not mc.need.flags.get("lang_trouble") and not mc.need.flags.get("garbled") and _resolvable(mc)):
             return _do_answer(mc)  # "कीमत बताओ बेटा, सीधे सीधे" is a question with a known answer, not a reason to ask "which part?"
         return _do_clarity(mc)
@@ -642,7 +648,7 @@ def repeat_move(mc: MoveContext, intent: str) -> Move:
     """A deterministic plan was about to repeat an earlier reply word for word (or nearly). Say something that
     helps instead: a garbled/unclear turn gets a different request, a finished call a polite close, anything
     else the honest "that's all I have"."""
-    if intent in ("goodbye", "declined"):  # the caller's own goodbye / no: the only repeat that may close the call
+    if intent in ("goodbye", "declined", "reoffer"):  # the caller's own goodbye / no (a re-offer that would repeat = the no is respected)
         return _simple("close", CLOSE, mc, "closure", end_call=True, note="Close politely; do not repeat.")
     if (honest.is_question(mc.text) or honest.info_request(mc.text)) and mc.product is not None:  # a question, asked again: answer it in other words
         return answer_again(mc, "the reply would have repeated an earlier one")

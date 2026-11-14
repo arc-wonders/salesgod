@@ -259,6 +259,16 @@ def unknown_combo(p, lang: str, topics: list[Topic], idx: int = 0) -> str:
     return line
 
 
+def payer_variants(p, lang: str) -> list[str]:
+    """"Can my grandson pay?": common sense, no pointing at a payment page. Anyone can pay; nothing is taken on the call."""
+    return {"en": ["Yes, anyone can pay for it, your grandson too; nothing is charged on this call, and I can send the details by SMS to this number if you like.",
+                   "Of course, whoever is paying can do it at the gym or through the link; just tell me if you want the details sent by SMS."],
+            "hi": ["जी हाँ, पेमेंट कोई भी कर सकता है, आपके पोते भी; इस कॉल पर कुछ नहीं कटता, और आप चाहें तो मैं इसी नंबर पर SMS से जानकारी भेज दूँ।",
+                   "बिल्कुल, जो भी पेमेंट करना चाहे वो जिम पर या लिंक से कर सकता है; चाहें तो बताइए, मैं SMS से जानकारी भेज दूँगा।"],
+            "hinglish": ["Ji haan, payment koi bhi kar sakta hai, aapke pote bhi; is call par kuch nahi katta, aur aap chahein to main isi number par SMS se jaankari bhej doon.",
+                         "Bilkul, jo bhi payment karna chahe wo gym par ya link se kar sakta hai; chahein to bataiye, main SMS se jaankari bhej dunga."]}[lang]
+
+
 def offer_end_variants(p, lang: str) -> list[str]:
     """'How long is the offer?' answered from the facts: how long the price lasts, and honestly that no end date is known."""
     first, after = terms_parts(p, lang)

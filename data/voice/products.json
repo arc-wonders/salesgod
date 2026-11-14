@@ -719,6 +719,30 @@
    "hi": "नज़दीकी ब्रांच पर जिम की टीम आपको बता सकती है",
    "hinglish": "nazdeeki branch par gym ki team aapko bata sakti hai"
   },
-  "description": "operator demo facts: FitZone is the operator's own demo gym, not a real company. Every fact in this sheet (plans, branches, policies, rates) is authored demo data; the operator confirms or replaces it (see docs/PRODUCT_FACTS_TODO.md)."
+  "description": "operator demo facts: FitZone is the operator's own demo gym, not a real company. Every fact in this sheet (plans, branches, policies, rates) is authored demo data; the operator confirms or replaces it (see docs/PRODUCT_FACTS_TODO.md).",
+  "negotiation": {
+   "levers": {
+    "trial_pass": {
+     "en": "What I can offer is a one-day free trial pass: walk into any branch with an ID and try it before you decide.",
+     "hi": "मैं एक दिन का फ्री ट्रायल पास दे सकता हूँ: किसी भी ब्रांच में ID लेकर आइए और तय करने से पहले आज़मा लीजिए।",
+     "hinglish": "Main ek din ka free trial pass de sakta hoon: kisi bhi branch mein ID lekar aaiye aur tay karne se pehle try kar lijiye."
+    },
+    "cheaper_plan": {
+     "en": "If 3 months at once is too much, there is also a monthly plan at 2,200 rupees a month.",
+     "hi": "अगर एक साथ 3 महीने भारी लग रहे हैं, तो 2,200 रुपये महीने का मंथली प्लान भी है।",
+     "hinglish": "Agar ek saath 3 mahine bhaari lag rahe hain, to 2,200 rupaye mahine ka monthly plan bhi hai."
+    },
+    "annual_saving": {
+     "en": "The annual plan is 21,000 rupees, about 1,750 rupees a month, which is the lowest per-month rate we have.",
+     "hi": "सालाना प्लान 21,000 रुपये का है, यानी करीब 1,750 रुपये महीना, जो हमारा सबसे कम मासिक रेट है।",
+     "hinglish": "Annual plan 21,000 rupaye ka hai, yaani kareeb 1,750 rupaye mahina, jo hamara sabse kam monthly rate hai."
+    },
+    "referral": {
+     "en": "If a friend joins through you, you both get one extra free personal trainer session.",
+     "hi": "अगर आपके ज़रिए कोई दोस्त जुड़ता है, तो आप दोनों को एक एक्स्ट्रा फ्री पर्सनल ट्रेनर सेशन मिलता है।",
+     "hinglish": "Agar aapke zariye koi dost judta hai, to aap dono ko ek extra free personal trainer session milta hai."
+    }
+   }
+  }
  }
 }
