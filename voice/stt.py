@@ -19,7 +19,7 @@ class WhisperSTT:
         self.lock = asyncio.Semaphore(int(os.getenv("STT_CONCURRENCY", "4")))
 
     def _transcribe(self, audio: np.ndarray, hint: str | None, prefer: str | None,
-                    prompt: str | None) -> tuple[str, str, str]:
+                    prompt: str | None) -> tuple[str, str, str, float]:
         lang = hint if hint in ALLOWED else None
         if lang is None:
             # Hindi speech is sometimes detected as Urdu/Punjabi/etc: pick the likelier of en/hi,
@@ -63,7 +63,8 @@ class WhisperSTT:
                 # caller's own (a soft "हाँ" from a quiet phone is still the customer talking)
                 quiet.append(s)
         text = " ".join(s.text.strip() for s in keep).strip()
-        return text, lang, " ".join(s.text.strip() for s in quiet).strip()
+        self_nsp = max((s.no_speech_prob for s in keep), default=1.0)
+        return text, lang, " ".join(s.text.strip() for s in quiet).strip(), self_nsp
 
     def _run(self, audio: np.ndarray, lang: str, prompt: str | None) -> list:
         segments, _ = self.model.transcribe(
@@ -75,13 +76,14 @@ class WhisperSTT:
 
     async def transcribe(self, audio: np.ndarray, hint: str | None = None, prefer: str | None = None,
                          prompt: str | None = None) -> tuple[str, str, float]:
-        text, lang, ms, _ = await self.transcribe_detail(audio, hint, prefer, prompt)
+        text, lang, ms, _, _ = await self.transcribe_detail(audio, hint, prefer, prompt)
         return text, lang, ms
 
     async def transcribe_detail(self, audio: np.ndarray, hint: str | None = None, prefer: str | None = None,
-                                prompt: str | None = None) -> tuple[str, str, float, str]:
-        """Like transcribe, plus the words dropped ONLY for being quiet (not hallucination-like)."""
+                                prompt: str | None = None) -> tuple[str, str, float, str, float]:
+        """Like transcribe, plus the words dropped ONLY for being quiet (not hallucination-like) and Whisper's
+        highest no-speech probability over the kept words (real speech ~0.1-0.3, its noise phrases 0.5+)."""
         t0 = time.perf_counter()
         async with self.lock:
-            text, lang, quiet = await asyncio.to_thread(self._transcribe, audio, hint, prefer, prompt)
-        return text, lang, (time.perf_counter() - t0) * 1000, quiet
+            text, lang, quiet, nsp = await asyncio.to_thread(self._transcribe, audio, hint, prefer, prompt)
+        return text, lang, (time.perf_counter() - t0) * 1000, quiet, nsp

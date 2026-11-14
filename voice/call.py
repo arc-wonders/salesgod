@@ -417,7 +417,7 @@ class CallSession:
         n = sum(1 for t in self.call.turns if t["role"] == "customer") + 1
         self.app.save_audio(self.call.call_id, n, audio)  # for listening back / STT debugging
         # Whisper (GPU), the voice print and the voice features (CPU) run at the same time: no added latency
-        (text, stt_lang, stt_ms, quiet), (prosody, feats), (emb, is_caller, voice_sim) = await asyncio.gather(
+        (text, stt_lang, stt_ms, quiet, nsp), (prosody, feats), (emb, is_caller, voice_sim) = await asyncio.gather(
             self.transcribe(audio, hint, prefer),
             asyncio.to_thread(measure_voice, audio),
             asyncio.to_thread(self.speaker.score, audio))
@@ -467,16 +467,18 @@ class CallSession:
         psim = None if confirmed else self.speaker.provisional_sim(emb)
         # not confirmed yet, but one clean turn is known: noise scored 0.07-0.2 against it, the caller 0.49+
         unlike_first = psim is not None and psim < 0.35
-        if is_caller and self.stock_noise(text) and not caller_voice and (confirmed or overlap or rms < 0.035
-                                                                          or unlike_first):
+        # a quiet stock phrase with the agent silent is believed only if Whisper heard speech in it
+        # (live 6bb1ca00ad: the caller's real "Yes." no-speech 0.17; noise phrases 0.55-0.88)
+        if is_caller and self.stock_noise(text) and not caller_voice and (
+                confirmed or overlap or unlike_first or (rms < 0.035 and nsp >= 0.3)):
             self.event("noise", {"duration_s": round(dur_s, 2), "why": "noise phrase, not the caller's voice",
                                  "text": text, "voice_similarity": voice_sim if confirmed else psim,
                                  "rms": round(rms, 3), "overlap": overlap})
             return
-        if is_caller and self.hangup_after_speaking and not (caller_voice or (not confirmed and not overlap
-                                                                               and not self.stock_noise(text))):
-            # after our goodbye only the caller's own words reopen the call (live call 9d69a31bae said
-            # goodbye twice more to noise heard as "हुआ है")
+        if is_caller and self.hangup_after_speaking and self.stock_noise(text) and not caller_voice:
+            # after our goodbye a noise phrase never reopens the call (live call 9d69a31bae said goodbye twice
+            # more to noise heard as "हुआ है"). Real sentences always do: after "I think we've lost the line"
+            # the caller's "what do you have in the gym?" must be answered
             self.event("noise", {"duration_s": round(dur_s, 2), "why": "after goodbye, not clearly the caller",
                                  "text": text, "voice_similarity": voice_sim})
             return
@@ -492,7 +494,8 @@ class CallSession:
         # words): the old lock learned from everything, so noise heard as words could become "the caller"
         self.accepted_turns += 1
         self.in_turn = True
-        if not overlap and rms >= CLEAN_RMS and not self.stock_noise(text):
+        # callers who talk over the agent still get learned from their clearly loud, longer turns
+        if not self.stock_noise(text) and rms >= CLEAN_RMS and (not overlap or (rms >= 0.05 and dur_s >= 1.5)):
             self.speaker.learn(emb, len(audio))
         self.calib.accept(feats)
         if prosody is not None:
@@ -559,9 +562,10 @@ class CallSession:
     async def transcribe(self, audio: np.ndarray, hint: str | None, prefer: str | None):
         stt = self.app.stt
         if hasattr(stt, "transcribe_detail"):
-            return await stt.transcribe_detail(audio, hint, prefer)
+            out = await stt.transcribe_detail(audio, hint, prefer)
+            return out if len(out) == 5 else (*out, 0.5)
         text, lang, ms = await stt.transcribe(audio, hint, prefer)  # test doubles
-        return text, lang, ms, ""
+        return text, lang, ms, "", 0.5
 
     async def send_link(self) -> None:
         """The agent just said it is sending the payment link: send it (once per call)."""

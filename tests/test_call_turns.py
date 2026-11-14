@@ -19,10 +19,11 @@ from voice.call import CallRecord, CallSession
 class FakeSTT:
     def __init__(self):
         self.next = ("", "")
+        self.nsp = 0.6
 
     async def transcribe_detail(self, audio, hint=None, prefer=None, prompt=None):
         text, quiet = self.next
-        return text, "en", 5.0, quiet
+        return text, "en", 5.0, quiet, self.nsp
 
 
 class FakeTTS:
@@ -129,11 +130,17 @@ async def test_voicemail_words_only_hang_up_at_the_start():
 async def test_after_goodbye_noise_does_not_reopen_and_hangup_is_capped():
     """Live call 9d69a31bae: two more goodbyes to "हुआ है" heard on noise, line left open."""
     cs, _ = session()
-    voice(cs, 0.2)  # not the caller
+    voice(cs, None, confirmed=False)
     cs.hangup_after_speaking = True
-    cs.app.stt.next = ("okay done thank you sir", "")
-    await cs.handle_utterance(speech(), time.monotonic(), False)
+    cs.app.stt.next = ("हुआ है", "")
+    await cs.handle_utterance(speech(), time.monotonic(), False, overlap=False)
     assert not [t for t in cs.call.turns if t["role"] == "customer"]
+    # but a real sentence after "I think we've lost the line" is answered (replay of 339d4ace25)
+    cs.app.stt.next = ("That is fine, but what do you have in the gym?", "")
+    await cs.handle_utterance(speech(), time.monotonic(), False, overlap=True)
+    assert [t["text"] for t in cs.call.turns if t["role"] == "customer"] == [
+        "That is fine, but what do you have in the gym?"]
+    cs.hangup_after_speaking, cs.in_turn = True, False  # turn_worker clears in_turn after the reply
     now = time.monotonic()
     cs.play_until, cs.last_activity = now - 3, now - 0.5  # noise kept the VAD busy
     cs.detector.in_speech = True
@@ -187,3 +194,17 @@ async def test_short_okay_from_the_confirmed_caller_is_kept_when_the_agent_is_si
     cs.app.stt.next = ("Okay.", "")
     await cs.handle_utterance(speech(), time.monotonic(), False, overlap=False)
     assert [t["text"] for t in cs.call.turns if t["role"] == "customer"] == ["Okay."]
+
+
+async def test_quiet_real_yes_is_kept_when_whisper_heard_speech():
+    """Live 6bb1ca00ad: the caller's first "Yes." (rms 0.02, agent silent, no-speech 0.17)."""
+    cs, _ = session()
+    voice(cs, None, confirmed=False)
+    cs.app.stt.next, cs.app.stt.nsp = ("Yes.", ""), 0.17
+    await cs.handle_utterance(speech(amp=0.02), time.monotonic(), False, overlap=False)
+    assert [t["text"] for t in cs.call.turns if t["role"] == "customer"] == ["Yes."]
+    cs2, _ = session()
+    voice(cs2, None, confirmed=False)
+    cs2.app.stt.next, cs2.app.stt.nsp = ("Okay.", ""), 0.59  # the same words from noise
+    await cs2.handle_utterance(speech(amp=0.02), time.monotonic(), False, overlap=False)
+    assert not [t for t in cs2.call.turns if t["role"] == "customer"]
