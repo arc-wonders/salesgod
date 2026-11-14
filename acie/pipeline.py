@@ -28,6 +28,7 @@ from .personalization.policy import AdaptationPolicy, detect_explicit_requests, 
 from .personalization.profile_store import MemoryProfileStore, ProfileStore
 from .context import is_question
 from .safety import CONCERN_T, DISTRESS_T, concern_plan, distress_followup_plan, distress_plan, distress_score
+from . import safety
 from . import psyche
 from .psyche import emotion_policy
 from .psyche.ledger import (CustomerFacts, SaidLedger, clear_input, explicit_bye, firm_no, invented_memory, is_repeat_ask, next_unsaid,
@@ -470,8 +471,10 @@ class ACIEPipeline:
         # The crisis row is always active (it is the old distress override, now a row); the others need ACIE_PSYCHE=1
         # crisis evidence: phonetic + 2-turn window + voice (acie/safety.distress_score), OR the NLU's crisis flag
         hist = [u.text for u in session.history if u.role == "customer"][-2:]
-        d_score, d_ev = distress_score(turn.text, hist, getattr(turn, "voice", None))
+        d_score, d_ev = distress_score(turn.text, hist, getattr(turn, "voice", None)) if safety.enabled() else (0.0, [])
         nlu_crisis = session.dialog.pop("_nlu_crisis", None)
+        if not safety.enabled():  # guardrail off (default): no crisis flag, no check-in, the call stays on the sale
+            nlu_crisis = None
         # The NLU flag alone is never a crisis (gate run 4: "मेरे पास पहले से cloud है" and "मैं ठीक हूँ, बस fees पूछ रहा हूँ" ended calls).
         # Full distress needs lexical/phonetic evidence >= DISTRESS_T, or concern-band evidence plus the NLU flag. A caller who
         # reassures ("मैं ठीक हूँ") or asks about the product is released: back to normal, no sticky flag, no re-check.

@@ -1,0 +1,51 @@
+"""Owner, 15 Nov 2026: no Tele-MANAS / mental-health handling inside sales calls (default off), and the live false
+trigger "So can't you just give me a good discount for me?" must never read as a crisis even with the switch on."""
+import asyncio
+
+from acie import safety
+from acie.decision.domains.bank_demo import BankDemoDomain
+from acie.decision.engine import DecisionEngine
+from acie.pipeline import ACIEPipeline
+from acie.psyche import emotion_policy
+from acie.schemas import HumanState, TurnInput
+
+OWNER_LINE = "So can't you just give me a good discount for me?"
+ENGLISH_HAGGLE = [
+    OWNER_LINE,
+    "okay and i want a discount for joining as i'm leaving the current gym as well so i need a discount from you",
+    "So can you just tell me about those offers yourself?",
+    "Not this offer but about discount offers.",
+    "uh sure so i can just pay 33 rupees per day rather than a full monthly payment",
+    "can you do any better on the price for me",
+    "could you give me a good deal for four months",
+    "what are you talking about",
+    "okay 2,600 then, send the link",
+]
+
+
+def test_switch_is_off_by_default(monkeypatch):
+    monkeypatch.delenv("ACIE_SAFETY", raising=False)
+    assert not safety.enabled()
+    assert emotion_policy.decide(HumanState(), "mujhe marne ka mann hai").row != "crisis"
+
+
+def test_no_helpline_in_a_call_when_off(monkeypatch):
+    monkeypatch.delenv("ACIE_SAFETY", raising=False)
+    pipe = ACIEPipeline(DecisionEngine(BankDemoDomain()))
+    for text in (OWNER_LINE, "what are you talking about"):
+        r = asyncio.run(pipe.run_turn(TurnInput(session_id="sw", customer_id="c1", text=text)))
+        assert not r.plan.intent.startswith(("safety", "distress", "concern")), r.plan.intent
+        assert "14416" not in r.text and "Tele-MANAS" not in r.text
+
+
+def test_english_haggle_lines_never_score_as_crisis(monkeypatch):
+    monkeypatch.setenv("ACIE_SAFETY", "1")
+    for line in ENGLISH_HAGGLE:
+        score, ev = safety.distress_score(line)
+        assert score < safety.CONCERN_T, (line, score, ev)
+
+
+def test_true_crisis_lines_still_caught_when_on(monkeypatch):
+    monkeypatch.setenv("ACIE_SAFETY", "1")
+    for line in ("मेरे मरने का मन कर रहा है", "छत से कूदना है मुझे", "chhat se kood jaunga", "mujhe nahi jeena", "I want to end it all"):
+        assert safety.is_distress(line), line
