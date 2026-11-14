@@ -167,8 +167,10 @@ def main(call_id: str, as_json: bool = False) -> dict:
         "max_first_audio_ms": max(latencies) if latencies else None,
         "avg_agent_words": round(float(np.mean(agent_words)), 1) if agent_words else None,
         "fallbacks": sum(1 for r in report["turns"] if r.get("fallback")), **talk,
-        "outcome": next((i for i in reversed(intents) if i in ("link_sent", "declined", "callback", "safety_distress",
-                                                                "human_agent", "goodbye")), "no outcome"),
+        # a sale (link sent) stays a sale even if a later turn was classified declined, unless the link was cancelled
+        "outcome": ("link_sent" if "link_sent" in intents and "link_cancelled" not in intents else
+                    next((i for i in reversed(intents) if i in ("declined", "callback", "safety_distress",
+                                                                 "human_agent", "goodbye")), "no outcome")),
     }
     if as_json:
         print(json.dumps(report, ensure_ascii=False, indent=1))

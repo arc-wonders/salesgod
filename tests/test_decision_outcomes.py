@@ -74,3 +74,16 @@ async def test_link_cancelled_reopens():
 async def test_outcome_event_recorded_once():
     _, _, pipe, _, _ = await run(["yes tell me", "how much", "yes send the link", "ok thanks"])
     assert sum(1 for e in led(pipe).events if e.kind == "outcome") == 1
+
+
+def test_goodbye_after_link_is_not_a_decline():
+    """Gate run 7: 'Okay fine, will pay now. Thanks, bye' after link_sent was recorded as declined (sale lost in CRM)."""
+    from acie.context import CallContext
+    c = CallContext()
+    c.record_turn(1, "haan bhej do", "link_sent", False)
+    c.record_turn(2, "Okay fine, will pay now. Thanks, bye", "declined", False)
+    assert "payment_link" in c.promised and c.decision == "accepted"
+    c2 = CallContext()
+    c2.record_turn(1, "haan bhej do", "link_sent", False)
+    c2.record_turn(2, "no don't send it, cancel", "declined", False)
+    assert "payment_link" not in c2.promised and c2.decision == "declined"

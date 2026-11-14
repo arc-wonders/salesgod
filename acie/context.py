@@ -33,6 +33,11 @@ _QUESTION = re.compile(r"\?|\b(what|how|why|when|where|which|who|kya|kaise|kab|k
                        re.IGNORECASE)
 
 
+_PAY_BYE = re.compile(r"\b(will pay|i.?ll pay|paying|pay (now|kar|kardunga|kar dunga|karunga)|thanks?|thank you|bye|ok(ay)? fine|done|"
+                      r"kar dunga|kar doonga|bhar dunga|dhanyavad|shukriya)\b|धन्यवाद|शुक्रिया|बाय|पे कर", re.I)
+_CANCEL_LINK = re.compile(r"\b(don.?t (send|want)|cancel|mat bhej|nahi chahiye|not interested|changed my mind)\b|मत भेज|नहीं चाहिए", re.I)
+
+
 def is_question(text: str) -> bool:
     return bool(text) and bool(_QUESTION.search(text))
 
@@ -109,6 +114,11 @@ class CallContext(BaseModel):
             self.add(ev, sinks)
             new.append(ev)
 
+        if intent == "declined" and "payment_link" in self.promised and _PAY_BYE.search(customer_text or "") \
+                and not _CANCEL_LINK.search(customer_text or ""):
+            # gate run 7: after the link, "Okay fine, will pay now. Thanks, bye" was classified declined and the sale was
+            # recorded as lost (link removed, CRM stage lost). A thank-you/goodbye/"will pay" after the link is a goodbye.
+            intent = "goodbye"
         if customer_text and is_question:
             self.questions.append({"q": customer_text[:160], "answer": intent})
             add("customer", "asked", customer_text[:160])
