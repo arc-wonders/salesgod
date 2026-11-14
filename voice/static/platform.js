@@ -10,7 +10,7 @@ const STAGES = ['new', 'contacted', 'interested', 'qualified', 'demo_booked', 'n
 const STAGE_LABEL = { new: 'New', contacted: 'Contacted', interested: 'Interested', qualified: 'Qualified', demo_booked: 'Demo booked', negotiating: 'Negotiating', won: 'Won', lost: 'Lost', do_not_call: 'Do not call' };
 const STAGE_TONE = { new: '', contacted: 'blue', interested: 'blue', qualified: 'green', demo_booked: 'green', negotiating: 'amber', won: 'green', lost: 'red', do_not_call: 'red' };
 const ACTIONS = ['send_link', 'book_callback', 'book_demo', 'transfer_human', 'opt_out', 'send_sms', 'take_payment_link'];
-const ANSWER_TYPES = ['text', 'yes_no', 'number', 'choice', 'date', 'phone', 'email'];
+const ANSWER_TYPES = ['text', 'yes_no', 'number', 'choice', 'date', 'none'];
 const BUILTIN_CT = [['sales_pitch', 'Sales pitch'], ['lead_qualification', 'Lead qualification'], ['follow_up', 'Follow-up'], ['payment_reminder', 'Payment reminder'], ['feedback_survey', 'Feedback survey'], ['appointment_booking', 'Appointment booking'], ['custom', 'Custom']];
 
 Object.assign(ICONS, {
@@ -60,11 +60,16 @@ const post = (path, body, method) => tryApi(path, { method: method || 'POST', bo
 /* create (no id) or update (id); a server that wants PUT for create gets a second try */
 async function saveObj(base, id, obj) {
   if (id) return post(`${base}/${esc(id)}`, obj, 'PUT');
+  if (!obj.id) { obj = { ...obj }; delete obj.id; }
   let r = await post(base, obj);
   if (!r.ok && r.status === 405 && obj.id) r = await post(`${base}/${esc(obj.id)}`, obj, 'PUT');
   return r;
 }
 const proj = () => S.tenants.find((t) => t.id === S.tenant) || { id: S.tenant, name: '—', color: '#888' };
+const isDnc = (c) => !!(c && ((c.consent && c.consent.dnc) || c.dnc || c.stage === 'do_not_call'));
+const hh = (n) => String(n).padStart(2, '0') + ':00';
+const hoursOf = (p) => (p && Array.isArray(p.call_hours) && p.call_hours.length === 2 ? p.call_hours : [10, 20]);
+const hourSel = (v, label, lo, hi) => h('select', { 'aria-label': label }, Array.from({ length: hi - lo + 1 }, (_, i) => lo + i).map((n) => h('option', { value: n, selected: n === v }, hh(n))));
 const stageName = (s) => (proj().stages && proj().stages[s]) || STAGE_LABEL[s] || s;
 function naBox(what, r, retry) {
   if (r && r.na) return h('div', { class: 'empty na' }, h('b', {}, what + ' is not available yet'), 'This server does not have that part of the API yet. Everything else keeps working, and this page fills in as soon as it does.');
@@ -92,6 +97,12 @@ const confirmBox = (title, desc, okLabel, onOk, opts) => modal(title, desc, (b, 
 
 /* ------------------------------------------------------------ Add with AI */
 function fmtVal(v) { if (v == null) return ''; if (typeof v === 'string') return v; if (Array.isArray(v) && v.every((x) => typeof x === 'string')) return v.join('\n'); return JSON.stringify(v, null, 1); }
+/* drop empty strings / null / [] / {} recursively (the server's draft carries every model default) */
+function prune(v) {
+  if (Array.isArray(v)) { const a = v.map(prune).filter((x) => x !== undefined); return a.length ? a : undefined; }
+  if (v && typeof v === 'object') { const o = {}; for (const [k, x] of Object.entries(v)) { const p = prune(x); if (p !== undefined) o[k] = p; } return Object.keys(o).length ? o : undefined; }
+  return v === '' || v == null ? undefined : v;
+}
 const same = (a, b) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
 /* aiBox: a prompt box for any form. It never saves; "Apply" only fills the form so the operator can edit and press the form's own Save. */
 function aiBox(o) {
@@ -109,7 +120,8 @@ function aiBox(o) {
   };
   function showDraft(d) {
     const cur = (o.current && o.current()) || {};
-    const keys = Object.keys(d).filter((k) => !k.startsWith('_') && d[k] != null && d[k] !== '' && !(Array.isArray(d[k]) && !d[k].length));
+    d = prune(d) || {};
+    const keys = Object.keys(d).filter((k) => !k.startsWith('_') && (!o.keys || o.keys.includes(k)));
     if (!keys.length) { out.append(h('div', { class: 'hint' }, 'The AI returned nothing usable. Try describing it with more detail.')); return; }
     const checks = {};
     const rows = keys.map((k) => {
@@ -214,7 +226,7 @@ async function doSearch(q, res, mine, cur) {
   if (q.length < 2) { res.hidden = true; return; }
   const ql = q.toLowerCase();
   const prods = SG.tenantProducts().filter((p) => (p.product_name || '').toLowerCase().includes(ql)).slice(0, 4);
-  const [cu, ca] = await Promise.all([tryApi('/api/customers?' + qs({ project: S.tenant, q, limit: 6 })), campaigns()]);
+  const [cu, ca] = await Promise.all([tryApi('/api/customers?' + qs({ project: S.tenant, q, page_size: 6 })), campaigns()]);
   if (mine !== cur()) return;
   const cust = cu.ok ? arr(cu.data, 'customers').slice(0, 6) : [], camps = (ca || []).filter((c) => (c.name || '').toLowerCase().includes(ql)).slice(0, 4);
   const grp = (t, items) => items.length ? [h('div', { class: 'group', style: 'padding:6px 12px 2px' }, t), items] : null;
@@ -250,7 +262,7 @@ function callNow(c, o) {
     else {
       const pid = o.productId || SG.tenantProducts()[0]?.id;
       if (!pid) { notice('Add a product to this project first: the call needs something to talk about.'); return; }
-      r = await post('/api/calls', { numbers: c.phone, campaign: pid, customer_name: c.name || '', language: c.language || 'hinglish', call_type: o.callType || undefined, customer_id: c.id, project_id: S.tenant });
+      r = await post(`/api/customers/${esc(c.id)}/call`, { product_id: pid, call_type: o.callType || undefined });
     }
     if (!r.ok) { notice(r.na ? 'Calling is not available on this server yet.' : r.err); return; }
     const d = r.data, first = (d.calls || [])[0] || d;
@@ -270,13 +282,13 @@ function obLoad(id) {
 async function obSave(st) {
   store.set(obKey(st.projectId), JSON.stringify(st));
   const p = S.tenants.find((t) => t.id === st.projectId);
-  if (p && S.projectsApi) { p.onboarding = st; await post(`/api/projects/${esc(p.id)}`, { ...p, onboarding: st }, 'PUT'); }
+  if (p && S.projectsApi) { const { sim, draftCT, ...keep } = st; p.onboarding = keep; await post(`/api/projects/${esc(p.id)}`, { onboarding: keep }, 'PUT'); }
 }
 
 /* ------------------------------------------------------------ Dashboard */
 async function pageDashboard(el, ctx) {
   el.replaceChildren(h('div', { class: 'pad' }, head('Dashboard', 'Where this project stands today.', h('a', { class: 'btn sm', href: '#/progress' }, ic('activity', 'sm'), 'Build progress'), h('a', { class: 'btn pri sm', href: '#/onboarding' }, ic('spark', 'sm'), 'Guided setup')), h('div', { class: 'empty' }, 'Loading…')));
-  const [cu, ca, fu, ct] = await Promise.all([tryApi('/api/customers?' + qs({ project: S.tenant, limit: 1 })), campaigns(true), tryApi('/api/followups?' + qs({ project: S.tenant, due: 'today' })), calltypes()]);
+  const [cu, ca, fu, ct] = await Promise.all([tryApi('/api/customers?' + qs({ project: S.tenant, page_size: 1 })), campaigns(true), tryApi('/api/followups?' + qs({ project: S.tenant, due: 'today' })), calltypes()]);
   if (!ctx.alive()) return;
   const prods = SG.tenantProducts(), calls = SG.tenantCalls();
   const customers = cu.ok ? (cu.data.total ?? arr(cu.data, 'customers').length) : null, due = fu.ok ? arr(fu.data, 'followups').length : null;
@@ -308,7 +320,7 @@ function pageProducts(el) {
 }
 
 /* ------------------------------------------------------------ Call types */
-const blankCT = () => ({ id: '', name: '', objective: '', opening: {}, steps: [], allowed_actions: [], outcomes: [], closing: {}, tone: '', max_call_seconds: 300, selling_allowed: false, negotiation_allowed: false, compliance_lines: [] });
+const blankCT = () => ({ id: '', name: '', objective: '', opening: {}, steps: [], allowed_actions: [], success_outcomes: [], closing: {}, tone: '', max_call_seconds: 360, selling_allowed: false, negotiation_allowed: false, compliance_lines: [] });
 async function pageCallTypes(el, ctx) {
   if (ctx.id) return ctEditorPage(el, ctx);
   el.replaceChildren(h('div', { class: 'pad' }, h('div', { class: 'empty' }, 'Loading…')));
@@ -330,7 +342,6 @@ async function ctEditorPage(el, ctx) {
   const isNew = ctx.id === 'new';
   const res = await calltypes(); if (!ctx.alive()) return;
   let base = isNew ? blankCT() : res.list.find((c) => c.id === ctx.id);
-  if (!base && !isNew) { const r = await tryApi(`/api/calltypes/${esc(ctx.id)}`); if (r.ok) base = r.data.calltype || r.data; }
   if (!base && !isNew && !res.list.length) base = { ...blankCT(), id: ctx.id, name: (BUILTIN_CT.find((b) => b[0] === ctx.id) || [])[1] || ctx.id, builtin: true };
   if (!base) { el.replaceChildren(h('div', { class: 'pad' }, naBox('This call type', { err: 'Not found' }))); return; }
   const ro = !!base.builtin, d = { ...blankCT(), ...clone(base) };
@@ -338,7 +349,7 @@ async function ctEditorPage(el, ctx) {
   const dis = ro ? true : null, I = (v, a) => h('input', { value: v ?? '', disabled: dis, ...(a || {}) });
   const f = { name: I(d.name), objective: h('textarea', { rows: 2, disabled: dis }, d.objective || ''), tone: I(d.tone), max: I(d.max_call_seconds ?? '', { type: 'number', min: 30, step: 30 }) };
   const opening = langBlock(d.opening, 2), closing = langBlock(d.closing, 2);
-  const outcomes = h('textarea', { rows: 2, disabled: dis, placeholder: 'one per line, e.g. demo_booked' }, (d.outcomes || []).join('\n'));
+  const outcomes = h('textarea', { rows: 2, disabled: dis, 'aria-label': 'Success outcomes', placeholder: 'one per line, e.g. demo_booked' }, (d.success_outcomes || []).join('\n'));
   const comp = h('textarea', { rows: 2, disabled: dis, placeholder: 'lines the agent must say or never say' }, (d.compliance_lines || []).join('\n'));
   const sell = h('input', { type: 'checkbox', checked: !!d.selling_allowed, disabled: dis, style: 'width:auto;height:auto' }), neg = h('input', { type: 'checkbox', checked: !!d.negotiation_allowed, disabled: dis, style: 'width:auto;height:auto' });
   const actions = new Set(d.allowed_actions || []);
@@ -371,11 +382,11 @@ async function ctEditorPage(el, ctx) {
     if (!d.steps.length) stepsBox.append(h('div', { class: 'hint', style: 'padding:8px 0' }, 'No steps yet: the call follows the objective freely.'));
   }
   drawSteps();
-  const collect = () => ({ ...d, name: f.name.value.trim(), objective: f.objective.value.trim(), tone: f.tone.value.trim(), max_call_seconds: num(f.max.value) || undefined, opening: opening.get(), closing: closing.get(), outcomes: lines(outcomes.value), compliance_lines: lines(comp.value),
+  const collect = () => ({ ...d, name: f.name.value.trim(), objective: f.objective.value.trim(), tone: f.tone.value.trim(), max_call_seconds: num(f.max.value) || undefined, opening: opening.get(), closing: closing.get(), success_outcomes: lines(outcomes.value), compliance_lines: lines(comp.value),
     selling_allowed: sell.checked, negotiation_allowed: sell.checked && neg.checked, allowed_actions: [...actions], steps: d.steps.map((s, i) => ({ ...s, id: stepId(s, i), text: s.text || {}, answer_type: s.answer_type || 'text', required: !!s.required })), project_id: S.tenant });
   const apply = (p) => {
     if ('name' in p) f.name.value = p.name; if ('objective' in p) f.objective.value = p.objective; if ('tone' in p) f.tone.value = p.tone; if ('max_call_seconds' in p) f.max.value = p.max_call_seconds;
-    if (p.opening) opening.set(p.opening); if (p.closing) closing.set(p.closing); if (p.outcomes) outcomes.value = [].concat(p.outcomes).join('\n'); if (p.compliance_lines) comp.value = [].concat(p.compliance_lines).join('\n');
+    if (p.opening) opening.set(p.opening); if (p.closing) closing.set(p.closing); if (p.success_outcomes) outcomes.value = [].concat(p.success_outcomes).join('\n'); if (p.compliance_lines) comp.value = [].concat(p.compliance_lines).join('\n');
     if ('selling_allowed' in p) sell.checked = !!p.selling_allowed; if ('negotiation_allowed' in p) neg.checked = !!p.negotiation_allowed;
     if (p.allowed_actions) { p.allowed_actions.forEach((a) => actions.add(a)); [...actBox.querySelectorAll('input')].forEach((cb) => { cb.checked = actions.has(cb.parentNode.textContent.trim().replaceAll(' ', '_')); }); }
     if (Array.isArray(p.steps)) { d.steps = p.steps.map((s) => ({ id: s.id || '', text: typeof s.text === 'string' ? { en: s.text } : s.text || {}, answer_type: s.answer_type || 'text', required: !!s.required })); drawSteps(); }
@@ -385,19 +396,19 @@ async function ctEditorPage(el, ctx) {
     const o = collect(); err.textContent = '';
     if (!o.name) { err.textContent = 'Give the call type a name.'; return; }
     const ids = o.steps.map((s) => s.id); if (new Set(ids).size !== ids.length) { err.textContent = 'Two steps share the same id. Ids must be unique.'; return; }
-    if (isNew) o.id = slug(o.name);
+    if (isNew) delete o.id;  // the server derives the id from the name
     const r = await saveObj('/api/calltypes', isNew ? '' : d.id, o);
     if (!r.ok) { err.textContent = r.na ? 'Saving call types is not available on this server yet.' : r.err; return; }
     _cts = null; toast('Saved.');
-    const ret = ctx.q.get('return'); if (ret === 'onboarding') { const st = obLoad(S.tenant); st.calltypeId = o.id; await obSave(st); go('onboarding'); } else go('calltypes');
+    const saved = r.data.calltype || r.data, ret = ctx.q.get('return'); if (ret === 'onboarding') { const st = obLoad(S.tenant); st.calltypeId = saved.id || o.id; await obSave(st); go('onboarding'); } else go('calltypes');
   };
   const dupBtn = isNew ? null : h('button', { class: 'btn', onclick: () => dupCT(base) }, ic('dup', 'sm'), 'Duplicate');
   const section = (t, ...kids) => h('div', { class: 'panel', style: 'margin-bottom:16px' }, h('div', { class: 'panel-head' }, h('b', {}, t)), h('div', { style: 'padding:4px 18px 16px' }, kids));
   el.replaceChildren(h('div', { class: 'pad narrow' },
     head(isNew ? 'New call type' : d.name || 'Call type', ro ? 'This is a built-in call type. Duplicate it to change anything.' : 'Changes apply to the next call that uses it.', dupBtn,
-      !isNew && !ro ? h('button', { class: 'btn danger', onclick: () => confirmBox('Delete this call type?', 'Campaigns using it fall back to the default call type.', 'Delete', async () => { const r = await tryApi(`/api/calltypes/${esc(d.id)}`, { method: 'DELETE' }); if (!r.ok) return notice(r.err); _cts = null; go('calltypes'); }, { danger: true }) }, ic('trash', 'sm'), 'Delete') : null,
+      !isNew && !ro ? h('button', { class: 'btn danger', onclick: () => confirmBox('Delete this call type?', 'This cannot be undone. A call type that a campaign still uses cannot be deleted: change that campaign first.', 'Delete', async () => { const r = await tryApi(`/api/calltypes/${esc(d.id)}`, { method: 'DELETE' }); if (!r.ok) return notice(r.err); _cts = null; go('calltypes'); }, { danger: true }) }, ic('trash', 'sm'), 'Delete') : null,
       ro ? null : h('button', { class: 'btn pri', onclick: save }, ic('save', 'sm'), 'Save')),
-    ro ? null : aiBox({ kind: 'calltype', placeholder: 'e.g. a follow-up call for people who got the payment link but did not pay', context: () => ({ project: S.tenant, calltype: collect() }), current: collect, apply }),
+    ro ? null : aiBox({ kind: 'calltype', keys: ['name', 'objective', 'opening', 'steps', 'allowed_actions', 'success_outcomes', 'closing', 'tone', 'max_call_seconds', 'selling_allowed', 'negotiation_allowed', 'compliance_lines'], placeholder: 'e.g. a follow-up call for people who got the payment link but did not pay', context: () => ({ project: S.tenant, calltype: collect() }), current: collect, apply }),
     ctx.q.get('ai') && isNew ? h('div', { class: 'hint', style: 'margin:-6px 0 14px' }, 'Describe the call above, press Draft with AI, apply it and adjust.') : null,
     section('Purpose', fld('Name', f.name), fld('Objective: what counts as success', f.objective), h('div', { class: 'grid2' }, fld('Tone', f.tone), fld('Maximum call length (seconds)', f.max))),
     section('Opening line · per language', opening.box),
@@ -452,19 +463,24 @@ function importer(onDone, startText) {
       h('div', { class: 'row', style: 'margin-top:10px' }, h('button', { class: 'btn', type: 'button', disabled: st.map.phone == null, onclick: () => check(false) }, ic('check', 'sm'), 'Check before importing'), st.map.phone == null ? h('span', { class: 'err', style: 'margin:0' }, 'Pick which column is the phone number.') : null));
     msg.replaceChildren();
   }
+  /* The server takes the CSV as text plus a {field: column name} mapping; custom fields are "custom.<key>". */
+  const toCSV = (rows) => rows.map((r) => r.map((c) => (/[",\n]/.test(c) ? '"' + String(c).replace(/"/g, '""') + '"' : String(c))).join(',')).join('\n');
+  const heads = () => { const seen = {}; return st.headers.map((x, i) => { let n = (x || '').trim() || 'Column ' + (i + 1); if (seen[n]) n += ' (' + (i + 1) + ')'; seen[n] = 1; return n; }); };
   const payload = (commit) => {
-    const out = st.rows.map((r) => { const o = { custom: {} }; for (const [k, i] of Object.entries(st.map)) { const v = (r[i] || '').trim(); if (k.startsWith('cf:')) o.custom[k.slice(3)] = v; else o[k] = k === 'phone' ? e164(v) || v : k === 'tags' ? csv(v) : v; } return o; }).filter((o) => o.phone);
-    return { project: S.tenant, project_id: S.tenant, commit, mapping: st.map, rows: out };
+    const hs = heads(), mapping = {};
+    for (const [k, i] of Object.entries(st.map)) mapping[k.startsWith('cf:') ? 'custom.' + k.slice(3) : k] = hs[i];
+    return { project: S.tenant, csv: toCSV([hs, ...st.rows.map((r) => hs.map((_, i) => r[i] ?? ''))]), mapping, commit, on_duplicate: 'skip', tags: [] };
   };
   async function check(commit) {
     msg.textContent = commit ? 'Importing…' : 'Checking…';
     const r = await post('/api/customers/import', payload(commit));
     if (!r.ok) { msg.replaceChildren(r.na ? h('div', { class: 'empty na' }, h('b', {}, 'Import is not available yet'), 'The server does not have the customers import API yet. Your list is not lost: pick it again once it is.') : h('div', { class: 'err' }, r.err)); return; }
-    const d = r.data, n = (k) => d[k] ?? (Array.isArray(d[k + 's']) ? d[k + 's'].length : 0);
-    if (commit) { msg.replaceChildren(h('div', { class: 'tag green' }, `Imported ${d.imported ?? d.created ?? d.valid ?? '?'} customers`)); onDone && onDone(d.imported ?? d.created ?? d.valid ?? 0); return; }
+    const d = r.data, n = d.counts || {};
+    if (commit) { const added = (n.new || 0) + (n.updated || 0); msg.replaceChildren(h('div', { class: 'tag green' }, `Imported ${added} customers`)); onDone && onDone(added); return; }
+    const bad = (d.rows || []).filter((x) => x.status === 'invalid');
     msg.replaceChildren(h('div', { class: 'panel', style: 'padding:12px 16px;margin-top:10px' }, h('div', { class: 'row', style: 'flex-wrap:wrap;gap:6px' },
-      h('span', { class: 'tag green' }, (d.valid ?? d.new ?? '?') + ' will be added'), h('span', { class: 'tag' }, (d.duplicates ?? d.duplicate ?? 0) + ' duplicates (same phone) skipped'), h('span', { class: 'tag red' }, (d.dnc ?? 0) + ' on Do-not-call'), h('span', { class: 'tag amber' }, (d.invalid ?? 0) + ' invalid')),
-      (d.errors || []).length ? h('ul', { class: 'pts' }, d.errors.slice(0, 5).map((x) => h('li', {}, typeof x === 'string' ? x : JSON.stringify(x)))) : null,
+      h('span', { class: 'tag green' }, (n.new || 0) + ' will be added'), h('span', { class: 'tag' }, (n.duplicate || 0) + ' duplicates (same phone) skipped'), h('span', { class: 'tag red' }, (n.dnc || 0) + ' on Do-not-call'), h('span', { class: 'tag amber' }, (n.invalid || 0) + ' invalid')),
+      bad.length ? h('ul', { class: 'pts' }, bad.slice(0, 5).map((x) => h('li', {}, 'Row ' + x.row + ': ' + x.error))) : null,
       h('div', { class: 'row', style: 'margin-top:10px' }, h('button', { class: 'btn pri', type: 'button', onclick: () => check(true) }, ic('upload', 'sm'), 'Import now'))));
   }
   if (startText) load(startText, true);
@@ -480,12 +496,12 @@ function custForm(c, fields, done) {
     const I = (v, a) => h('input', { value: v ?? '', ...(a || {}) }), err = h('div', { class: 'err' });
     const n = I(base.name), p = I(base.phone, { placeholder: '+91 98765 43210', inputmode: 'tel' }), e = I(base.email, { type: 'email' }), ci = I(base.city), t = I((base.tags || []).join(', '), { placeholder: 'comma separated' });
     const l = h('select', {}, LANGS.map(([k, v]) => h('option', { value: k, selected: base.language === k }, v)));
-    const cf = {}; const cfBox = fields.map((fd) => fld(fd.label || fd.key, cf[fd.key] = fd.type === 'choice' ? h('select', {}, h('option', { value: '' }, '—'), (fd.options || []).map((o) => h('option', { value: o, selected: (base.custom || {})[fd.key] === o }, o))) : I((base.custom || {})[fd.key], { type: fd.type === 'number' ? 'number' : fd.type === 'date' ? 'date' : 'text' })));
+    const cf = {}; const cfBox = fields.map((fd) => fld(fd.label || fd.key, cf[fd.key] = fd.type === 'choice' ? h('select', {}, h('option', { value: '' }, '—'), (fd.choices || []).map((o) => h('option', { value: o, selected: (base.custom || {})[fd.key] === o }, o))) : I((base.custom || {})[fd.key], { type: fd.type === 'number' ? 'number' : fd.type === 'date' ? 'date' : 'text' })));
     b.append(h('div', { class: 'grid2' }, fld('Name', n), fld('Phone', p)), h('div', { class: 'grid2' }, fld('Email', e), fld('City', ci)), h('div', { class: 'grid2' }, fld('Language', l), fld('Tags', t)), cfBox, err);
     f.append(h('button', { class: 'btn pri', onclick: async () => {
       const ph = e164(p.value); if (!ph) { err.textContent = 'That phone number does not look right. Use 10 digits or +country code.'; return; }
-      const custom = { ...(base.custom || {}) }; for (const [k, el] of Object.entries(cf)) custom[k] = el.value;
-      const o = { ...base, name: n.value.trim(), phone: ph, email: e.value.trim(), city: ci.value.trim(), language: l.value, tags: csv(t.value), custom, project_id: S.tenant, source: base.source || 'manual' };
+      const custom = {}; for (const [k, el] of Object.entries(cf)) if (String(el.value).trim() !== '') custom[k] = el.value;
+      const o = { name: n.value.trim(), phone: ph, email: e.value.trim(), city: ci.value.trim(), language: l.value, tags: csv(t.value), custom, ...(c ? {} : { project_id: S.tenant }) };
       const r = await saveObj('/api/customers', c ? c.id : '', o);
       if (!r.ok) { err.textContent = r.na ? 'Saving customers is not available on this server yet.' : r.err; return; }
       close(); done && done(r.data.customer || r.data);
@@ -496,10 +512,10 @@ async function pageCustomers(el, ctx) {
   if (ctx.id) return pageCustomer(el, ctx);
   const draw = async () => {
     const board = C.view === 'board';
-    const r = await tryApi('/api/customers?' + qs({ project: S.tenant, q: C.q, stage: board ? '' : C.stage, tag: C.tag, page: board ? 1 : C.page, limit: board ? 200 : 50 }));
+    const r = await tryApi('/api/customers?' + qs({ project: S.tenant, q: C.q, stage: board ? '' : C.stage, tag: C.tag, page: board ? 1 : C.page, page_size: board ? 200 : 50 }));
     if (!ctx.alive()) return;
     C.data = r; const list = r.ok ? arr(r.data, 'customers') : [], total = r.ok ? (r.data.total ?? list.length) : 0;
-    const pages = r.ok ? (r.data.pages ?? Math.max(1, Math.ceil(total / 50))) : 1;
+    const pages = r.ok ? Math.max(1, Math.ceil(total / (r.data.page_size || 50))) : 1;
     const bar = h('div', { class: 'filters' },
       h('input', { type: 'search', placeholder: 'Search name or phone', value: C.q, 'aria-label': 'Search customers', style: 'max-width:240px', onkeydown: (e) => { if (e.key === 'Enter') { C.q = e.target.value.trim(); C.page = 1; draw(); } } }),
       board ? null : h('select', { class: 'inline', 'aria-label': 'Filter by stage', onchange: (e) => { C.stage = e.target.value; C.page = 1; draw(); } }, h('option', { value: '' }, 'All stages'), STAGES.map((s) => h('option', { value: s, selected: C.stage === s }, stageName(s)))),
@@ -515,23 +531,29 @@ async function pageCustomers(el, ctx) {
   };
   const kanban = (list) => {
     const cols = STAGES.map((s) => [s, list.filter((c) => (c.stage || 'new') === s)]);
-    const move = async (c, to, card) => { if ((c.stage || 'new') === to) return; const was = c.stage; c.stage = to; const r = await post(`/api/customers/${esc(c.id)}`, { ...c, stage: to, ...(to === 'do_not_call' ? { dnc: true } : {}) }, 'PUT'); if (!r.ok) { c.stage = was; notice(r.err); } draw(); };
+    const move = async (c, to) => {
+      if ((c.stage || 'new') === to) return;
+      if (isDnc(c)) { notice('This person is on the Do-not-call list and stays there: only they can ask to be called again.'); draw(); return; }
+      const go2 = async () => { const r = await post(`/api/customers/${esc(c.id)}`, to === 'do_not_call' ? { consent: { dnc: true, reason: 'moved to Do not call by the operator' } } : { stage: to }, 'PUT'); if (!r.ok) notice(r.err); draw(); };
+      if (to === 'do_not_call') confirmBox('Mark ' + (c.name || c.phone) + ' as Do not call?', 'They will never be called by any campaign. This cannot be undone from here.', 'Mark Do not call', go2, { danger: true });
+      else await go2();
+    };
     return h('div', { class: 'board' }, cols.map(([s, cs]) => h('section', { class: 'col', 'aria-label': stageName(s),
       ondragover: (e) => { e.preventDefault(); e.currentTarget.classList.add('over'); }, ondragleave: (e) => e.currentTarget.classList.remove('over'),
       ondrop: (e) => { e.preventDefault(); e.currentTarget.classList.remove('over'); const id = e.dataTransfer.getData('text/plain'); const c = list.find((x) => x.id === id); if (c) move(c, s); } },
       h('div', { class: 'col-h' }, h('span', { class: 'tag ' + (STAGE_TONE[s] || '') }, stageName(s)), h('span', { class: 'hint' }, cs.length)),
-      cs.map((c) => h('div', { class: 'kcard', draggable: 'true', ondragstart: (e) => { e.dataTransfer.setData('text/plain', c.id); e.dataTransfer.effectAllowed = 'move'; } },
+      cs.map((c) => h('div', { class: 'kcard' + (isDnc(c) ? ' locked' : ''), draggable: isDnc(c) ? 'false' : 'true', ondragstart: (e) => { e.dataTransfer.setData('text/plain', c.id); e.dataTransfer.effectAllowed = 'move'; } },
         h('a', { href: '#/customers/' + esc(c.id), class: 'kn' }, c.name || c.phone), h('div', { class: 'hint' }, c.phone + (c.score != null ? ' · score ' + c.score : '')),
-        h('select', { class: 'inline mv', 'aria-label': 'Move ' + (c.name || c.phone) + ' to stage', onchange: (e) => move(c, e.target.value) }, STAGES.map((x) => h('option', { value: x, selected: x === (c.stage || 'new') }, stageName(x)))))))));
+        h('select', { class: 'inline mv', disabled: isDnc(c), 'aria-label': 'Move ' + (c.name || c.phone) + ' to stage', onchange: (e) => move(c, e.target.value) }, STAGES.map((x) => h('option', { value: x, selected: x === (c.stage || 'new') }, stageName(x)))))))));
   };
   const custTable = (list, pages) => {
     const all = h('input', { type: 'checkbox', 'aria-label': 'Select all', style: 'width:auto;height:auto', checked: list.every((c) => C.sel.has(c.id)), onchange: (e) => { list.forEach((c) => e.target.checked ? C.sel.add(c.id) : C.sel.delete(c.id)); draw(); } });
     return h('div', {}, C.sel.size ? bulkBar(list, draw) : null,
       h('div', { class: 'tablewrap' }, h('table', { class: 'tbl' }, h('thead', {}, h('tr', {}, h('th', { style: 'width:30px' }, all), ['Name', 'Phone', 'Stage', 'Score', 'Tags', 'Next action', 'Last call'].map((t) => h('th', {}, t)))),
         h('tbody', {}, list.map((c) => h('tr', {}, h('td', {}, h('input', { type: 'checkbox', style: 'width:auto;height:auto', 'aria-label': 'Select ' + (c.name || c.phone), checked: C.sel.has(c.id), onchange: (e) => { e.target.checked ? C.sel.add(c.id) : C.sel.delete(c.id); draw(); } })),
-          h('td', {}, h('a', { href: '#/customers/' + esc(c.id), class: 'lnk' }, c.name || '(no name)'), c.dnc ? h('span', { class: 'tag red', style: 'margin-left:6px' }, 'DNC') : null), h('td', { class: 'mono' }, c.phone),
+          h('td', {}, h('a', { href: '#/customers/' + esc(c.id), class: 'lnk' }, c.name || '(no name)'), isDnc(c) ? h('span', { class: 'tag red', style: 'margin-left:6px' }, 'DNC') : null), h('td', { class: 'mono' }, c.phone),
           h('td', {}, h('span', { class: 'tag ' + (STAGE_TONE[c.stage || 'new'] || '') }, stageName(c.stage || 'new'))), h('td', {}, c.score ?? '—'),
-          h('td', {}, (c.tags || []).slice(0, 3).map((t) => h('span', { class: 'tag', style: 'margin-right:4px' }, t))), h('td', { class: 'hint' }, c.next_action ? `${(c.next_action.type || '').replaceAll('_', ' ')} ${c.next_action.due_at ? '· ' + when(c.next_action.due_at) : ''}` : '—'), h('td', { class: 'hint' }, c.last_call_at ? when(c.last_call_at) : '—'))))),
+          h('td', {}, (c.tags || []).slice(0, 3).map((t) => h('span', { class: 'tag', style: 'margin-right:4px' }, t))), h('td', { class: 'hint' }, c.next_action ? `${(c.next_action.type || '').replaceAll('_', ' ')} ${c.next_action.due_at ? '· ' + when(c.next_action.due_at) : ''}` : '—'), h('td', { class: 'hint' }, c.last_contact_at ? when(c.last_contact_at) : '—'))))),
       pages > 1 ? h('div', { class: 'row', style: 'justify-content:center;margin-top:14px' }, h('button', { class: 'btn sm', disabled: C.page <= 1, onclick: () => { C.page--; draw(); } }, 'Previous'), h('span', { class: 'hint' }, `Page ${C.page} of ${pages}`), h('button', { class: 'btn sm', disabled: C.page >= pages, onclick: () => { C.page++; draw(); } }, 'Next')) : null));
   };
   el.replaceChildren(h('div', { class: 'pad' }, h('div', { class: 'empty' }, 'Loading…')));
@@ -541,9 +563,9 @@ function bulkBar(list, redraw) {
   const picked = () => list.filter((c) => C.sel.has(c.id));
   const each = async (fn, label) => { let ok = 0, bad = 0; for (const c of picked()) { const r = await fn(c); r.ok ? ok++ : bad++; } C.sel.clear(); toast(`${label}: ${ok} done${bad ? ', ' + bad + ' failed' : ''}`); redraw(); };
   return h('div', { class: 'bulk', role: 'toolbar', 'aria-label': 'Bulk actions' }, h('b', {}, C.sel.size + ' selected'),
-    h('button', { class: 'btn sm', onclick: () => modal('Tag ' + C.sel.size + ' people', null, (b, f, close) => { const t = h('input', { placeholder: 'tag, another tag' }); b.append(fld('Tags to add', t)); f.append(h('button', { class: 'btn pri', onclick: async () => { const add = csv(t.value); close(); await each((c) => post(`/api/customers/${esc(c.id)}`, { ...c, tags: [...new Set([...(c.tags || []), ...add])] }, 'PUT'), 'Tagged'); } }, 'Add tags'), h('button', { class: 'btn ghost', onclick: close }, 'Cancel')); }) }, ic('tag', 'sm'), 'Tag'),
-    h('button', { class: 'btn sm', onclick: async () => { const cs = await campaigns(); modal('Add to a campaign', null, (b, f, close) => { if (!cs.length) { b.append(h('div', { class: 'hint' }, _camps && _camps.na ? 'Campaigns are not available yet.' : 'Create a campaign first.')); f.append(h('button', { class: 'btn', onclick: close }, 'Close')); return; } const s = h('select', {}, cs.map((c) => h('option', { value: c.id }, c.name))); b.append(fld('Campaign', s)); f.append(h('button', { class: 'btn pri', onclick: async () => { const camp = cs.find((c) => c.id === s.value), ids = picked().map((c) => c.id); close(); const aud = { ...(camp.audience || {}), customer_ids: [...new Set([...((camp.audience || {}).customer_ids || []), ...ids])] }; const r = await post(`/api/campaigns/${esc(camp.id)}`, { ...camp, audience: aud }, 'PUT'); C.sel.clear(); r.ok ? toast(ids.length + ' added to ' + camp.name) : notice(r.err); _camps = null; redraw(); } }, 'Add'), h('button', { class: 'btn ghost', onclick: close }, 'Cancel')); }); } }, ic('mega', 'sm'), 'Add to campaign'),
-    h('button', { class: 'btn sm danger', onclick: () => confirmBox('Mark ' + C.sel.size + ' as Do not call?', 'They will never be called by any campaign until you change this on their page.', 'Mark Do not call', () => each((c) => post(`/api/customers/${esc(c.id)}`, { ...c, dnc: true, dnc_reason: 'marked by operator', stage: 'do_not_call' }, 'PUT'), 'Marked'), { danger: true }) }, ic('ban', 'sm'), 'Mark DNC'),
+    h('button', { class: 'btn sm', onclick: () => modal('Tag ' + C.sel.size + ' people', null, (b, f, close) => { const t = h('input', { placeholder: 'tag, another tag' }); b.append(fld('Tags to add', t)); f.append(h('button', { class: 'btn pri', onclick: async () => { const add = csv(t.value); close(); await each((c) => post(`/api/customers/${esc(c.id)}`, { tags: [...new Set([...(c.tags || []), ...add])] }, 'PUT'), 'Tagged'); } }, 'Add tags'), h('button', { class: 'btn ghost', onclick: close }, 'Cancel')); }) }, ic('tag', 'sm'), 'Tag'),
+    h('button', { class: 'btn sm', onclick: async () => { const cs = await campaigns(); modal('Add to a campaign', null, (b, f, close) => { if (!cs.length) { b.append(h('div', { class: 'hint' }, _camps && _camps.na ? 'Campaigns are not available yet.' : 'Create a campaign first.')); f.append(h('button', { class: 'btn', onclick: close }, 'Close')); return; } const s = h('select', {}, cs.map((c) => h('option', { value: c.id }, c.name))); b.append(fld('Campaign', s)); f.append(h('button', { class: 'btn pri', onclick: async () => { const camp = cs.find((c) => c.id === s.value), ids = picked().map((c) => c.id); close(); const aud = { ...(camp.audience || {}), customer_ids: [...new Set([...((camp.audience || {}).customer_ids || []), ...ids])] }; const r = await post(`/api/campaigns/${esc(camp.id)}`, { audience: aud }, 'PUT'); C.sel.clear(); r.ok ? toast(ids.length + ' added to ' + camp.name) : notice(r.err); _camps = null; redraw(); } }, 'Add'), h('button', { class: 'btn ghost', onclick: close }, 'Cancel')); }); } }, ic('mega', 'sm'), 'Add to campaign'),
+    h('button', { class: 'btn sm danger', onclick: () => confirmBox('Mark ' + C.sel.size + ' as Do not call?', 'They will never be called by any campaign. This cannot be undone from here.', 'Mark Do not call', () => each((c) => post(`/api/customers/${esc(c.id)}`, { consent: { dnc: true, reason: 'marked by the operator' } }, 'PUT'), 'Marked'), { danger: true }) }, ic('ban', 'sm'), 'Mark DNC'),
     h('button', { class: 'btn ghost sm', onclick: () => { C.sel.clear(); redraw(); } }, 'Clear'));
 }
 
@@ -555,8 +577,8 @@ async function pageCustomer(el, ctx) {
   if (!ctx.alive()) return;
   if (!r.ok) { el.replaceChildren(h('div', { class: 'pad' }, naBox('This customer', r, () => pageCustomer(el, ctx)))); return; }
   let c = r.data.customer || r.data; setCrumb(c.name || c.phone);
-  const events = tl.ok ? arr(tl.data, 'timeline').concat(tl.data.events || []) : [];
-  const upd = async (patch) => { const x = await post(`/api/customers/${esc(id)}`, { ...c, ...patch }, 'PUT'); if (!x.ok) return notice(x.err); toast('Saved.'); pageCustomer(el, ctx); };
+  const events = tl.ok ? arr(tl.data, 'timeline') : [];
+  const upd = async (patch) => { const x = await post(`/api/customers/${esc(id)}`, patch, 'PUT'); if (!x.ok) return notice(x.err); toast('Saved.'); pageCustomer(el, ctx); };
   const notes = h('textarea', { rows: 4, placeholder: 'Private notes for your team' }, c.notes || c.owner_notes || '');
   const ctSel = h('select', { class: 'inline', 'aria-label': 'Call type' }, h('option', { value: '' }, 'Default call type'), ctOptions(cts).map(([v, n]) => h('option', { value: v, selected: v === (c.next_action || {}).call_type }, n)));
   const camSel = h('select', { class: 'inline', 'aria-label': 'Campaign' }, h('option', { value: '' }, 'No campaign (single call)'), cams.map((x) => h('option', { value: x.id, selected: x.id === (c.next_action || {}).campaign_id }, x.name)));
@@ -565,31 +587,31 @@ async function pageCustomer(el, ctx) {
   const kv = (k, v) => [h('dt', {}, k), h('dd', {}, v == null || v === '' ? '—' : v)];
   el.replaceChildren(h('div', { class: 'pad' },
     head(c.name || c.phone, c.phone + (c.email ? ' · ' + c.email : ''), h('button', { class: 'btn', onclick: () => custForm(c, fields, () => pageCustomer(el, ctx)) }, 'Edit'),
-      c.dnc ? h('span', { class: 'tag red' }, 'Do not call') : [ctSel, camSel, SG.tenantProducts().length > 1 ? prodSel : null, h('button', { class: 'btn pri', onclick: () => { const ct = ctSel.value; callNow(c, { callType: ct, callTypeName: ct ? ctSel.selectedOptions[0].textContent : '', campaignId: camSel.value, productId: prodSel.value || undefined }); } }, ic('phone', 'sm'), 'Call now')]),
+      isDnc(c) ? h('span', { class: 'tag red' }, 'Do not call') : [ctSel, camSel, SG.tenantProducts().length > 1 ? prodSel : null, h('button', { class: 'btn pri', onclick: () => { const ct = ctSel.value; callNow(c, { callType: ct, callTypeName: ct ? ctSel.selectedOptions[0].textContent : '', campaignId: camSel.value, productId: prodSel.value || undefined }); } }, ic('phone', 'sm'), 'Call now')]),
     h('div', { class: 'cols3' },
       h('div', {},
         h('div', { class: 'panel' }, h('div', { class: 'panel-head' }, h('b', {}, 'Pipeline'), h('span', { class: 'tag ' + (STAGE_TONE[c.stage || 'new'] || ''), style: 'margin-left:auto' }, stageName(c.stage || 'new'))),
-          h('div', { class: 'stagebar', role: 'group', 'aria-label': 'Stage' }, STAGES.filter((s) => s !== 'do_not_call').map((s) => h('button', { class: 'stg' + ((c.stage || 'new') === s ? ' on' : ''), 'aria-pressed': String((c.stage || 'new') === s), onclick: () => upd({ stage: s }) }, stageName(s)))),
+          h('div', { class: 'stagebar', role: 'group', 'aria-label': 'Stage' }, STAGES.filter((s) => s !== 'do_not_call').map((s) => h('button', { class: 'stg' + ((c.stage || 'new') === s ? ' on' : ''), disabled: isDnc(c), 'aria-pressed': String((c.stage || 'new') === s), onclick: () => upd({ stage: s }) }, stageName(s)))),
           h('dl', { class: 'kv' }, ...kv('score', c.score != null ? c.score + ' / 100' : null), ...kv('next action', na.type ? `${na.type.replaceAll('_', ' ')}${na.due_at ? ' · ' + when(na.due_at) : ''}${na.call_type ? ' · ' + na.call_type : ''}` : null),
             ...kv('agreed price', hist.agreed_price), ...kv('objections', (hist.objections || []).join(', ')), ...kv('likes', (hist.likes || []).join(', ')), ...kv('source', c.source))),
         h('div', { class: 'panel' }, h('div', { class: 'panel-head' }, h('b', {}, 'Profile')), h('dl', { class: 'kv' }, ...kv('language', c.language), ...kv('city', c.city), ...kv('tags', (c.tags || []).map((t) => h('span', { class: 'tag', style: 'margin-right:4px' }, t))),
           ...fields.map((fd) => kv(fd.label || fd.key, (c.custom || {})[fd.key])).flat())),
         h('div', { class: 'panel' }, h('div', { class: 'panel-head' }, h('b', {}, 'Notes')), h('div', { style: 'padding:12px 16px' }, notes, h('div', { class: 'row', style: 'margin-top:8px' }, h('button', { class: 'btn sm', onclick: () => upd({ notes: notes.value }) }, ic('save', 'sm'), 'Save notes'))),
-          h('div', { style: 'padding:0 16px 14px' }, c.dnc ? h('button', { class: 'btn sm', onclick: () => confirmBox('Allow calls again?', 'Only do this if the person asked to be called again.', 'Allow calls', () => upd({ dnc: false, stage: 'new' })) }, 'Remove Do-not-call') : h('button', { class: 'btn sm danger', onclick: () => confirmBox('Mark as Do not call?', 'They will never be called by any campaign.', 'Mark Do not call', () => upd({ dnc: true, dnc_reason: 'marked by operator', stage: 'do_not_call' }), { danger: true }) }, ic('ban', 'sm'), 'Mark Do not call')))),
+          h('div', { style: 'padding:0 16px 14px' }, isDnc(c) ? h('div', { class: 'hint' }, 'On the Do-not-call list' + ((c.consent || {}).reason ? ': ' + c.consent.reason : '') + '. Only the person asking us again can lift this, so there is no button for it.') : h('button', { class: 'btn sm danger', onclick: () => confirmBox('Mark as Do not call?', 'They will never be called by any campaign. This cannot be undone from here.', 'Mark Do not call', () => upd({ consent: { dnc: true, reason: 'marked by the operator' } }), { danger: true }) }, ic('ban', 'sm'), 'Mark Do not call')))),
       h('div', { class: 'panel' }, h('div', { class: 'panel-head' }, h('b', {}, 'Timeline')),
         !tl.ok ? naBox('The timeline', tl) : events.length ? h('div', { class: 'tline' }, events.map((e) => {
           const t = e.type || (e.call_id ? 'call' : 'note');
-          return h('div', { class: 'tl-item ' + t }, h('div', { class: 'tl-d' }, when(e.at || e.time || e.created_at)),
-            h('div', {}, h('b', {}, t === 'call' ? 'Call' + (e.call_type ? ' · ' + e.call_type.replaceAll('_', ' ') : '') : t === 'stage' ? 'Stage: ' + stageName(e.from || '') + ' to ' + stageName(e.to || e.stage || '') : 'Note'),
-              e.outcome ? h('span', { class: 'tag ' + (/won|book|agree|paid|link/i.test(e.outcome) ? 'green' : /lost|declin|opt|dnc/i.test(e.outcome) ? 'red' : 'amber'), style: 'margin-left:8px' }, e.outcome.replaceAll('_', ' ')) : null,
+          return h('div', { class: 'tl-item ' + t }, h('div', { class: 'tl-d' }, when(e.t || e.at)),
+            h('div', {}, h('b', {}, t === 'call' ? 'Call' + (e.call_type ? ' · ' + e.call_type.replaceAll('_', ' ') : '') : t === 'call_started' ? 'Call started' + (e.call_type ? ' · ' + e.call_type.replaceAll('_', ' ') : '') : t === 'stage' ? 'Stage: ' + stageName(e.from || '') + ' to ' + stageName(e.to || '') : t === 'created' ? 'Added' + (e.source ? ' · ' + e.source : '') : t === 'lead_again' ? 'Came in again · ' + (e.source || '') : 'Note'),
+              e.outcome ? h('span', { class: 'tag ' + (/won|book|accept|agree|paid|link/i.test(e.outcome) ? 'green' : /lost|declin|opt|dnc/i.test(e.outcome) ? 'red' : 'amber'), style: 'margin-left:8px' }, e.outcome.replaceAll('_', ' ')) : null,
               e.summary || e.text ? h('div', { class: 'hint', style: 'margin-top:3px' }, e.summary || e.text) : null,
               e.call_id ? h('a', { class: 'btn sm', style: 'margin-top:6px', href: '#/calls/' + esc(e.call_id) }, ic('tree', 'sm'), 'Open call and info map') : null)); })) : h('div', { class: 'empty' }, 'No history yet.')))));
 }
 
 /* ------------------------------------------------------------ Campaigns */
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-const blankCamp = () => ({ id: '', name: '', product_id: '', call_type_id: '', language: 'hinglish', status: 'draft', dial_mode: 'manual', audience: { stages: [], tags: [], q: '', customer_ids: [] },
-  schedule: { start: proj().calling_hours?.start || '10:00', end: proj().calling_hours?.end || '19:00', days: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'], max_parallel: 1, retries: 2, retry_gap_hours: 24, pacing_seconds: 60 } });
+const blankCamp = () => { const [a, b] = hoursOf(proj()); return { id: '', name: '', product_id: '', call_type_id: '', language: 'hinglish', tone_level: 'mid', status: 'draft', dial_mode: 'manual', audience: { stages: [], tags: [], languages: [], min_score: null, customer_ids: [] },
+  schedule: { window: [a, b], days: [0, 1, 2, 3, 4, 5], max_parallel: 1, pacing_seconds: 60, retry: { max_attempts: 3, retry_after_minutes: 1440, retry_on: ['no_answer', 'voicemail', 'failed'] } } }; };
 const statusTone = { draft: '', running: 'green', paused: 'amber', done: 'blue' };
 async function pageCampaigns(el, ctx) {
   if (ctx.id) return campaignPage(el, ctx);
@@ -599,41 +621,47 @@ async function pageCampaigns(el, ctx) {
   el.replaceChildren(h('div', { class: 'pad' }, head('Campaigns', 'A campaign is who to call, with which call type and product, and when. Dial mode is manual by default: nothing is dialled until you press Call.', h('button', { class: 'btn pri', onclick: () => go('campaigns', { id: 'new' }) }, ic('plus', 'sm'), 'New campaign')),
     bad ? naBox('Campaigns', { na: _camps.na, err: 'The campaigns API did not answer.' }, () => pageCampaigns(el, ctx)) : list.length ? h('div', { class: 'tablewrap' }, h('table', { class: 'tbl' }, h('thead', {}, h('tr', {}, ['Campaign', 'Status', 'Product', 'Call type', 'Dial mode', 'Progress', ''].map((t) => h('th', {}, t)))),
       h('tbody', {}, list.map((c) => { const st = c.stats || {}; return h('tr', {}, h('td', {}, h('a', { class: 'lnk', href: '#/campaigns/' + esc(c.id) }, c.name)), h('td', {}, h('span', { class: 'tag ' + (statusTone[c.status] || '') }, c.status || 'draft')), h('td', {}, SG.pname(c.product_id)), h('td', {}, c.call_type_id || '—'),
-        h('td', {}, h('span', { class: 'tag ' + (c.dial_mode === 'auto' ? 'amber' : '') }, c.dial_mode || 'manual')), h('td', { class: 'hint' }, `${st.called ?? 0} called · ${st.connected ?? 0} connected · ${st.queued ?? st.remaining ?? '—'} to go`),
+        h('td', {}, h('span', { class: 'tag ' + (c.dial_mode === 'auto' ? 'amber' : '') }, c.dial_mode || 'manual')), h('td', { class: 'hint' }, `${st.dialed ?? 0} dialled · ${st.calls ?? 0} finished`),
         h('td', {}, h('button', { class: 'btn sm', onclick: () => toggleCampaign(c, () => pageCampaigns(el, ctx)) }, c.status === 'running' ? [ic('pause', 'sm'), 'Pause'] : [ic('play', 'sm'), 'Start']))); })))) : h('div', { class: 'empty' }, h('b', {}, 'No campaigns yet'), 'Create one to group people, a call type and a schedule.')));
 }
 function toggleCampaign(c, done) {
   const running = c.status === 'running', auto = c.dial_mode === 'auto';
   confirmBox(running ? 'Pause ' + c.name + '?' : 'Start ' + c.name + '?',
-    running ? 'No new calls will be placed. Calls already in progress finish normally.' : auto ? `Dial mode is AUTO: once started, the system places calls by itself inside the calling window (${c.schedule?.start || '?'} to ${c.schedule?.end || '?'}), skipping anyone on Do-not-call. Be sure the audience and the call type are right.` : 'Dial mode is MANUAL: starting only opens the queue. Nothing is dialled until you press Call next to a person in the queue.',
+    running ? 'No new calls will be placed. Calls already in progress finish normally.' : auto ? `Dial mode is AUTO: once started, the system places calls by itself inside the calling window (${(c.schedule && c.schedule.window) ? c.schedule.window.map(hh).join(' to ') : hoursOf(proj()).map(hh).join(' to ')}), skipping anyone on Do-not-call. Be sure the audience and the call type are right.` : 'Dial mode is MANUAL: starting only opens the queue. Nothing is dialled until you press Call next to a person in the queue.',
     running ? 'Pause' : 'Start', async () => { const r = await post(running ? `/api/campaigns/${esc(c.id)}/pause` : `/api/campaigns/${esc(c.id)}/start`); if (!r.ok) notice(r.na ? 'Starting campaigns is not available on this server yet.' : r.err); else toast(running ? 'Paused.' : 'Started.'); _camps = null; done && done(); }, auto && !running ? { type: 'START' } : {});
 }
 function campaignForm(base, o) {
-  const d = { ...blankCamp(), ...clone(base) }; d.audience = { ...blankCamp().audience, ...d.audience }; d.schedule = { ...blankCamp().schedule, ...d.schedule };
+  const B = blankCamp(), d = { ...B, ...clone(base) }; d.audience = { ...B.audience, ...d.audience }; d.schedule = { ...B.schedule, ...d.schedule }; d.schedule.retry = { ...B.schedule.retry, ...(d.schedule.retry || {}) };
+  const win = d.schedule.window || hoursOf(proj());
   const I = (v, a) => h('input', { value: v ?? '', ...(a || {}) });
-  const f = { name: I(d.name), product: h('select', {}, h('option', { value: '' }, 'Choose a product'), SG.tenantProducts().map((p) => h('option', { value: p.id, selected: p.id === d.product_id }, p.product_name))),
-    ct: h('select', {}, ctOptions(o.cts).map(([v, n]) => h('option', { value: v, selected: v === d.call_type_id }, n))), lang: h('select', {}, LANGS.map(([k, n]) => h('option', { value: k, selected: k === d.language }, n))),
-    start: I(d.schedule.start, { type: 'time' }), end: I(d.schedule.end, { type: 'time' }), par: I(d.schedule.max_parallel, { type: 'number', min: 1, max: 20 }), ret: I(d.schedule.retries, { type: 'number', min: 0, max: 10 }), gap: I(d.schedule.retry_gap_hours, { type: 'number', min: 1 }), pace: I(d.schedule.pacing_seconds, { type: 'number', min: 0 }),
-    tone: toneField(d.tone_level), tags: I((d.audience.tags || []).join(', ')), q: I(d.audience.q || '', { placeholder: 'optional text match' }) };
+  const f = { name: I(d.name, { 'aria-label': 'Campaign name' }), product: h('select', { 'aria-label': 'Product' }, h('option', { value: '' }, 'Choose a product'), SG.tenantProducts().map((p) => h('option', { value: p.id, selected: p.id === d.product_id }, p.product_name))),
+    ct: h('select', { 'aria-label': 'Call type' }, ctOptions(o.cts).map(([v, n]) => h('option', { value: v, selected: v === d.call_type_id }, n))), lang: h('select', { 'aria-label': 'Language' }, LANGS.map(([k, n]) => h('option', { value: k, selected: k === d.language }, n))),
+    start: hourSel(win[0], 'Calling window starts', 0, 23), end: hourSel(win[1], 'Calling window ends', 1, 24), par: I(d.schedule.max_parallel, { type: 'number', min: 1, max: 20, 'aria-label': 'Calls at the same time' }), pace: I(d.schedule.pacing_seconds, { type: 'number', min: 0, 'aria-label': 'Seconds between calls' }),
+    tries: I(d.schedule.retry.max_attempts, { type: 'number', min: 1, max: 10, 'aria-label': 'Tries per person' }), gap: I(Math.round(d.schedule.retry.retry_after_minutes / 60 * 10) / 10, { type: 'number', min: 0.1, step: 0.5, 'aria-label': 'Hours between tries' }),
+    tone: toneField(d.tone_level), tags: I((d.audience.tags || []).join(', '), { 'aria-label': 'Tags' }), min: I(d.audience.min_score ?? '', { type: 'number', min: 0, max: 100, placeholder: 'optional', 'aria-label': 'Minimum score' }) };
   const stages = new Set(d.audience.stages || []), days = new Set(d.schedule.days || []);
-  const chipset = (items, set, label) => h('div', { class: 'chips' }, items.map(([k, n]) => h('label', { class: 'chip' }, h('input', { type: 'checkbox', style: 'width:auto;height:auto', checked: set.has(k), onchange: (e) => { e.target.checked ? set.add(k) : set.delete(k); } }), n)));
-  const auto = h('input', { type: 'checkbox', checked: d.dial_mode === 'auto', style: 'width:auto;height:auto' });
-  const collect = () => ({ ...d, name: f.name.value.trim(), product_id: f.product.value, call_type_id: f.ct.value, language: f.lang.value, tone_level: f.tone.sel.value, dial_mode: auto.checked ? 'auto' : 'manual', project_id: S.tenant,
-    audience: { ...d.audience, stages: [...stages], tags: csv(f.tags.value), q: f.q.value.trim() }, schedule: { ...d.schedule, start: f.start.value, end: f.end.value, days: DAYS.filter((x) => days.has(x)), max_parallel: num(f.par.value) || 1, retries: num(f.ret.value) ?? 0, retry_gap_hours: num(f.gap.value) || 24, pacing_seconds: num(f.pace.value) ?? 0 } });
+  const chipset = (items, set, label) => h('div', { class: 'chips', role: 'group', 'aria-label': label }, items.map(([k, n]) => h('label', { class: 'chip' }, h('input', { type: 'checkbox', style: 'width:auto;height:auto', checked: set.has(k), onchange: (e) => { e.target.checked ? set.add(k) : set.delete(k); } }), n)));
+  const auto = h('input', { type: 'checkbox', checked: d.dial_mode === 'auto', style: 'width:auto;height:auto', 'aria-label': 'Automatic dialling' });
+  const collect = () => ({ name: f.name.value.trim(), product_id: f.product.value, call_type_id: f.ct.value, language: f.lang.value, tone_level: f.tone.sel.value, dial_mode: auto.checked ? 'auto' : 'manual', project_id: S.tenant,
+    audience: { ...d.audience, stages: STAGES.filter((s) => stages.has(s)), tags: csv(f.tags.value).map((t) => t.toLowerCase()), min_score: f.min.value === '' ? null : num(f.min.value) },
+    schedule: { ...d.schedule, window: [+f.start.value, +f.end.value], days: [0, 1, 2, 3, 4, 5, 6].filter((x) => days.has(x)), max_parallel: num(f.par.value) || 1, pacing_seconds: num(f.pace.value) ?? 0,
+      retry: { ...d.schedule.retry, max_attempts: Math.max(1, Math.round(num(f.tries.value) || 1)), retry_after_minutes: Math.max(1, Math.round((num(f.gap.value) || 1) * 60)) } } });
   const apply = (p) => {
     if (p.name) f.name.value = p.name; if (p.product_id && [...f.product.options].some((x) => x.value === p.product_id)) f.product.value = p.product_id;
     if (p.call_type_id && [...f.ct.options].some((x) => x.value === p.call_type_id)) f.ct.value = p.call_type_id; if (p.language) f.lang.value = p.language; if (p.tone_level && TONES.some((t) => t[0] === p.tone_level)) { f.tone.sel.value = p.tone_level; f.tone.sel.dispatchEvent(new Event('change')); }
-    const a = p.audience; if (a) { stages.clear(); (a.stages || []).forEach((s) => stages.add(s)); f.tags.value = (a.tags || []).join(', '); f.q.value = a.q || ''; chipsA.replaceWith(chipsA = chipset(STAGES.map((s) => [s, stageName(s)]), stages)); }
-    const s = p.schedule; if (s) { if (s.start) f.start.value = s.start; if (s.end) f.end.value = s.end; if (s.max_parallel) f.par.value = s.max_parallel; if (s.retries != null) f.ret.value = s.retries; if (s.days) { days.clear(); s.days.forEach((x) => days.add(x)); chipsD.replaceWith(chipsD = chipset(DAYS.map((x) => [x, x]), days)); } }
+    const a = p.audience; if (a) { stages.clear(); (a.stages || []).forEach((s) => stages.add(s)); f.tags.value = (a.tags || []).join(', '); f.min.value = a.min_score ?? ''; d.audience = { ...d.audience, languages: a.languages || d.audience.languages }; chipsA.replaceWith(chipsA = chipset(STAGES.map((s) => [s, stageName(s)]), stages, 'Stages')); }
+    const s = p.schedule; if (s) { if (s.window && s.window.length === 2) { f.start.value = s.window[0]; f.end.value = s.window[1]; } if (s.max_parallel) f.par.value = s.max_parallel; if (s.pacing_seconds != null) f.pace.value = s.pacing_seconds;
+      if (s.retry) { if (s.retry.max_attempts) f.tries.value = s.retry.max_attempts; if (s.retry.retry_after_minutes) f.gap.value = Math.round(s.retry.retry_after_minutes / 60 * 10) / 10; }
+      if (s.days) { days.clear(); s.days.forEach((x) => days.add(x)); chipsD.replaceWith(chipsD = chipset(DAYS.map((x, i) => [i, x]), days, 'Days')); } }
   };
-  let chipsA = chipset(STAGES.map((s) => [s, stageName(s)]), stages), chipsD = chipset(DAYS.map((x) => [x, x]), days);
+  let chipsA = chipset(STAGES.map((s) => [s, stageName(s)]), stages, 'Stages'), chipsD = chipset(DAYS.map((x, i) => [i, x]), days, 'Days');
   const section = (t, ...k) => h('div', { class: 'panel', style: 'margin-bottom:16px' }, h('div', { class: 'panel-head' }, h('b', {}, t)), h('div', { style: 'padding:4px 18px 16px' }, k));
-  const el = h('div', {}, aiBox({ kind: 'campaign', placeholder: 'e.g. call everyone interested in the gym plan who has not answered twice, weekday evenings', context: () => ({ project: S.tenant, campaign: collect(), products: SG.tenantProducts().map((p) => ({ id: p.id, name: p.product_name })), calltypes: ctOptions(o.cts).map(([id, name]) => ({ id, name })) }), current: collect, apply }),
+  const el = h('div', {}, aiBox({ kind: 'campaign', keys: ['name', 'call_type_id', 'language', 'audience', 'schedule'], placeholder: 'e.g. call everyone interested in the gym plan who has not answered twice, weekday evenings', context: () => ({ project: S.tenant, campaign: collect(), products: SG.tenantProducts().map((p) => ({ id: p.id, name: p.product_name })), calltypes: ctOptions(o.cts).map(([id, name]) => ({ id, name })) }), current: collect, apply }),
     section('What to call about', fld('Name', f.name), h('div', { class: 'grid2' }, fld('Product', f.product), fld('Call type', f.ct)), fld('Language', f.lang), f.tone.el),
-    section('Audience · who gets called', h('label', { class: 'lbl' }, 'Stages (none ticked = everyone not on Do-not-call)'), chipsA, h('div', { class: 'grid2' }, fld('Tags (any of)', f.tags), fld('Text match', f.q)), (d.audience.customer_ids || []).length ? h('div', { class: 'hint', style: 'margin-top:8px' }, (d.audience.customer_ids || []).length + ' people were added by hand and are always included.') : null),
+    section('Audience · who gets called', h('label', { class: 'lbl' }, 'Stages (none ticked = everyone who is not won, lost or on Do-not-call)'), chipsA, h('div', { class: 'grid2' }, fld('Tags (any of)', f.tags), fld('Minimum score (0-100)', f.min)), (d.audience.customer_ids || []).length ? h('div', { class: 'hint', style: 'margin-top:8px' }, (d.audience.customer_ids || []).length + ' people were added by hand: only they (and who matches the filters above) are called.') : null),
     section('Schedule', h('div', { class: 'grid2' }, fld('Calling window starts', f.start), fld('Calling window ends', f.end)), h('label', { class: 'lbl' }, 'Days'), chipsD,
-      h('div', { class: 'grid2' }, fld('Calls at the same time', f.par), fld('Seconds between calls', f.pace)), h('div', { class: 'grid2' }, fld('Retries when unanswered', f.ret), fld('Hours between retries', f.gap))),
-    section('Dial mode', h('p', { class: 'hint', style: 'margin:8px 0' }, 'Manual (default): you press Call for each person from the queue. Auto places calls by itself inside the calling window and needs an explicit confirmation when the campaign starts.'), h('label', { class: 'chip' }, auto, 'Switch this campaign to automatic dialling')));
+      h('div', { class: 'grid2' }, fld('Calls at the same time', f.par), fld('Seconds between calls', f.pace)), h('div', { class: 'grid2' }, fld('Tries per person when unanswered', f.tries), fld('Hours between tries', f.gap))),
+    section('Dial mode', h('p', { class: 'hint', style: 'margin:8px 0' }, 'Manual (default): you press Call for each person from the queue. Auto places calls by itself inside the calling window; it needs your explicit confirmation when you save, and the server must also have automatic dialling switched on.'), h('label', { class: 'chip' }, auto, 'Switch this campaign to automatic dialling')));
   return { el, collect };
 }
 async function campaignPage(el, ctx) {
@@ -643,14 +671,17 @@ async function campaignPage(el, ctx) {
   if (!base) { el.replaceChildren(h('div', { class: 'pad' }, naBox('This campaign', _camps && !_camps.ok ? { na: _camps.na, err: 'The campaigns API did not answer.' } : { err: 'Not found' }))); return; }
   setCrumb(base.name || 'New campaign');
   const form = campaignForm(base, { cts }), err = h('div', { class: 'err' });
-  const save = async () => {
-    const o = form.collect(); err.textContent = '';
-    if (!o.name) { err.textContent = 'Give the campaign a name.'; return; } if (!o.product_id) { err.textContent = 'Pick a product.'; return; }
-    if (isNew) o.id = slug(o.name) + '-' + Date.now().toString(36).slice(-4);
+  const doSave = async (o) => {
     const r = await saveObj('/api/campaigns', isNew ? '' : base.id, o);
     if (!r.ok) { err.textContent = r.na ? 'Saving campaigns is not available on this server yet.' : r.err; return; }
     _camps = null; toast('Saved.'); const saved = r.data.campaign || r.data;
-    if (ctx.q.get('return') === 'onboarding') { const st = obLoad(S.tenant); st.campaignId = saved.id || o.id; await obSave(st); go('onboarding'); } else go('campaigns', { id: saved.id || o.id });
+    if (ctx.q.get('return') === 'onboarding') { const st = obLoad(S.tenant); st.campaignId = saved.id; await obSave(st); go('onboarding'); } else go('campaigns', { id: saved.id });
+  };
+  const save = async () => {
+    const o = form.collect(); err.textContent = '';
+    if (!o.name) { err.textContent = 'Give the campaign a name.'; return; } if (!o.product_id) { err.textContent = 'Pick a product.'; return; }
+    if (o.dial_mode === 'auto' && base.dial_mode !== 'auto') return confirmBox('Switch to automatic dialling?', 'Once this campaign is started the system places calls by itself inside the calling window, skipping anyone on Do-not-call. You confirm this now and again when you start it.', 'Yes, allow automatic dialling', () => doSave({ ...o, confirm_auto: true }), { danger: true });
+    await doSave(o);
   };
   const running = base.status === 'running';
   el.replaceChildren(h('div', { class: 'pad narrow' }, head(isNew ? 'New campaign' : base.name, isNew ? '' : null, h('span', { class: 'tag ' + (statusTone[base.status] || '') }, base.status || 'draft'),
@@ -663,29 +694,31 @@ function queueView(c) {
   const box = h('div', {}, h('div', { class: 'empty' }, 'Loading the queue…'));
   tryApi(`/api/campaigns/${esc(c.id)}/queue`).then((r) => {
     if (!r.ok) { box.replaceChildren(naBox('The queue', r)); return; }
-    const q = arr(r.data, 'queue').concat(r.data.items || []);
-    box.replaceChildren(h('p', { class: 'hint', style: 'margin:12px 0' }, c.dial_mode === 'auto' ? 'Automatic dialling: this is the order calls will be placed in.' : 'Manual dialling: nothing is placed until you press Call next to a person.'),
-      q.length ? h('div', { class: 'tablewrap' }, h('table', { class: 'tbl' }, h('thead', {}, h('tr', {}, ['#', 'Who', 'Why they are here', 'Call type', ''].map((t) => h('th', {}, t)))), h('tbody', {}, q.map((x, i) => h('tr', {}, h('td', { class: 'mono' }, x.position ?? i + 1),
-        h('td', {}, h('a', { class: 'lnk', href: '#/customers/' + esc(x.customer_id || x.id) }, x.name || x.phone), h('div', { class: 'hint' }, x.phone || '')), h('td', {}, x.reason || x.why || '—'), h('td', { class: 'hint' }, x.call_type || c.call_type_id || '—'),
-        h('td', {}, h('button', { class: 'btn sm', onclick: () => callNow({ id: x.customer_id || x.id, name: x.name, phone: x.phone, language: x.language }, { campaignId: c.id, callType: x.call_type || c.call_type_id }) }, ic('phone', 'sm'), 'Call'))))))) : h('div', { class: 'empty' }, h('b', {}, 'Nobody is queued'), 'Add customers matching the audience, or adjust the audience.'));
+    const d = r.data, q = d.eligible || [], w = d.window || {}, sk = (d.skipped || []).length;
+    const win = (w.window ? hh(w.window[0]) + '–' + hh(w.window[1]) + ' ' + (w.timezone || '') : '') + (w.open ? ': open now' : w.next_open_at ? ': next opens ' + when(w.next_open_at) : '');
+    box.replaceChildren(h('p', { class: 'hint', style: 'margin:12px 0' }, (c.dial_mode === 'auto' ? 'Automatic dialling: this is the order calls will be placed in.' : 'Manual dialling: nothing is placed until you press Call next to a person.') + (win ? ' Calling window ' + win + '.' : '') + (c.status === 'running' ? '' : ' The campaign is not running (' + (d.status || c.status) + ').')),
+      q.length ? h('div', { class: 'tablewrap' }, h('table', { class: 'tbl' }, h('thead', {}, h('tr', {}, ['#', 'Who', 'Why they are here', 'Call type', ''].map((t) => h('th', {}, t)))), h('tbody', {}, q.map((x, i) => h('tr', {}, h('td', { class: 'mono' }, i + 1),
+        h('td', {}, h('a', { class: 'lnk', href: '#/customers/' + esc(x.customer_id) }, x.name || x.phone), h('div', { class: 'hint' }, x.phone || '')), h('td', {}, x.reason || '—'), h('td', { class: 'hint' }, x.call_type || c.call_type_id || '—'),
+        h('td', {}, h('button', { class: 'btn sm', onclick: () => callNow({ id: x.customer_id, name: x.name, phone: x.phone, language: x.language }, { campaignId: c.id, callType: x.call_type || c.call_type_id }) }, ic('phone', 'sm'), 'Call'))))))) : h('div', { class: 'empty' }, h('b', {}, 'Nobody is queued'), 'Add customers matching the audience, or adjust the audience.' + (sk ? ' ' + sk + ' people are held back (Do-not-call, stage, score or waiting for a retry).' : '')));
   });
   return box;
 }
 
 /* ------------------------------------------------------------ Follow-ups */
 const FU = { due: 'today' };
+const FU_TABS = [['now', 'Due now'], ['today', 'By end of today'], ['week', 'This week'], ['all', 'All scheduled']];
 async function pageFollowups(el, ctx) {
   const load = async () => {
     el.replaceChildren(h('div', { class: 'pad' }, h('div', { class: 'empty' }, 'Loading…')));
     const r = await tryApi('/api/followups?' + qs({ project: S.tenant, due: FU.due })); if (!ctx.alive()) return;
     const list = r.ok ? arr(r.data, 'followups') : [];
     el.replaceChildren(h('div', { class: 'pad' }, head('Follow-ups', 'Calls the agent promised or that are worth making, from the outcome of earlier calls. One click starts the call.'),
-      tabs([['overdue', 'Overdue'], ['today', 'Due today'], ['upcoming', 'Upcoming']], FU.due, (t) => { FU.due = t; load(); }),
+      tabs(FU_TABS, FU.due, (t) => { FU.due = t; load(); }),
       !r.ok ? naBox('Follow-ups', r, load) : list.length ? h('div', { class: 'tablewrap' }, h('table', { class: 'tbl' }, h('thead', {}, h('tr', {}, ['Who', 'Due', 'Why', 'Call type', ''].map((t) => h('th', {}, t)))), h('tbody', {}, list.map((x) => {
-        const cu = x.customer || { id: x.customer_id, name: x.name, phone: x.phone, language: x.language }, na = x.next_action || x;
-        return h('tr', {}, h('td', {}, h('a', { class: 'lnk', href: '#/customers/' + esc(cu.id) }, cu.name || cu.phone), h('div', { class: 'hint' }, cu.phone || '')), h('td', { class: FU.due === 'overdue' ? 'late' : '' }, when(na.due_at || x.due_at)), h('td', {}, x.reason || x.why || (na.type || '').replaceAll('_', ' ') || '—'), h('td', { class: 'hint' }, na.call_type || 'follow_up'),
+        const cu = { id: x.customer_id, name: x.name, phone: x.phone, language: x.language }, na = x.next_action || {};
+        return h('tr', {}, h('td', {}, h('a', { class: 'lnk', href: '#/customers/' + esc(cu.id) }, cu.name || cu.phone), h('div', { class: 'hint' }, cu.phone || '')), h('td', { class: x.overdue ? 'late' : '' }, when(x.due_at || na.due_at) + (na.due_estimated ? ' (estimated)' : '')), h('td', {}, na.note || (na.type || '').replaceAll('_', ' ') || '—'), h('td', { class: 'hint' }, na.call_type || 'follow_up'),
           h('td', {}, h('button', { class: 'btn pri sm', onclick: () => callNow(cu, { campaignId: na.campaign_id, callType: na.call_type || 'follow_up', callTypeName: 'a follow-up call' }) }, ic('phone', 'sm'), 'Start call')));
-      })))) : h('div', { class: 'empty' }, h('b', {}, 'Nothing ' + (FU.due === 'overdue' ? 'overdue' : FU.due === 'today' ? 'due today' : 'coming up')), 'Follow-ups appear here after calls where someone asked to be called back or a link was sent.')));
+      })))) : h('div', { class: 'empty' }, h('b', {}, 'Nothing here'), 'Follow-ups appear here after calls where someone asked to be called back or a link was sent.')));
   };
   await load();
 }
@@ -695,7 +728,7 @@ async function pageSettings(el, ctx) {
   const tab = ctx.q.get('tab') || 'customization', p = proj();
   const body = h('div');
   el.replaceChildren(h('div', { class: 'pad narrow' }, head('Settings', 'Make the system fit how ' + p.name + ' works.'), tabs([['customization', 'Customization'], ['project', 'Project']], tab, (t) => go('settings', { query: { tab: t } })), body));
-  const saveProject = async (patch, msg) => { const r = await saveObj('/api/projects', p.id, { ...p, ...patch }); if (!r.ok && !r.na) return notice(r.err); if (r.na && !S.projectsApi) { const r2 = await post('/api/tenants/' + esc(p.id), { name: patch.name || p.name, color: patch.color || p.color }, 'PUT'); if (!r2.ok) return notice(r2.err); } Object.assign(p, patch); toast(msg || 'Saved.'); if (r.na) toast('Saved on this screen only: the projects API is not available yet.'); };
+  const saveProject = async (patch, msg) => { const r = await saveObj('/api/projects', p.id, patch); if (!r.ok && !r.na) return notice(r.err); if (r.na && !S.projectsApi) { const r2 = await post('/api/tenants/' + esc(p.id), { name: patch.name || p.name, color: patch.color || p.color }, 'PUT'); if (!r2.ok) return notice(r2.err); } Object.assign(p, patch); toast(msg || 'Saved.'); if (r.na) toast('Saved on this screen only: the projects API is not available yet.'); };
   if (tab === 'project') return projectTab(body, p, saveProject);
   const [fields, cts] = [await fieldDefs(), await calltypes()]; if (!ctx.alive()) return;
   /* custom fields */
@@ -703,13 +736,14 @@ async function pageSettings(el, ctx) {
   const drawF = () => flist.replaceChildren(...fs.map((fd, i) => h('div', { class: 'frow' }, h('input', { value: fd.label || '', placeholder: 'Label, e.g. Budget', 'aria-label': 'Field label', oninput: (e) => { fd.label = e.target.value; if (!fd._saved) fd.key = slug(e.target.value).replaceAll('-', '_'); } }),
     h('select', { 'aria-label': 'Field type', onchange: (e) => { fd.type = e.target.value; drawF(); } }, ['text', 'number', 'date', 'choice'].map((t) => h('option', { value: t, selected: (fd.type || 'text') === t }, t))),
     h('select', { 'aria-label': 'Applies to', onchange: (e) => { fd.applies_to = e.target.value; } }, [['both', 'Customers and leads'], ['customer', 'Customers'], ['lead', 'Leads']].map(([v, n]) => h('option', { value: v, selected: (fd.applies_to || 'both') === v }, n))),
-    fd.type === 'choice' ? h('input', { value: (fd.options || []).join(', '), placeholder: 'options, comma separated', 'aria-label': 'Options', oninput: (e) => { fd.options = csv(e.target.value); } }) : h('span', { class: 'hint mono' }, fd.key || ''),
+    fd.type === 'choice' ? h('input', { value: (fd.choices || []).join(', '), placeholder: 'options, comma separated', 'aria-label': 'Options', oninput: (e) => { fd.choices = csv(e.target.value); } }) : h('span', { class: 'hint mono' }, fd.key || ''),
     h('button', { class: 'btn ghost sm danger', 'aria-label': 'Remove field', onclick: () => { fs.splice(i, 1); drawF(); } }, ic('trash', 'sm')))));
   drawF();
   const saveFields = async () => {
     const keep = new Set(fs.map((x) => x.key)); let bad = null;
     for (const old of fields) if (!keep.has(old.key)) { const r = await tryApi(`/api/projects/${esc(p.id)}/fields/${esc(old.key)}`, { method: 'DELETE' }); if (!r.ok) bad = r; }
-    for (const fd of fs) { if (!fd.key) continue; const { _saved, ...o } = fd; const r = await post(`/api/projects/${esc(p.id)}/fields`, o); if (!r.ok) bad = r; }
+    const had = new Set(fields.map((x) => x.key));
+    for (const fd of fs) { if (!fd.key) continue; const { _saved, ...o } = fd; const r = had.has(fd.key) ? await post(`/api/projects/${esc(p.id)}/fields/${esc(fd.key)}`, o, 'PUT') : await post(`/api/projects/${esc(p.id)}/fields`, o); if (!r.ok) bad = r; }
     bad ? notice(bad.na ? 'Custom fields are not available on this server yet.' : bad.err) : (toast('Fields saved.'), pageSettings(el, ctx));
   };
   const stageIn = {}, dc = { ...(p.default_calltypes || {}) };
@@ -727,14 +761,14 @@ async function pageSettings(el, ctx) {
 function projectTab(body, p, save) {
   const I = (v, a) => h('input', { value: v ?? '', ...(a || {}) });
   const tzs = (typeof Intl.supportedValuesOf === 'function' ? Intl.supportedValuesOf('timeZone') : ['Asia/Kolkata', 'UTC']);
-  const f = { name: I(p.name), color: I(p.color || '#4f7cff', { type: 'color', style: 'width:64px;padding:2px' }), tz: h('select', {}, tzs.map((z) => h('option', { value: z, selected: z === (p.timezone || 'Asia/Kolkata') }, z))), s: I((p.calling_hours || {}).start || '10:00', { type: 'time' }), e: I((p.calling_hours || {}).end || '19:00', { type: 'time' }), notes: h('textarea', { rows: 3 }, p.compliance_notes || '') };
+  const f = { name: I(p.name), color: I(p.color || '#4f7cff', { type: 'color', style: 'width:64px;padding:2px' }), tz: h('select', {}, tzs.map((z) => h('option', { value: z, selected: z === (p.timezone || 'Asia/Kolkata') }, z))), s: hourSel(hoursOf(p)[0], 'Calling hours start', 0, 23), e: hourSel(hoursOf(p)[1], 'Calling hours end', 1, 24), notes: h('textarea', { rows: 3 }, p.compliance_notes || '') };
   const langs = new Set(p.languages || ['en', 'hi', 'hinglish']);
   const webhook = `${location.origin}/api/leads/webhook/${esc(p.id)}${p.webhook_token ? '?token=' + esc(p.webhook_token) : ''}`;
   body.replaceChildren(h('div', { class: 'panel' }, h('div', { class: 'panel-head' }, h('b', {}, 'Project basics')), h('div', { style: 'padding:4px 18px 16px' },
     h('div', { class: 'grid2' }, fld('Name', f.name), fld('Colour', f.color)), fld('Languages', h('div', { class: 'chips' }, LANGS.map(([k, n]) => h('label', { class: 'chip' }, h('input', { type: 'checkbox', style: 'width:auto;height:auto', checked: langs.has(k), onchange: (e) => { e.target.checked ? langs.add(k) : langs.delete(k); } }), n)))),
     fld('Time zone', f.tz), h('div', { class: 'grid2' }, fld('Calling hours start', f.s), fld('Calling hours end', f.e)), fld('Compliance notes', f.notes, 'Anything the agent must always respect for this business.'),
     fld('Lead webhook URL', h('div', { class: 'row' }, I(webhook, { readonly: true, class: 'mono', 'aria-label': 'Webhook URL' }), h('button', { class: 'btn sm', onclick: () => { navigator.clipboard && navigator.clipboard.writeText(webhook); toast('Copied.'); } }, ic('copy', 'sm'), 'Copy')), p.webhook_token ? 'POST a JSON lead (name, phone, …) to this link from your website or ad form.' : 'The server adds the secret token to this link once the CRM API is on. Keep the link private.'),
-    h('div', { class: 'row', style: 'margin-top:14px' }, h('button', { class: 'btn pri', onclick: () => save({ name: f.name.value.trim() || p.name, color: f.color.value, languages: [...langs], timezone: f.tz.value, calling_hours: { start: f.s.value, end: f.e.value }, compliance_notes: f.notes.value }).then(() => SG.loadTenants().then(() => refresh())) }, ic('save', 'sm'), 'Save')))));
+    h('div', { class: 'row', style: 'margin-top:14px' }, h('button', { class: 'btn pri', onclick: () => save({ name: f.name.value.trim() || p.name, color: f.color.value, languages: [...langs], timezone: f.tz.value, call_hours: [+f.s.value, +f.e.value], compliance_notes: f.notes.value }).then(() => SG.loadTenants().then(() => refresh())) }, ic('save', 'sm'), 'Save')))));
 }
 
 /* ------------------------------------------------------------ Onboarding wizard (resumable) */
@@ -759,17 +793,17 @@ async function pageOnboarding(el, ctx) {
 }
 const sec2 = (t, d) => h('div', { class: 'dh' }, h('h3', {}, t), d ? h('p', {}, d) : null);
 function ob1(body, st, o) {
-  const p = S.tenants.find((t) => t.id === st.projectId), b = { name: '', languages: ['en', 'hi', 'hinglish'], timezone: 'Asia/Kolkata', start: '10:00', end: '19:00', ...(p ? { name: p.name, languages: p.languages || ['en', 'hi', 'hinglish'], timezone: p.timezone || 'Asia/Kolkata', start: (p.calling_hours || {}).start || '10:00', end: (p.calling_hours || {}).end || '19:00' } : {}), ...(st.basics || {}) };
+  const p = S.tenants.find((t) => t.id === st.projectId), b = { name: '', languages: ['en', 'hi', 'hinglish'], timezone: 'Asia/Kolkata', start: 10, end: 20, ...(p ? { name: p.name, languages: p.languages || ['en', 'hi', 'hinglish'], timezone: p.timezone || 'Asia/Kolkata', start: hoursOf(p)[0], end: hoursOf(p)[1] } : {}), ...(st.basics || {}) };
   const tzs = typeof Intl.supportedValuesOf === 'function' ? Intl.supportedValuesOf('timeZone') : ['Asia/Kolkata', 'UTC'];
   const name = h('input', { value: b.name, placeholder: 'e.g. FitZone Gym', 'aria-label': 'Project name' }), tz = h('select', {}, tzs.map((z) => h('option', { value: z, selected: z === b.timezone }, z)));
-  const s = h('input', { type: 'time', value: b.start }), e = h('input', { type: 'time', value: b.end }), langs = new Set(b.languages), err = h('div', { class: 'err' });
+  const s = hourSel(+b.start, 'Calling hours start', 0, 23), e = hourSel(+b.end, 'Calling hours end', 1, 24), langs = new Set(b.languages), err = h('div', { class: 'err' });
   body.append(sec2('1. Project basics', 'A project is one business or brand the agent calls for.'), h('div', { class: 'db' }, fld('Project name', name),
     fld('Languages the agent may use', h('div', { class: 'chips' }, LANGS.map(([k, n]) => h('label', { class: 'chip' }, h('input', { type: 'checkbox', style: 'width:auto;height:auto', checked: langs.has(k), onchange: (ev) => { ev.target.checked ? langs.add(k) : langs.delete(k); } }), n)))),
     fld('Time zone', tz), h('div', { class: 'grid2' }, fld('Calling hours start', s), fld('Calling hours end', e), ), h('div', { class: 'hint', style: 'margin-top:6px' }, 'The agent never calls outside these hours.'), err),
     o.nav(true, async () => {
       if (!name.value.trim()) { err.textContent = 'Name the project first.'; return; }
-      const basics = { name: name.value.trim(), languages: [...langs], timezone: tz.value, calling_hours: { start: s.value, end: e.value } };
-      st.basics = { name: basics.name, languages: basics.languages, timezone: basics.timezone, start: s.value, end: e.value };
+      const basics = { name: name.value.trim(), languages: [...langs], timezone: tz.value, call_hours: [+s.value, +e.value] };
+      st.basics = { name: basics.name, languages: basics.languages, timezone: basics.timezone, start: +s.value, end: +e.value };
       if (!st.projectId) {
         const id = slug(basics.name) || 'project-' + Date.now().toString(36);
         let r = await saveObj('/api/projects', '', { id, color: '#4f7cff', ...basics });
@@ -777,7 +811,7 @@ function ob1(body, st, o) {
         if (!r.ok) { err.textContent = r.err || 'Could not create the project.'; return; }
         try { localStorage.removeItem(obKey('')); } catch {}
         st.projectId = id; await SG.loadTenants(); S.tenant = id; store.set('sg_tenant', id);
-      } else await saveObj('/api/projects', st.projectId, { ...(p || {}), id: st.projectId, ...basics });
+      } else { const r = await saveObj('/api/projects', st.projectId, basics); if (!r.ok && !r.na) { err.textContent = r.err; return; } }
       await SG.loadTenants(); o.next(2);
     }));
 }
@@ -797,8 +831,8 @@ async function ob3(body, st, o) {
       h('b', {}, c.name || c.id), h('p', { class: 'hint', style: 'margin:6px 0' }, c.objective || (c.builtin ? 'Built in' : 'Custom')), h('button', { class: 'btn sm', onclick: (e) => { e.preventDefault(); go('calltypes', { id: c.id, query: { return: 'onboarding' } }); } }, c.builtin ? 'View steps' : 'Customise steps')))),
     h('div', { class: 'sec-lbl', style: 'margin:18px 0 6px' }, 'Or describe it'), draft),
     o.nav(!!st.calltypeId, () => o.next(4)));
-  draft.append(aiBox({ kind: 'calltype', placeholder: 'e.g. call people who got the payment link but did not pay, remind them kindly and offer help', context: () => ({ project: S.tenant, calltype: blankCT() }), current: blankCT,
-    apply: async (p) => { const ct = { ...blankCT(), ...p, project_id: S.tenant }; ct.id = slug(ct.name || 'custom-call') + '-' + Date.now().toString(36).slice(-3); ct.steps = (ct.steps || []).map((s, i) => ({ id: s.id || 'step_' + (i + 1), answer_type: 'text', required: false, ...s, text: typeof s.text === 'string' ? { en: s.text } : s.text || {} })); st.draftCT = ct; draft.append(h('div', { class: 'row', style: 'margin-top:10px' }, h('button', { class: 'btn pri', onclick: async () => { const r = await saveObj('/api/calltypes', '', st.draftCT); if (!r.ok) return notice(r.na ? 'Saving call types is not available yet.' : r.err); _cts = null; st.calltypeId = st.draftCT.id; delete st.draftCT; await obSave(st); o.draw(); } }, ic('save', 'sm'), 'Save as a new call type'), h('span', { class: 'hint' }, 'Review it first, or save and edit the steps afterwards.'))); } }));
+  draft.append(aiBox({ kind: 'calltype', keys: ['name', 'objective', 'opening', 'steps', 'allowed_actions', 'success_outcomes', 'closing', 'tone', 'max_call_seconds', 'selling_allowed', 'negotiation_allowed', 'compliance_lines'], placeholder: 'e.g. call people who got the payment link but did not pay, remind them kindly and offer help', context: () => ({ project: S.tenant, calltype: blankCT() }), current: blankCT,
+    apply: async (p) => { const ct = { ...blankCT(), ...p, project_id: S.tenant }; delete ct.id; ct.name = ct.name || 'Custom call'; ct.steps = (ct.steps || []).map((s, i) => ({ id: s.id || 'step_' + (i + 1), answer_type: 'text', required: false, ...s, text: typeof s.text === 'string' ? { en: s.text } : s.text || {} })); st.draftCT = ct; draft.append(h('div', { class: 'row', style: 'margin-top:10px' }, h('button', { class: 'btn pri', onclick: async () => { const r = await saveObj('/api/calltypes', '', st.draftCT); if (!r.ok) return notice(r.na ? 'Saving call types is not available yet.' : r.err); _cts = null; st.calltypeId = (r.data.calltype || r.data).id; delete st.draftCT; await obSave(st); o.draw(); } }, ic('save', 'sm'), 'Save as a new call type'), h('span', { class: 'hint' }, 'Review it first, or save and edit the steps afterwards.'))); } }));
 }
 function ob4(body, st, o) {
   let mode = st.custMode || 'csv'; const area = h('div');
@@ -818,10 +852,10 @@ async function ob5(body, st, o) {
   body.append(sec2('5. Campaign', 'Who to call, when, with which call type and product. Dial mode stays manual: nothing is called until you decide.'), h('div', { class: 'db' }, form.el, err),
     o.nav(true, async () => {
       const c = form.collect(); if (!c.name) { err.textContent = 'Name the campaign.'; return; } if (!c.product_id) { err.textContent = 'Pick a product.'; return; }
-      if (!st.campaignId) c.id = slug(c.name) + '-' + Date.now().toString(36).slice(-4);
+      c.dial_mode = 'manual';
       const r = await saveObj('/api/campaigns', st.campaignId || '', c);
       if (!r.ok) { if (r.na) { err.textContent = 'Campaigns are not available on this server yet. You can skip this step and come back.'; return; } err.textContent = r.err; return; }
-      st.campaignId = (r.data.campaign || r.data).id || c.id; _camps = null; st.productId = c.product_id; st.calltypeId = c.call_type_id || st.calltypeId; o.next(6);
+      st.campaignId = (r.data.campaign || r.data).id; _camps = null; st.productId = c.product_id; st.calltypeId = c.call_type_id || st.calltypeId; o.next(6);
     }, 'Save and test'));
   const skip = h('button', { class: 'btn ghost sm', onclick: () => o.next(6) }, 'Skip this step'); body.querySelector('.df').insertBefore(skip, body.querySelector('.df').children[1] || null);
 }
@@ -894,7 +928,7 @@ const css = `
 .bulk{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 12px;margin-bottom:10px;border:1px solid hsl(var(--signal)/.5);border-radius:10px;background:hsl(var(--signal)/.07)}
 .board{display:flex;gap:12px;overflow-x:auto;padding-bottom:12px;align-items:flex-start}.col{flex:0 0 230px;min-height:120px;border:1px solid hsl(var(--rule));border-radius:10px;background:hsl(var(--panel));padding:8px}.col.over{border-color:hsl(var(--signal))}
 .col-h{display:flex;align-items:center;justify-content:space-between;padding:4px 4px 8px}
-.kcard{padding:9px 10px;margin-bottom:8px;border:1px solid hsl(var(--rule-strong));border-radius:8px;background:hsl(var(--bg));cursor:grab}.kcard .kn{font-weight:500;color:hsl(var(--fg));text-decoration:none}.kcard .mv{margin-top:6px;width:100%;height:26px;font-size:11.5px}
+.kcard{padding:9px 10px;margin-bottom:8px;border:1px solid hsl(var(--rule-strong));border-radius:8px;background:hsl(var(--bg));cursor:grab}.kcard.locked{cursor:not-allowed;opacity:.75}.kcard .kn{font-weight:500;color:hsl(var(--fg));text-decoration:none}.kcard .mv{margin-top:6px;width:100%;height:26px;font-size:11.5px}
 .stagebar{display:flex;flex-wrap:wrap;gap:6px;padding:12px 16px}.stg{height:26px;padding:0 10px;border:1px solid hsl(var(--rule-strong));border-radius:999px;background:none;color:hsl(var(--muted));cursor:pointer;font-size:11.5px}.stg.on{background:hsl(var(--signal));border-color:hsl(var(--signal));color:hsl(220 10% 6%)}
 .tline{padding:6px 16px 14px}.tl-item{position:relative;padding:10px 0 10px 18px;border-left:2px solid hsl(var(--rule-strong));margin-left:6px}.tl-item::before{content:'';position:absolute;left:-6px;top:15px;width:10px;height:10px;border-radius:50%;background:hsl(var(--panel));border:2px solid hsl(var(--signal))}.tl-d{font-family:var(--mono);font-size:10px;color:hsl(var(--tertiary))}
 .ai{margin:0 0 16px;padding:12px 14px;border:1px solid hsl(var(--violet)/.5);border-radius:10px;background:hsl(var(--violet)/.06)}.ai-h{display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap}.ai-h svg{color:hsl(var(--violet))}

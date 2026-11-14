@@ -50,6 +50,9 @@ class Project(BaseModel):
     compliance_notes: str = ""
     fields: list[FieldDef] = Field(default_factory=list)
     webhook_token: str = ""  # lead webhook secret; generated on create, shown only to admins
+    stages: dict[str, str] = Field(default_factory=dict)  # operator's own names for the pipeline stages {stage: label}; order/meaning never change
+    default_calltypes: dict[str, str] = Field(default_factory=dict)  # {lead|follow_up|payment|default: call type id}
+    onboarding: dict[str, Any] = Field(default_factory=dict)  # the console's resumable setup-wizard state
     created_at: float = Field(default_factory=time.time)
 
     @field_validator("id")
@@ -167,6 +170,7 @@ class Campaign(BaseModel):
     schedule: Schedule = Field(default_factory=Schedule)
     status: Literal["draft", "running", "paused", "done"] = "draft"
     dial_mode: Literal["manual", "auto"] = "manual"  # auto needs the explicit operator switch (see api.py)
+    tone_level: Literal["professional", "mid", "casual"] = "mid"  # stored per campaign; the console's Tone dropdown
     auto_confirmed: bool = False
     stats: dict[str, int] = Field(default_factory=dict)
     created_at: float = Field(default_factory=time.time)
