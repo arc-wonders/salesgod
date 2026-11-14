@@ -191,6 +191,30 @@ _HYPER_RAW = frozenset(normalize(w) for w in (
 _FILLER = _set("hi to bhi ho hai he ki ka ke ko")  # tolerated between "mar" and "jaun"
 
 
+# Everyday words (mostly English loanwords written in Devanagari, plus bol/khud/bas) whose phonetic skeleton collides with a
+# method / place word: ऑफ़िस = PIS = vish (poison), बोल = PUR = pul (bridge), खुद = KUJ = kud (jump). They never carry a method
+# concept (gate run 4: "ऑफ़िस से आकर" was a poison concern; "खुद आकर देख लूंगा" a jump). "khud" still counts for "khud ko ...".
+_BENIGN_RAW = frozenset(normalize(w) for w in (
+    "ऑफ़िस ऑफिस ऑफीस आफिस ऑफ़र ऑफर office offis offer ofis पॉलिसी पालिसी policy सर्विस सर्विसेज service services बस bus फ़ीस फीस fees fee "
+    "प्लान plan पैकेज package पास pass बैच batch बोल बोलो बोला बोली बोलना bol bolo bola boli bolna बात baat बाद baad बार bar baar "
+    "खुद khud sector सेक्टर सिस्टम system बिल bill ट्रायल trial फ्री free पोज़िशन position एक्सेस access कार्ड card कैश cash "
+    "वीज़ा visa ऐप app ऐपल apple स्कूल school पूल pool फील feel फ़ील मॉल mall सेशन session लेसन lesson मिल mil पल pal "
+    "पुल्स पुश push पुश-अप पीएफ pf").split())
+_METHOD_SKEL_CONCEPTS_NEED_RAW = True
+
+
+def _scrub_benign(tok: list[str], raw: list[str]) -> list[str]:
+    """Skeletons with the benign everyday words blanked out, for the method concepts (poison / jump / place / train)."""
+    return ["-" if (i < len(raw) and raw[i] in _BENIGN_RAW) else t for i, t in enumerate(tok)]
+
+
+def _poison_verb_ok(raw_w: str, sk: str) -> bool:
+    """A 1-2 consonant verb skeleton (KR = खाकर, P = पी) is only the poison verb when the word really starts like it."""
+    if len(sk) > 2:
+        return True
+    return raw_w[:1] in ("kh", "खा", "ख", "p", "प") or raw_w.startswith(("kh", "pi", "pe", "pee", "ख", "प"))
+
+
 def _idx(tok: list[str], conc) -> list[int]:
     return [i for i, t in enumerate(tok) if t in conc]
 
@@ -321,7 +345,8 @@ def _evidence(tok: list[str], turn: list[int], hyper: set[int], raw: list[str]) 
         for j in MAR + _idx(tok, _DIEV):
             if 0 < j - i <= 3:
                 add("ideation", 0.9, j, "khud_ko_maar", True)
-    # 4. methods
+    # 4. methods (matched on the scrubbed skeletons, see _BENIGN_RAW)
+    tok_all, tok = tok, _scrub_benign(tok, raw)
     JUMP = sorted(set(_idx(tok, _JUMP) + [i for i, r in enumerate(raw) if r in _JUMP_RAW]))
     TRAIN = sorted(set(_idx(tok, _TRAIN) + [i for i, r in enumerate(raw) if r in _TRAIN_RAW]))
     PLACE = sorted(set(_idx(tok, _PLACE) + [i for i, r in enumerate(raw) if r in _PLACE_RAW] + TRAIN))
@@ -341,8 +366,9 @@ def _evidence(tok: list[str], turn: list[int], hyper: set[int], raw: list[str]) 
         if any(0 < abs(i - j) <= 2 for j in _idx(tok, _CUT)):
             near_self = any(abs(s - i) <= 5 for s in SELF)
             add("method", 0.9 if near_self else 0.7, i, "nas_kaatna")
-    for i in _idx(tok, _POISON):
-        if any(0 < j - i <= 3 or 0 < i - j <= 2 for j in _idx(tok, _POISON_V)):
+    pv = [j for j in _idx(tok, _POISON_V) if j < len(raw) and _poison_verb_ok(raw[j], tok[j])]
+    for i in [i for i in _idx(tok, _POISON) if not raw[i].endswith(("कर", "के", "kar", "ke", "kr"))]:  # जाकर / आकर are not जहर
+        if any(0 < j - i <= 3 or 0 < i - j <= 2 for j in pv):
             near_self = any(abs(s - i) <= 5 for s in SELF)
             add("method", 0.9 if near_self else 0.7, i, "poison")
     for i in [i for i, r in enumerate(raw) if r in _FANSI_RAW]:
@@ -357,6 +383,7 @@ def _evidence(tok: list[str], turn: list[int], hyper: set[int], raw: list[str]) 
             big = any(abs(j - i) <= 6 for j in _idx(tok, _GOLI_BIG))
             near_self = any(abs(s - i) <= 6 for s in SELF)
             add("method", 0.85 if big else (0.6 if near_self else 0.35), i, "sleeping_pills")
+    tok = tok_all
     # 5. "जी कर क्या" (what is the use of living)
     kr, kj = _skel_word("kar"), _skel_word("kya")
     for i in range(len(tok) - 2):

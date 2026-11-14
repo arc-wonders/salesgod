@@ -178,6 +178,30 @@ VALUE_NEED = _t("You mentioned \"{need}\", so the part that helps is {b1}.", "�
 BUDGET_NOTE = _t("Please don't stretch your budget for this.", "इसके लिए अपना बजट मत खींचिए।", "Iske liye apna budget mat kheenchiye.")
 
 
+# a real push for a LOWER price (a number, "kam karo", "discount do", "cheaper", "reduce"). A comparison question ("what's better than Cult?",
+# "Gemini to free hai, uska kya?") or a plain question about how the price works is NOT a push: it is answered, and nothing is conceded.
+_PUSH = re.compile(r"kam kar|कम कर|\bsasta\b|सस्त[ाी]|\bcheap|discount|छूट|डिस्काउंट|reduce|lower|cheaper|sasta kar|सस्ता कर|best price|final price|last price|aur kam|और कम|"
+                   r"thoda (aur )?(kam|sasta)|bargain|negotiat|match|beat (that|their|it)|give (me )?(it )?(for|at)|(mein|में|me) (do|de|dedo|दो|दे)\b|"
+                   r"too (much|expensive|costly)|bahut (mehenga|mehnga|महंगा)|बहुत (महंगा|महँगा)|can.?t afford|afford nahi|budget", _I)
+
+
+def explicit_push(text: str) -> bool:
+    return bool(_PUSH.search(text)) or counter_number(text) is not None and detect(text) == "counter_offer"
+
+
+def _compare_reply(p, st: NegState) -> NegReply:
+    """"What's better than Cult?" / "Gemini is free, what about it?": an honest comparison question gets an honest answer (what you get
+    here), never a price floor or a concession."""
+    st.last = "compare"
+    b = {l: " ; ".join(x for x in (_benefit(p, l, 0), _benefit(p, l, 1)) if x) for l in LANGS}
+    parts = {l: ACK["competitor"][l] for l in LANGS}
+    if all(b.values()):
+        clean = lambda v: str(v).replace("{", "(").replace("}", ")")
+        for l in LANGS:
+            parts[l] = _join(parts[l], COMPARE[l].format(b1=clean(b[l])))
+    return NegReply("negotiation", parts, st, note="Honest comparison answer only: no floor line, no concession; the price is not on the table.")
+
+
 def _benefit(p, lang: str, i: int = 0) -> str:
     if lang == "en":
         return p.benefits[i] if len(p.benefits) > i else ""
@@ -225,14 +249,14 @@ PERK_LEADS = [
     _t("How about this: a bit more value rather than a lower number.", "एक काम करता हूँ: कम कीमत की जगह थोड़ा और वैल्यू जोड़ देता हूँ।", "Ek kaam karta hoon: kam keemat ki jagah thoda aur value jod deta hoon."),
     _t("Here's one more thing from my side.", "लीजिए, एक चीज़ और मेरी तरफ़ से।", "Ye lijiye, ek cheez aur meri taraf se."),
 ]
-PRICE_LINES = [  # a price concession, each tied to a commitment (never a deadline or scarcity); {p} = the price
-    ("I can do {p} for you, if we finalise it now.", "मैं आपके लिए {p} कर सकता हूँ, अगर अभी तय हो जाए।", "Aapke liye main {p} kar sakta hoon, agar abhi tay ho jaye."),
-    ("It has been nice talking to you, so I'll come down to {p} if you're ready to join now.", "आपसे बात करके अच्छा लगा, इसलिए अगर आप अभी जुड़ने को तैयार हैं तो {p} कर देता हूँ।",
-     "Aapse baat karke achha laga, isliye agar aap abhi judne ko taiyaar hain to {p} kar deta hoon."),
-    ("Let me stretch a little more: {p}, if you'll go ahead today.", "थोड़ा और खींचता हूँ: {p}, अगर आप आज आगे बढ़ें।", "Thoda aur kheenchta hoon: {p}, agar aap aaj aage badhein."),
-    ("One more small step down to {p}, on the promise that we close it now.", "एक छोटा क़दम और, {p}, इस वादे पर कि अभी बात पक्की करें।", "Ek chhota kadam aur, {p}, is vaade par ki abhi baat pakki karein."),
+PRICE_LINES = [  # a price concession; NO urgency or deadline wording (gate run 4: "अगर अभी तय हो जाए" was false urgency); {p} = the price
+    ("I can do {p} for you.", "मैं आपके लिए {p} कर सकता हूँ।", "Aapke liye main {p} kar sakta hoon."),
+    ("It has been nice talking to you, so I'll come down to {p}.", "आपसे बात करके अच्छा लगा, इसलिए {p} कर देता हूँ।",
+     "Aapse baat karke achha laga, isliye {p} kar deta hoon."),
+    ("Let me stretch a little more: {p}.", "थोड़ा और खींचता हूँ: {p}।", "Thoda aur kheenchta hoon: {p}."),
+    ("One more small step down, to {p}.", "एक छोटा क़दम और, {p}।", "Ek chhota kadam aur, {p}."),
 ]
-MIDDLE_LINE = ("Let's meet in the middle: {p}, if you'll join now.", "चलिए बीच का करते हैं: {p}, अगर आप अभी जुड़ें।", "Chaliye beech ka karte hain: {p}, agar aap abhi judein.")
+MIDDLE_LINE = ("Let's meet in the middle: {p}.", "चलिए बीच का करते हैं: {p}।", "Chaliye beech ka karte hain: {p}.")
 FINAL_LINE = ("{p} is my final price, I can't go below it; it is a fair one and I'd be glad to have you.",
               "{p} मेरी आख़िरी कीमत है, इससे नीचे नहीं जा सकता; ये ठीक कीमत है और आपका स्वागत है।",
               "{p} meri aakhri keemat hai, isse neeche nahi ja sakta; ye theek keemat hai aur aapka swagat hai.")
@@ -381,6 +405,11 @@ def step(p, text: str, st: NegState, need_known: str = "", faq_line=None, commit
         return None
     st = NegState(**asdict(st))
     st.rounds += 1
+    if kind == "competitor" and not explicit_push(text):
+        return _compare_reply(p, st)
+    ladder_on = getattr(p, "economics", None) is not None and p.economics.list_price > 0 and bool(p.economics.ladder)
+    if ladder_on and kind in ("value_doubt", "budget") and honest.is_question(text) and not explicit_push(text):
+        return None  # a question about how the price works is answered by the conversation first, not met with a concession
     if getattr(p, "economics", None) is not None and p.economics.list_price > 0 and p.economics.ladder \
             and kind in ("haggle", "value_doubt", "budget", "counter_offer", "competitor"):
         return _ladder_reply(p, kind, text, st, need_known, committed)

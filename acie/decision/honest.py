@@ -168,8 +168,8 @@ TOPICS: list[Topic] = [
     Topic("group_discount", re.compile(r"(friend|दोस्त|\bgroup\b|ग्रुप|couple|family|corporate|senior citizen|referral|refer).{0,40}(discount|डिस्काउंट|छूट|offer|ऑफर|\boff\b|plan|सस्ता|sasta|कम|kam)|"
                                        r"(discount|डिस्काउंट|छूट|offer|ऑफर|plan|कम|kam).{0,40}(friend|दोस्त|\bgroup\b|ग्रुप|couple|family|corporate|senior citizen)", _I),
           _t("details on a friend or group discount", "दोस्त या ग्रुप डिस्काउंट", "friend ya group discount")),
-    Topic("payer", re.compile(r"(pota|पोता|beta|बेटा|son|husband|pati|पति|wife|daughter|grandson|dost|दोस्त|friend|papa|पापा|bhai|भाई).{0,40}"
-                              r"(pay|paise|पैसे|payment|पेमेंट|de (sakta|sakti|dega|degi)|दे (सकता|सकती|देगा|देगी))", _I),
+    Topic("payer", re.compile(r"(pota|पोता|beta|बेटा|son|husband|pati|पति|wife|daughter|grandson|dost|दोस्त|friend|papa|पापा|bhai|भाई)[^।?.!,]{0,40}"
+                              r"(pay|(paise|पैसे|paisa|पैसा) (de|दे)|payment|पेमेंट|de (sakta|sakti|dega|degi)|दे (सकता|सकती|देगा|देगी))", _I),
           _t("details on someone else paying", "किसी और के पेमेंट करने", "kisi aur ke payment karne")),
 ]
 
@@ -366,8 +366,8 @@ SAD = re.compile(
     r"lost my job|job (nahi|chali|gayi|gai|chhut|chut)|naukri (nahi|chali|gayi|chhut|chut)|jobless|unemployed|no job|laid off|got fired|"
     r"(abhi |ab )?(paise|paisa|pese) (nahi|nhi)|no money|can.?t afford|cannot afford|afford nahi|i.?m broke|paise ki (tangi|dikkat|kami)|money (problem|trouble|issue)|"
     r"kuch (accha|achha) nahi chal|sab kharab|money (is )?(very |really )?tight|tight on money|(really|very) low|paise ki (kami|tangi|dikkat)|ghar mein (bimari|bimaar)|pata nahi kya karun|depress|udaas|udas|feeling low|thak (gaya|gayi)|tired of everything|tension mein|stress mein|"
-    r"mushkil (waqt|time|din)|going through a (hard|tough|bad)|"
-    r"नौकरी (नहीं|चली|छूट)|जॉब (नहीं|चली|छूट)|(अभी )?पैसे नहीं|पैसा नहीं|पैसों की (तंगी|दिक्कत|कमी)|पैसे की (तंगी|दिक्कत|कमी)|घर में (बीमारी|बीमार)|बीमारी चल|पता नहीं क्या करूँ|पता नहीं क्या करूं|उदास|थक (गया|गई|गयी)|मुश्किल (समय|वक्त|दिन)|"
+    r"dukhi|dukh mein|mushkil (waqt|time|din)|going through a (hard|tough|bad)|"
+    r"नौकरी (नहीं|चली|छूट)|जॉब (नहीं|चली|छूट)|(अभी )?पैसे नहीं|पैसा नहीं|पैसों की (तंगी|दिक्कत|कमी)|पैसे की (तंगी|दिक्कत|कमी)|घर में (बीमारी|बीमार)|बीमारी चल|पता नहीं क्या करूँ|पता नहीं क्या करूं|उदास|दुखी|थक (गया|गई|गयी)|मुश्किल (समय|वक्त|दिन)|"
     r"कुछ अच्छा नहीं चल|सब खराब|डिप्रेस", _I)
 
 
