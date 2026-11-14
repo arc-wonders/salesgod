@@ -82,6 +82,8 @@ class App:
     session_store: object = None  # acie.store (ACIE_SESSION_STORE); None = in-process sessions
     memory: object = None
     sinks: list = field(default_factory=list)
+    live_sessions: dict = field(default_factory=dict)  # call_id -> CallSession while the call is up (live map)
+    maps: dict = field(default_factory=dict)  # call_id -> latest live-map snapshot (voice/live_map.py)
 
     # ------------------------------------------------------------------ products
 
@@ -144,6 +146,9 @@ class App:
     def broadcast(self, event: dict) -> None:
         for q in list(self.listeners):
             q.put_nowait(event)
+        if event.get("type") == "turn" and event.get("role") == "agent":
+            from . import live_map
+            live_map.on_turn(self, event)  # pushes a {"type": "map"} event; never raises
 
     def save_audio(self, call_id: str, n: int, audio) -> None:
         import wave
@@ -184,7 +189,10 @@ class App:
             w.writeframes((np.clip(stereo, -1, 1) * 32767).astype("<i2").tobytes())
 
     def save(self, call: CallRecord) -> None:
-        (CALLS_DIR / f"{call.call_id}.json").write_text(json.dumps(call.public(), ensure_ascii=False, indent=1))
+        rec = call.public()
+        if self.maps.get(call.call_id):
+            rec["map"] = self.maps[call.call_id]  # last live-map snapshot, for GET /api/calls/{id}/map
+        (CALLS_DIR / f"{call.call_id}.json").write_text(json.dumps(rec, ensure_ascii=False, indent=1))
 
     async def finish(self, call: CallRecord, pipeline: ACIEPipeline, session_id: str) -> None:
         call.status, call.ended_at = "ended", time.time()
@@ -194,12 +202,16 @@ class App:
         sess = await pipeline.forget_session(session_id)
         if sess is not None:
             call.context = sess.context.model_dump(exclude={"events"})
+            from . import live_map
+            live_map.capture(self, call, sess, self.live_sessions.get(call.call_id))  # final map, saved with the call
         if sess is not None:  # end of call -> long-term memory update
             prof = await pipeline.store.load(call.customer_id)
             pipeline.feedback.end_session(prof, sess)
             await pipeline.feedback.remember(sess, prof)
             await pipeline.store.save(prof)
         self.save(call)
+        self.live_sessions.pop(call.call_id, None)
+        self.maps.pop(call.call_id, None)
         self.broadcast({"type": "status", "call": call.public()})
 
 
@@ -415,7 +427,15 @@ def build_app() -> tuple[FastAPI, App]:
     @api.get("/api/products")
     async def list_products(request: Request) -> dict:
         _require(request)
-        return {"products": [p.model_dump() for p in state.products().values()]}
+        from . import live_map
+        extras = live_map.load_extras(DATA)
+        out = []
+        for p in state.products().values():
+            d = p.model_dump()
+            d["economics"]["max_perks"] = extras.get(p.id, {}).get("max_perks", max(1, live_map.perk_count(p.economics)))
+            d["real_company"] = live_map.is_real_company(p)
+            out.append(d)
+        return {"products": out}
 
     @api.put("/api/products/{product_id}")
     async def put_product(product_id: str, request: Request) -> dict:
@@ -424,14 +444,27 @@ def build_app() -> tuple[FastAPI, App]:
         body["id"] = product_id
         if not product_id.replace("-", "").replace("_", "").isalnum() or len(product_id) > 40:
             raise HTTPException(400, "id: letters, digits, - and _ only")
+        from . import live_map
+        max_perks = (body.get("economics") or {}).pop("max_perks", None) if isinstance(body.get("economics"), dict) else None
+        body.pop("real_company", None)
         try:
             product = Product.model_validate(body)
         except Exception as e:
             raise HTTPException(400, str(e)[:300])
+        try:  # negotiation range: floor <= every step <= list, no concessions on a real company's product
+            live_map.validate_economics(product.economics, product)
+            if max_perks is not None:
+                max_perks = live_map.validate_max_perks(product.economics, max_perks)
+        except ValueError as e:
+            raise HTTPException(400, str(e))
         products = state.products()
         products[product_id] = product
         state.save_products(products)
-        return {"product": product.model_dump()}
+        if max_perks is not None:
+            live_map.save_extra(DATA, product_id, {"max_perks": max_perks})
+        out = product.model_dump()
+        out["economics"]["max_perks"] = live_map.load_extras(DATA).get(product_id, {}).get("max_perks", max(1, live_map.perk_count(product.economics)))
+        return {"product": out}
 
     @api.get("/api/playbooks/{product_id}")
     async def get_playbook(product_id: str, request: Request):
@@ -568,11 +601,30 @@ def build_app() -> tuple[FastAPI, App]:
         for p in sorted(CALLS_DIR.glob("*.json"), key=lambda p: p.stat().st_mtime, reverse=True)[:200]:
             try:
                 saved[p.stem] = json.loads(p.read_text())
+                saved[p.stem].pop("map", None)  # heavy, fetched per call from /api/calls/{id}/map
             except json.JSONDecodeError:
                 pass
         for cid, c in state.calls.items():
             saved[cid] = c.public()
         return {"calls": sorted(saved.values(), key=lambda c: c["created_at"], reverse=True)}
+
+    @api.get("/api/calls/{call_id}/map")
+    async def call_map(call_id: str, request: Request) -> dict:
+        _require(request)
+        from . import live_map
+        cid = "".join(c for c in call_id if c.isalnum())
+        if cid in state.maps:
+            return {"map": state.maps[cid], "live": cid in state.live_sessions}
+        path = CALLS_DIR / f"{cid}.json"
+        if not path.exists():
+            call = state.calls.get(cid)
+            if call is None:
+                raise HTTPException(404, "no such call")
+            return {"map": live_map.from_record(call.public()), "live": cid in state.live_sessions}
+        rec = json.loads(path.read_text())
+        if rec.get("map"):
+            return {"map": rec["map"], "live": False}
+        return {"map": live_map.from_record(rec, state.products().get(rec.get("campaign"))), "live": False}
 
     @api.get("/api/calls/{call_id}/recording")
     async def recording(call_id: str, request: Request) -> FileResponse:
@@ -668,7 +720,12 @@ def build_app() -> tuple[FastAPI, App]:
             msg = json.loads(await ws.receive_text())
             if msg.get("event") == "start":
                 start = msg["start"]
-        await CallSession(state, call, ws, start["streamId"]).run()
+        cs = CallSession(state, call, ws, start["streamId"])
+        state.live_sessions[call.call_id] = cs
+        try:
+            await cs.run()
+        finally:
+            state.live_sessions.pop(call.call_id, None)
 
     @api.get("/healthz")
     async def health() -> dict:

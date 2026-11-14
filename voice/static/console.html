@@ -265,6 +265,55 @@ select.inline{width:auto}
 @keyframes enter{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
 @media (max-width:1100px){.live{grid-template-columns:260px minmax(0,1fr)}.live>section:last-child{display:none}.tree,.sim{grid-template-columns:1fr}.insp,.sim>section:last-child{display:none}.cols{grid-template-columns:1fr}}
 @media (max-width:760px){.side{display:none}.live{grid-template-columns:1fr}.live>section:first-child{max-height:200px}.strip{grid-template-columns:repeat(2,1fr)}.pad{padding:20px 16px 40px}.topbar{padding:0 16px}}
+/* live information map + negotiation editor */
+.live.wide{grid-template-columns:260px minmax(0,1fr) minmax(380px,46%)}
+.rtabs{display:flex;gap:4px;margin-left:auto}
+.rtabs button{height:24px;padding:0 10px;border:1px solid transparent;border-radius:999px;background:none;color:hsl(var(--muted));font-size:11.5px;cursor:pointer}
+.rtabs button.on{border-color:hsl(var(--rule-strong));background:hsl(var(--elevated));color:hsl(var(--fg))}
+.imap{padding:12px 16px 32px;display:flex;flex-direction:column;gap:16px}
+.imap h4{margin:0 0 7px;font-size:10.5px;font-weight:500;letter-spacing:.16em;text-transform:uppercase;color:hsl(var(--tertiary));display:flex;align-items:center;gap:8px}
+.imap h4 .hint{letter-spacing:0;text-transform:none;font-weight:400}
+.imap svg.chart{display:block;width:100%;height:auto;overflow:visible}
+.imap svg text{font-family:var(--mono);font-size:8.5px;fill:hsl(var(--tertiary))}
+.imap svg text.cur{fill:hsl(var(--signal));font-weight:600}
+.imap .mlane{stroke:hsl(var(--rule));stroke-width:1}
+.imap .medge{fill:none;stroke:hsl(var(--signal)/.6);stroke-width:1.6;stroke-linejoin:round}
+.imap .mdot{fill:hsl(var(--elevated));stroke:hsl(var(--signal));stroke-width:1.5}
+.imap .mdot.now{fill:hsl(var(--signal));stroke:hsl(var(--signal)/.35);stroke-width:5}
+.layers{display:grid;grid-template-columns:62px minmax(0,1fr);gap:5px 10px;font-size:12px;margin:8px 0 0;padding:9px 11px;border:1px solid hsl(var(--rule));border-radius:9px;background:hsl(var(--bg))}
+.layers dt{color:hsl(var(--tertiary));font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;padding-top:2px}
+.layers dd{margin:0;display:flex;flex-wrap:wrap;gap:5px;align-items:center;min-width:0;overflow-wrap:anywhere}
+.mnd{display:inline-block;width:9px;height:9px;border-radius:3px;flex:none;border:1.5px solid hsl(var(--tertiary)/.6);background:transparent}
+.mnd.asked{background:hsl(var(--amber));border-color:hsl(var(--amber))}
+.mnd.answered{background:hsl(var(--green));border-color:hsl(var(--green))}
+.mnd.recommended{background:hsl(var(--violet));border-color:hsl(var(--violet))}
+.mnd.closed{background:hsl(var(--signal));border-color:hsl(var(--signal))}
+.mlegend{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:11px;color:hsl(var(--muted));margin-bottom:8px}
+.mlegend span{display:inline-flex;align-items:center;gap:5px}
+.mtn{border:1px solid hsl(var(--rule));border-radius:8px;background:hsl(var(--bg));margin-bottom:5px}
+.mtn>summary{display:flex;align-items:center;gap:8px;padding:6px 9px;cursor:pointer;list-style:none;font-size:12px}
+.mtn>summary::-webkit-details-marker{display:none}
+.mtn>summary .mc{margin-left:auto;font-family:var(--mono);font-size:10px;color:hsl(var(--tertiary))}
+.mtn .mtn{margin:4px 0 0 6px}
+.mtn .mbody{padding:2px 9px 8px}
+.men{display:flex;align-items:flex-start;gap:7px;padding:2px 0;font-size:11.5px;color:hsl(var(--muted))}
+.men .mnd{margin-top:4px}.men.answered,.men.asked{color:hsl(var(--fg))}
+.moffs{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px}
+.moff{display:inline-flex;align-items:center;gap:6px;padding:4px 9px;border:1px solid hsl(var(--rule-strong));border-radius:999px;font-size:11.5px}
+.moff.recommended{border-color:hsl(var(--violet)/.6)}.moff.closed{border-color:hsl(var(--signal)/.7)}
+.mkv{display:grid;grid-template-columns:78px minmax(0,1fr);gap:4px 10px;margin:0;font-size:12px}
+.mkv dt{color:hsl(var(--tertiary));font-size:10.5px;padding-top:1px}.mkv dd{margin:0;overflow-wrap:anywhere}
+.neg-ed{margin-top:18px;padding:12px 14px;border:1px solid hsl(var(--rule-strong));border-radius:10px;background:hsl(var(--elevated))}
+.neg-ed.off{opacity:.6}
+.neg-ed h4{margin:0 0 2px;font-size:13px;font-weight:600}
+.neg-ed .nstep{display:grid;grid-template-columns:22px 82px minmax(0,1fr) auto;gap:8px;align-items:start;padding:8px 0;border-top:1px solid hsl(var(--rule))}
+.neg-ed .nstep .nn{font-family:var(--mono);color:hsl(var(--tertiary));padding-top:7px}
+.neg-ed .floor{font-family:var(--mono);color:hsl(var(--signal))}
+.neg-ed .nctl{display:flex;gap:2px}
+.neg-ed .nctl button{width:24px;height:26px;border:0;border-radius:5px;background:none;color:hsl(var(--muted));cursor:pointer}
+.neg-ed .nctl button:hover{background:hsl(var(--hover))}
+@media (max-width:1100px){.live.wide{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.live.wide>section:first-child{display:none}.live.wide>section:last-child{display:block}}
+@media (max-width:760px){.live.wide{grid-template-columns:1fr;overflow-y:auto;grid-auto-rows:minmax(320px,auto)}.live.wide>section{overflow:visible}.neg-ed .nstep{grid-template-columns:20px 70px minmax(0,1fr)}.neg-ed .nstep .nctl{grid-column:2/4}}
 </style>
 </head>
 <body>
@@ -370,6 +419,7 @@ function listen() {
       updateNavCount();
       return;
     }
+    if (ev.type === 'map') { S.maps[ev.call_id] = ev.map; if (S.page === 'live' && S.sel === ev.call_id && S.rtab === 'map') drawMap(); return; }
     const c = S.calls.find((x) => x.call_id === ev.call_id);
     if (!c) { loadCalls().then(() => { if (S.page === 'live') renderPage(); }).catch(() => {}); return; }
     if (ev.type === 'turn') {
@@ -385,6 +435,180 @@ function listen() {
 }
 function setConn(s) { S.conn = s; const e = $('#conn'); if (e) { e.className = 'conn ' + s; e.lastChild.textContent = s === 'ok' ? 'LIVE' : 'RECONNECTING'; } }
 function updateNavCount() { const e = $('#livecnt'); if (e) { const n = tenantCalls().filter((c) => ['live', 'ringing', 'dialing'].includes(c.status)).length; e.textContent = n ? n + ' live' : ''; } }
+
+/* ---------------------------------------------------------------- live information map */
+const MSTAGES = ['open', 'discover', 'educate', 'recommend', 'objection', 'negotiate', 'close', 'after_close'];
+const SNAME = { after_close: 'after-close' };
+const sname = (s) => SNAME[s] || s || '—';
+const MSTATES = [['untouched', 'not touched'], ['asked', 'asked by caller'], ['answered', 'answered by agent'], ['recommended', 'recommended'], ['closed', 'closed']];
+const money = (n, cur) => (n == null || n === '' ? '—' : (cur || '₹') + Math.round(n).toLocaleString('en-IN'));
+S.maps = S.maps || {}; S.mapOpen = S.mapOpen || {}; S.mapAsked = S.mapAsked || {};
+S.rtab = store.get('sg_rtab', 'map');
+
+function pathChart(m) {
+  const path = m.path || [], rows = Math.max(path.length, 1), RH = 20, W = 400, X0 = 34, DX = (W - X0 - 14) / (MSTAGES.length - 1), H = rows * RH + 26;
+  const x = (st) => X0 + Math.max(0, MSTAGES.indexOf(st)) * DX, y = (i) => 22 + i * RH;
+  const svg = sv('svg', { class: 'chart', viewBox: `0 0 ${W} ${H}`, role: 'img', 'aria-label': 'Decision path across the call' });
+  MSTAGES.forEach((st) => {
+    const cur = st === m.stage;
+    svg.append(sv('line', { class: 'mlane', x1: x(st), x2: x(st), y1: 12, y2: H - 4 }),
+      sv('text', { x: x(st), y: 8, 'text-anchor': 'middle', class: cur ? 'cur' : '' }, document.createTextNode(st === 'after_close' ? 'after' : st)));
+  });
+  if (path.length > 1) svg.append(sv('polyline', { class: 'medge', points: path.map((n, i) => `${x(n.stage)},${y(i)}`).join(' ') }));
+  path.forEach((n, i) => {
+    const now = i === path.length - 1, g = sv('g', {}, sv('title', {}, document.createTextNode(`turn ${n.n}: ${sname(n.stage)}${n.said ? ' · "' + n.said + '"' : ''}${n.action && n.action.type ? ' · ' + n.action.type : ''}`)),
+      sv('circle', { class: 'mdot' + (now ? ' now' : ''), cx: x(n.stage), cy: y(i), r: now ? 4 : 3 }),
+      sv('text', { x: 4, y: y(i) + 3, class: now ? 'cur' : '' }, document.createTextNode('T' + n.n)));
+    svg.append(g);
+  });
+  return svg;
+}
+function layersView(m) {
+  const n = (m.path || [])[(m.path || []).length - 1] || {};
+  const cl = m.clusters && m.clusters.length ? m.clusters : n.clusters || [];
+  return h('dl', { class: 'layers' },
+    h('dt', {}, 'stage'), h('dd', {}, h('span', { class: 'tag sig' }, sname(m.stage)), n.rule ? h('span', { class: 'hint' }, 'rule ' + n.rule) : null),
+    h('dt', {}, 'interest'), h('dd', {}, cl.length ? cl.map((c) => h('span', { class: 'tag blue', title: (c.evidence || []).join(', ') }, c.label, (c.evidence || []).length ? h('b', {}, ' · ' + c.evidence.slice(0, 2).join(', ')) : null)) : h('span', { class: 'hint' }, m.kb ? 'nothing stated yet' : 'needs the knowledge base')),
+    h('dt', {}, 'topic'), h('dd', {}, m.topic ? h('span', { class: 'tag' }, m.topic) : h('span', { class: 'hint' }, '—')),
+    h('dt', {}, 'action'), h('dd', {}, m.action && m.action.type ? [h('span', { class: 'tag green' }, m.action.type.replaceAll('_', ' ')), m.action.entry ? h('span', { class: 'hint' }, m.action.entry) : null, m.action.offering ? h('span', { class: 'hint' }, m.action.offering) : null]
+      : n.intent ? h('span', { class: 'tag' }, 'agent: ' + n.intent) : h('span', { class: 'hint' }, '—')));
+}
+function topicNode(t, byParent, m) {
+  const kids = byParent[t.path] || [];
+  const key = m.call_id + '|' + t.path;
+  const d = h('details', { class: 'mtn', open: S.mapOpen[key] ?? (t.state !== 'untouched' && !t.parent) ? true : null, ontoggle: (e) => { S.mapOpen[key] = e.target.open; } },
+    h('summary', {}, h('span', { class: 'mnd ' + t.state }), h('span', {}, t.title || t.path), h('span', { class: 'mc' }, `${t.answered}/${t.total}`)),
+    h('div', { class: 'mbody' }, (t.entries || []).map((e) => h('div', { class: 'men ' + e.state, title: e.id }, h('span', { class: 'mnd ' + e.state }), h('span', {}, e.q))), kids.map((k) => topicNode(k, byParent, m))));
+  return d;
+}
+function infoMapView(m) {
+  const t = m.tree || {}, topics = t.topics || [];
+  if (!m.kb) return h('div', { class: 'hint' }, 'No product knowledge map for this call (the knowledge base is off or the product has none). Stage, intent, facts and the ledger are shown instead.');
+  const byParent = {}; topics.forEach((x) => { (byParent[x.parent] = byParent[x.parent] || []).push(x); });
+  const cv = m.coverage || {};
+  return h('div', {},
+    h('div', { class: 'mlegend' }, MSTATES.map(([k, l]) => h('span', {}, h('i', { class: 'mnd ' + k }), l)), cv.kb_total ? h('span', { class: 'hint' }, `${cv.given}/${cv.kb_total} told · ${cv.asked} asked`) : null),
+    (byParent[''] || []).map((x) => topicNode(x, byParent, m)),
+    (t.offerings || []).length ? h('div', { class: 'moffs' }, t.offerings.map((o) => h('span', { class: 'moff ' + o.state, title: o.price || '' }, h('i', { class: 'mnd ' + o.state }), o.name, o.included ? h('span', { class: 'hint' }, 'included') : null))) : null);
+}
+function factsView(m) {
+  const f = m.facts || {}, rows = [];
+  const add = (k, v) => { if (v != null && v !== '' && !(Array.isArray(v) && !v.length)) rows.push([k, Array.isArray(v) ? v.join(', ') : String(v)]); };
+  add('goal', f.goal); add('sub-goal', f.sub_goal); add('schedule', f.schedule); add('budget', f.budget);
+  add('objections', f.objections); add('decision', f.decision); add('outcome', f.outcome); add('promised', f.promised); add('quoted', f.quoted); add('asked', f.questions); add('already told', f.told);
+  return rows.length ? h('dl', { class: 'mkv' }, rows.map(([k, v]) => [h('dt', {}, k), h('dd', {}, v)])) : h('div', { class: 'hint' }, 'Nothing stated yet.');
+}
+function negView(m) {
+  const n = m.negotiation;
+  if (!n) return h('div', { class: 'hint' }, 'No negotiation range for this product (the price is fixed).');
+  const lo = n.floor || 0, hi = n.list_price, span = Math.max(hi - lo, 1), W = 400, X0 = 24, X1 = W - 24;
+  const px = (v) => X0 + ((Math.min(Math.max(v, lo), hi) - lo) / span) * (X1 - X0);
+  const svg = sv('svg', { class: 'chart negbar', viewBox: `0 0 ${W} 54`, role: 'img', 'aria-label': 'Price between the floor and the list price' },
+    sv('rect', { x: X0, y: 22, width: X1 - X0, height: 8, rx: 4, fill: 'hsl(var(--rule-strong))' }),
+    sv('rect', { x: px(n.current_offer), y: 22, width: X1 - px(n.current_offer), height: 8, rx: 4, fill: 'hsl(var(--signal)/.35)' }),
+    sv('text', { x: X0, y: 46, 'text-anchor': 'start' }, document.createTextNode('floor ' + money(lo, n.currency))),
+    sv('text', { x: X1, y: 46, 'text-anchor': 'end' }, document.createTextNode('list ' + money(hi, n.currency))),
+    sv('circle', { cx: px(n.current_offer), cy: 26, r: 6, fill: 'hsl(var(--signal))' }),
+    sv('text', { x: px(n.current_offer), y: 14, 'text-anchor': 'middle', class: 'cur' }, document.createTextNode('offer ' + money(n.current_offer, n.currency))),
+    n.agreed_price != null ? sv('path', { d: `M${px(n.agreed_price)} 36 l-5 8 h10z`, fill: 'hsl(var(--green))' }) : null);
+  return h('div', {}, svg,
+    h('dl', { class: 'mkv' },
+      h('dt', {}, 'list price'), h('dd', {}, money(n.list_price, n.currency) + (n.unit ? ' / ' + n.unit : '')),
+      h('dt', {}, 'current offer'), h('dd', {}, money(n.current_offer, n.currency)),
+      h('dt', {}, 'floor'), h('dd', {}, money(n.floor, n.currency), ' ', n.floor_reached ? h('span', { class: 'tag amber' }, 'floor reached') : h('span', { class: 'tag' }, 'above floor')),
+      h('dt', {}, 'perks given'), h('dd', {}, (n.perks_given || []).length ? n.perks_given.map((p) => h('span', { class: 'tag blue' }, p)) : 'none'),
+      h('dt', {}, 'agreed'), h('dd', {}, n.agreed_price != null ? [h('b', {}, money(n.agreed_price, n.currency)), n.margin_pct != null ? h('span', { class: 'hint' }, '  margin ' + n.margin_pct + '%') : null] : n.accepted ? 'accepted at the current offer' : 'not yet'),
+      h('dt', {}, 'pushes'), h('dd', {}, String(n.pushes || 0) + (n.reason ? ' · ' + n.reason : ''))));
+}
+function mapView(m) {
+  const sec = (title, hint, body) => h('div', {}, h('h4', {}, title, hint ? h('span', { class: 'hint' }, hint) : null), body);
+  return h('div', { class: 'imap' },
+    sec('Decision path', `turn ${m.turn || 0} · ${sname(m.stage)}`, h('div', {}, pathChart(m), layersView(m))),
+    sec('What the caller told us', null, factsView(m)),
+    sec('Negotiation', m.negotiation && m.negotiation.active ? 'in play' : null, negView(m)),
+    sec('Information explored', m.kb ? null : 'no knowledge base', infoMapView(m)));
+}
+/* incremental: only the map box is redrawn, and only when the snapshot really changed */
+function drawMap() {
+  const box = $('#mapbox'); if (!box) return;
+  const m = S.maps[S.sel];
+  if (!m) { const sig = 'none|' + !!S.mapAsked[S.sel]; if (box.dataset.sig !== sig) { box.dataset.sig = sig; box.replaceChildren(h('div', { class: 'empty' }, h('b', {}, 'No map yet'), 'It appears after the agent\'s first reply.')); } return; }
+  const { t, ...rest } = m, sig = S.sel + '|' + JSON.stringify(rest);
+  if (box.dataset.sig === sig) return;
+  const keep = box.parentElement ? box.parentElement.scrollTop : 0;
+  box.dataset.sig = sig; box.replaceChildren(mapView(m));
+  if (box.parentElement) box.parentElement.scrollTop = keep;
+}
+async function loadMap(cid) {
+  if (!cid || S.maps[cid] || S.mapAsked[cid]) return;
+  S.mapAsked[cid] = true;
+  try { const j = await api(`/api/calls/${cid}/map`); S.maps[cid] = j.map; } catch { /* no map for this call */ }
+  if (S.page === 'live' && S.sel === cid) drawMap();
+}
+function setRtab(t) { S.rtab = t; store.set('sg_rtab', t); renderPage(); }
+
+/* ---------------------------------------------------------------- negotiation range editor */
+function negEditor(base, real) {
+  const e0 = base.economics || {}, cur = e0.currency || '₹';
+  const st = { ladder: JSON.parse(JSON.stringify(e0.ladder || [])), mode: (e0.min_margin_pct || 0) > 0 ? 'margin' : 'min' };
+  const num = (v) => { const x = parseFloat(String(v).replace(/,/g, '')); return Number.isFinite(x) ? x : 0; };
+  const lang3 = (o) => ['en', 'hi', 'hinglish'].map((x) => x + ': ' + ((o || {})[x] || '')).join('\n');
+  const parse3 = (v) => { const o = {}; v.split('\n').forEach((l) => { const m = l.match(/^(en|hi|hinglish):\s*(.*)$/); if (m && m[2].trim()) o[m[1]] = m[2].trim(); }); return o; };
+  const dis = real ? true : null;
+  const I = (v, a) => h('input', { value: v ?? '', disabled: dis, ...(a || {}) });
+  const f = {
+    currency: I(cur, { style: 'width:64px' }), unit: I(e0.unit || '', { placeholder: 'e.g. 3 months' }), list: I(e0.list_price || ''), minp: I(e0.min_margin_pct > 0 ? '' : (e0.cost || '')),
+    cost: I(e0.cost || ''), margin: I(e0.min_margin_pct || ''), maxp: I(e0.max_perks ?? 1, { type: 'number', min: 0, max: 10, style: 'width:70px' }),
+    terms: h('textarea', { rows: 3, class: 'mono', style: 'font-size:11.5px', disabled: dis }, lang3(e0.price_terms)),
+  };
+  const mode = h('select', { disabled: dis }, h('option', { value: 'min', selected: st.mode === 'min' }, 'I know the minimum price'), h('option', { value: 'margin', selected: st.mode === 'margin' }, 'Cost + minimum margin %'));
+  const floorEl = h('span', { class: 'floor' }), msg = h('div', { class: 'err' }), steps = h('div', {}), minRow = h('div', {}), marRow = h('div', { class: 'grid2' });
+  const floor = () => st.mode === 'min' ? num(f.minp.value) : Math.round(num(f.cost.value) * (1 + num(f.margin.value) / 100) * 100) / 100;
+  const check = () => {
+    const fl = floor(), lp = num(f.list.value); floorEl.textContent = fl ? 'floor ' + cur + fl.toLocaleString('en-IN') : 'no floor set'; let e = '';
+    if (lp && fl > lp) e = `The floor (${fl}) is above the list price (${lp}).`;
+    let last = lp;
+    st.ladder.forEach((s, i) => { if (e || s.kind !== 'price') return; const p = num(s.price); if (p < fl) e = `Step ${i + 1}: ${p} is below the floor ${fl}.`; else if (lp && p > lp) e = `Step ${i + 1}: ${p} is above the list price ${lp}.`; else if (last && p >= last) e = `Step ${i + 1}: ${p} must be lower than the step before it (${last}).`; if (!e) last = p; });
+    const perks = st.ladder.filter((s) => s.kind === 'perk').length; if (!e && perks > num(f.maxp.value)) e = `The ladder has ${perks} perks but max perks per sale is ${num(f.maxp.value)}.`;
+    msg.textContent = e;
+  };
+  const move = (i, d) => { const j = i + d; if (j < 0 || j >= st.ladder.length) return; [st.ladder[i], st.ladder[j]] = [st.ladder[j], st.ladder[i]]; drawSteps(); };
+  function drawSteps() {
+    steps.replaceChildren(...st.ladder.map((s, i) => h('div', { class: 'nstep' }, h('span', { class: 'nn' }, String(i + 1)),
+      h('select', { disabled: dis, onchange: (e) => { s.kind = e.target.value; if (s.kind === 'perk') { s.id = s.id || 'perk_' + (i + 1); s.text = s.text || {}; s.short = s.short || {}; } drawSteps(); } }, h('option', { value: 'price', selected: s.kind === 'price' }, 'Price'), h('option', { value: 'perk', selected: s.kind === 'perk' }, 'Perk')),
+      s.kind === 'price' ? I(s.price || '', { placeholder: 'new price', oninput: (e) => { s.price = num(e.target.value); check(); } })
+        : h('div', {}, I(s.id || '', { placeholder: 'perk id, e.g. extra_week', class: 'mono', oninput: (e) => { s.id = e.target.value.trim(); } }),
+          h('textarea', { rows: 5, class: 'mono', style: 'font-size:11.5px;margin-top:5px', disabled: dis, title: 'What the agent says, per language', oninput: (e) => { s.text = parse3(e.target.value); } }, lang3(s.text)),
+          h('textarea', { rows: 3, class: 'mono', style: 'font-size:11.5px;margin-top:5px', disabled: dis, title: 'Short phrase for the final terms', oninput: (e) => { s.short = parse3(e.target.value); } }, lang3(s.short))),
+      h('div', { class: 'nctl' }, real ? null : [h('button', { type: 'button', title: 'Up', onclick: () => move(i, -1) }, '↑'), h('button', { type: 'button', title: 'Down', onclick: () => move(i, 1) }, '↓'), h('button', { type: 'button', title: 'Remove', onclick: () => { st.ladder.splice(i, 1); drawSteps(); } }, '×')]))));
+    if (!st.ladder.length) steps.append(h('div', { class: 'hint', style: 'padding:6px 0' }, 'No steps: the agent holds the list price.'));
+    check();
+  }
+  function drawMode() {
+    st.mode = mode.value; minRow.style.display = st.mode === 'min' ? '' : 'none'; marRow.style.display = st.mode === 'margin' ? '' : 'none'; check();
+  }
+  mode.addEventListener('change', drawMode);
+  [f.list, f.minp, f.cost, f.margin, f.maxp].forEach((el) => el.addEventListener('input', check));
+  const field = (label, el) => h('div', {}, h('label', { class: 'lbl' }, label), el);
+  minRow.append(field('Minimum price (floor)', f.minp)); marRow.append(field('Cost per sale', f.cost), field('Minimum margin %', f.margin));
+  const el = h('div', { class: 'neg-ed' + (real ? ' off' : '') }, h('h4', {}, 'Negotiation'),
+    h('div', { class: 'hint' }, real ? 'No concessions: seller\'s own pricing. This product is a real company\'s, so the agent never offers a discount or perk.' : 'How far the agent may go when a caller bargains. It never goes below the floor.'),
+    h('div', { class: 'grid2' }, field('List price', f.list), h('div', { class: 'grid2' }, field('Currency', f.currency), field('Price covers', f.unit))),
+    h('label', { class: 'lbl' }, 'Floor'), mode, minRow, marRow, h('div', { style: 'margin-top:6px' }, floorEl),
+    h('label', { class: 'lbl' }, 'Concession ladder · first ask goes to the top step'), steps,
+    real ? null : h('button', { type: 'button', class: 'btn sm', style: 'margin-top:8px', onclick: () => { st.ladder.push({ kind: 'price', price: 0 }); drawSteps(); } }, ic('plus', 'sm'), 'Add step'),
+    h('div', { class: 'grid2' }, field('Max perks per sale', f.maxp), field('Full offer at a new price · use {price}', f.terms)), msg);
+  drawMode(); drawSteps();
+  return {
+    el,
+    collect() {
+      if (real) return base.economics || {};
+      const fl = floor(), lp = num(f.list.value);
+      const ladder = st.ladder.map((s) => s.kind === 'price' ? { kind: 'price', price: num(s.price) } : { kind: 'perk', id: s.id || '', text: s.text || {}, short: s.short || {} });
+      return { currency: f.currency.value || '₹', unit: f.unit.value, list_price: lp, cost: st.mode === 'min' ? fl : num(f.cost.value), min_margin_pct: st.mode === 'min' ? 0 : num(f.margin.value), price_terms: parse3(f.terms.value), ladder, max_perks: Math.max(0, Math.round(num(f.maxp.value))) };
+    },
+  };
+}
 
 /* ---------------------------------------------------------------- shell */
 const NAV = [
@@ -510,8 +734,10 @@ function pageLive(p) {
     c ? h('div', { class: 'tx' }, (c.turns || []).length ? (c.turns || []).map((t) => turnView(t, c.backend)) : h('div', { class: 'empty' }, h('b', {}, active(c.status) ? 'Waiting for the first words' : 'Nothing was said'), c.status),
         active(c.status) && (c.turns || []).length ? h('div', { class: 'hint', style: 'padding-left:88px' }, 'listening…') : null)
       : h('div', { class: 'empty' }, h('b', {}, 'Select a call'), 'Turns and decisions appear here as they happen.'));
-  const side = h('section', {},
-    h('div', { class: 'pane-head' }, h('span', { class: 'sec-lbl' }, 'Decision path'), h('span', { class: 'hint' }, 'latest turn')),
+  const tabs = h('div', { class: 'rtabs' }, h('button', { class: S.rtab === 'map' ? 'on' : '', onclick: () => setRtab('map') }, 'Info map'), h('button', { class: S.rtab === 'path' ? 'on' : '', onclick: () => setRtab('path') }, 'Gates'));
+  const mapSide = h('section', {}, h('div', { class: 'pane-head' }, h('span', { class: 'sec-lbl' }, 'Information explored'), tabs), h('div', { id: 'mapbox' }));
+  const side = S.rtab === 'map' ? mapSide : h('section', {},
+    h('div', { class: 'pane-head' }, h('span', { class: 'sec-lbl' }, 'Decision path'), h('span', { class: 'hint' }, 'latest turn'), tabs),
     last ? [pathView(last),
       h('dl', { class: 'kv' },
         h('dt', {}, 'objective'), h('dd', {}, (last.trace.objective || '—').slice(0, 220) + ((last.trace.objective || '').length > 220 ? '…' : '')),
@@ -519,7 +745,8 @@ function pageLive(p) {
         h('dt', {}, 'rule match'), h('dd', {}, last.trace.rule_intent || '—')),
       h('div', { style: 'padding:0 16px 16px' }, h('button', { class: 'btn sm', onclick: () => { S.tree.pid = c.campaign; S.tree.pb = null; S.tree.hot = { gate: last.trace.gate, node: last.trace.pb_node }; go('tree'); } }, ic('tree', 'sm'), 'Open in decision tree'))]
       : h('div', { class: 'empty' }, 'The path lights up after the agent\'s first reply.'));
-  p.append(h('div', { class: 'flush' }, h('div', { class: 'live' }, list, tx, side)));
+  p.append(h('div', { class: 'flush' }, h('div', { class: 'live' + (S.rtab === 'map' ? ' wide' : '') }, list, tx, side)));
+  if (S.rtab === 'map') { drawMap(); loadMap(S.sel); }
   tx.scrollTop = atBottom ? tx.scrollHeight : keep;
   list.scrollTop = keepList;
 }
@@ -817,6 +1044,7 @@ function editProduct(pid) {
   const base = pid ? JSON.parse(JSON.stringify(S.products[pid])) : { id: '', tenant: S.tenant, product_name: '', seller_name: S.tenants.find((t) => t.id === S.tenant)?.name || '', agent_name: 'Arjun', original_price: '', offer_price: '', discount: '', offer_validity: '', benefits: [], knowledge: '', pitch_en: '', pitch_hi: '', pitch_hinglish: '', faqs: [], allowed_numbers: [], price_note: '', rupee_terms: {}, renewal_note: {}, annual_note: {}, sms_text: '' };
   modal(pid ? base.product_name : 'New product', pid ? 'Changes apply to the next call.' : 'What the agent sells, and the facts it may use.', (b, f, close) => {
     const F = {}; let err;
+    const neg = negEditor(base, !!(pid && S.products[pid] && S.products[pid].real_company));
     const fld = (k, label, type) => {
       const v = base[k]; let el;
       if (type === 'lines') el = h('textarea', { rows: 3 }, (v || []).join('\n'));
@@ -827,7 +1055,7 @@ function editProduct(pid) {
     };
     const tsel = h('select', {}, S.tenants.map((t) => h('option', { value: t.id, selected: t.id === (base.tenant || S.tenant) }, t.name)));
     F.tenant = [tsel, 'text'];
-    b.append(
+    b.append(...flat([
       !pid ? fld('id', 'Id · letters, digits, -') : null,
       h('label', { class: 'lbl' }, 'Tenant'), tsel,
       h('div', { class: 'grid2' }, h('div', {}, fld('product_name', 'Product name')), h('div', {}, fld('seller_name', 'Calling for (company)'))),
@@ -840,7 +1068,7 @@ function editProduct(pid) {
       fld('benefits', 'Benefits · one per line', 'lines'),
       fld('knowledge', 'Knowledge the agent may use · facts only', 'area'),
       fld('tone', 'Tone'), fld('allowed_numbers', 'Only call these numbers · one per line · empty = any', 'lines'),
-      err = h('div', { class: 'err' }));
+      neg.el, err = h('div', { class: 'err' })]));
     const save = async () => {
       const out = { ...base };
       for (const [k, [el, type]] of Object.entries(F)) {
@@ -849,6 +1077,7 @@ function editProduct(pid) {
         else if (type === 'lang') { const o = {}; v.split('\n').forEach((line) => { const m = line.match(/^(en|hi|hinglish):\s*(.*)$/); if (m && m[2].trim()) o[m[1]] = m[2].trim(); }); out[k] = o; }
         else out[k] = v;
       }
+      out.economics = neg.collect(); delete out.real_company;
       const id = pid || out.id; if (!id) { err.textContent = 'Id is required'; return; }
       try { await api('/api/products/' + id, { method: 'PUT', body: JSON.stringify(out) }); await Promise.all([loadProducts(), loadTenants()]); close(); render(); } catch (e) { err.textContent = e.message; }
     };
