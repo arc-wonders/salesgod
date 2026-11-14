@@ -21,7 +21,7 @@ from .compiler import PromptCompiler
 from .decision.engine import DecisionEngine
 from .expression import ExpressionBackend, TemplateBackend, render_fallback
 from .feedback import FeedbackEngine
-from .personalization.policy import AdaptationPolicy, detect_explicit_requests
+from .personalization.policy import AdaptationPolicy, detect_explicit_requests, make_default_policy
 from .personalization.profile_store import MemoryProfileStore, ProfileStore
 from .context import is_question
 from .safety import distress_followup_plan, distress_plan, is_distress
@@ -53,7 +53,7 @@ class ACIEPipeline:
         self.backend = backend or TemplateBackend()
         self.store = store or MemoryProfileStore()
         self.estimator = estimator or HumanStateEstimator()
-        self.policy = policy or AdaptationPolicy()
+        self.policy = policy or make_default_policy()
         self.compiler = compiler or PromptCompiler()
         self.feedback = feedback or FeedbackEngine()
         self.sessions: dict[str, SessionState] = {}  # -> Redis in production

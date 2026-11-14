@@ -104,6 +104,9 @@ class CustomerProfile(BaseModel):
     preferences: dict[str, PreferenceField] = Field(default_factory=dict)  # language/formality/verbosity/complexity
     interaction_count: int = 0
     outcomes: list[str] = Field(default_factory=list)  # e.g. "resolved", "offer_declined"
+    likes: list[str] = Field(default_factory=list)
+    dislikes: list[str] = Field(default_factory=list)
+    topics: list[str] = Field(default_factory=list)
 
 
 class ExpressionParams(BaseModel):
@@ -116,6 +119,10 @@ class ExpressionParams(BaseModel):
     warmth: Level = "med"
     proactivity: Level = "med"
     acknowledge_emotion: bool = False
+    regional_variant: str | None = None  # "delhi", "mumbai", "lucknow", "bihar", "south_indian_english", ...
+    explanation_style: Literal["direct", "example", "step_by_step"] = "direct"
+    info_density: Level = "med"
+    reassurance: Level = "low"
 
 
 # --------------------------------------------------------------------------- layer 4: decision
