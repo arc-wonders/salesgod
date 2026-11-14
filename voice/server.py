@@ -192,6 +192,7 @@ class App:
         rec = call.public()
         if self.maps.get(call.call_id):
             rec["map"] = self.maps[call.call_id]  # last live-map snapshot, for GET /api/calls/{id}/map
+        rec.update(getattr(call, "crm", None) or {})  # CRM links (project_id, crm_customer_id, campaign_id, call_type), set by voice/crm
         (CALLS_DIR / f"{call.call_id}.json").write_text(json.dumps(rec, ensure_ascii=False, indent=1))
 
     async def finish(self, call: CallRecord, pipeline: ACIEPipeline, session_id: str) -> None:
@@ -210,6 +211,8 @@ class App:
             await pipeline.feedback.remember(sess, prof)
             await pipeline.store.save(prof)
         self.save(call)
+        if getattr(self, "on_call_end", None):  # CRM: apply the outcome to the customer (never raises)
+            self.on_call_end({**call.public(), **(getattr(call, "crm", None) or {}), "result": getattr(call, "result", None)})
         self.live_sessions.pop(call.call_id, None)
         self.maps.pop(call.call_id, None)
         self.broadcast({"type": "status", "call": call.public()})
@@ -725,6 +728,39 @@ def build_app() -> tuple[FastAPI, App]:
     # ------------------------------------------------------------------ productgen (add a product by name): one self-contained block
     from acie.productgen.api import register as _productgen_register
     _productgen_register(api, _require, DATA, CALLS_DIR)
+
+    # ------------------------------------------------------------------ CRM (projects, customers, campaigns, follow-ups): one self-contained block
+    from .crm.api import register as _crm_register
+
+    async def _crm_dial(to: str, product_id: str, language: str, customer_name: str, link: dict) -> dict:
+        """Operator/auto dial for the CRM: the same gates as POST /api/calls (allowed_numbers, DNC, call hours, max parallel)."""
+        live = sum(1 for c in state.calls.values() if c.status in ("dialing", "ringing", "live"))
+        if live >= cfg.max_parallel_calls:
+            return {"error": f"max {cfg.max_parallel_calls} calls at once ({live} running)"}
+        if product_id not in state.products():
+            return {"error": f"unknown product {product_id!r}"}
+        if why := state.dial_block(to, product_id, {}):
+            return {"error": why}
+        call = CallRecord(to=to, language=language if language in ("hi", "en", "hinglish") else "hi", backend="llm", campaign=product_id,
+                          customer_name=customer_name[:40], customer_id=to)
+        call.crm = {"project_id": link["project_id"], "crm_customer_id": link["customer_id"], "campaign_id": link["campaign_id"],
+                    "call_type": link["call_type"]}
+        call.call_type = link["call_type"]  # read by make_pipeline when the CALLTYPES lane is merged
+        state.calls[call.call_id] = call
+        try:
+            await plivo.dial(call)
+        except Exception as e:
+            call.status, call.end_reason = "failed", str(e)[:200]
+        state.save(call)
+        state.broadcast({"type": "status", "call": call.public()})
+        return {"call_id": call.call_id, "status": call.status, "error": call.end_reason}
+
+    def _crm_active() -> tuple[int, set[str]]:
+        live = [c for c in state.calls.values() if c.status in ("dialing", "ringing", "live")]
+        return len(live), {getattr(c, "crm", {}).get("crm_customer_id", "") for c in live}
+
+    state.crm = _crm_register(api, _require, DATA, CALLS_DIR, dialer=_crm_dial, active=_crm_active)
+    state.on_call_end = state.crm["on_call_end"]
 
     @api.get("/healthz")
     async def health() -> dict:
