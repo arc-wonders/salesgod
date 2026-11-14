@@ -1,0 +1,37 @@
+{
+ "id": "accept_close-eager-en",
+ "class": "accept_close",
+ "campaign": "claude-pro",
+ "lang": "en",
+ "opening_language": "en",
+ "source": "persona eager: yes in the first turns",
+ "turns": [
+  {
+   "say": "yes I was waiting for this",
+   "tags": [
+    "interest",
+    "accept"
+   ]
+  },
+  {
+   "say": "send me the link now",
+   "tags": [
+    "accept",
+    "ask_link",
+    "end_ok"
+   ]
+  },
+  {
+   "say": "thanks, bye",
+   "tags": [
+    "accept",
+    "end_ok"
+   ],
+   "must": {
+    "must": {
+     "end_call": true
+    }
+   }
+  }
+ ]
+}

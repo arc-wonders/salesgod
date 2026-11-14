@@ -1,0 +1,64 @@
+{
+ "id": "product_facts-claude-hindi",
+ "class": "product_facts",
+ "campaign": "claude-pro",
+ "lang": "hi",
+ "opening_language": "hi",
+ "source": "Hindi support, privacy, price details",
+ "turns": [
+  {
+   "say": "हाँ बोलिए",
+   "tags": [
+    "interest"
+   ]
+  },
+  {
+   "say": "क्या ये हिंदी में काम करता है?",
+   "tags": [
+    "interest"
+   ],
+   "must": {
+    "must": {
+     "contains_any": [
+      "हिंदी",
+      "hindi",
+      "Hindi",
+      "भाषा"
+     ]
+    }
+   }
+  },
+  {
+   "say": "मेरा डेटा सुरक्षित रहेगा क्या?",
+   "tags": [
+    "interest"
+   ],
+   "must": {
+    "must": {
+     "contains_any": [
+      "privacy",
+      "प्राइवेसी",
+      "सेटिंग",
+      "settings",
+      "anthropic.com"
+     ]
+    }
+   }
+  },
+  {
+   "say": "पहले तीन महीने के बाद कितना लगेगा?",
+   "tags": [
+    "asks_price",
+    "interest"
+   ],
+   "must": {
+    "must": {
+     "contains_any": [
+      "20",
+      "२०"
+     ]
+    }
+   }
+  }
+ ]
+}

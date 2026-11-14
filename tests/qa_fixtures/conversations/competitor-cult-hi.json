@@ -1,0 +1,38 @@
+{
+ "id": "competitor-cult-hi",
+ "class": "competitor",
+ "campaign": "fitzone-gym",
+ "lang": "hi",
+ "opening_language": "hi",
+ "source": "price comparison with a competitor gym",
+ "turns": [
+  {
+   "say": "हाँ बोलिए",
+   "tags": [
+    "interest"
+   ]
+  },
+  {
+   "say": "मेरा दोस्त दूसरे जिम में सस्ते में जाता है",
+   "tags": [
+    "interest"
+   ],
+   "must": {
+    "must": {
+     "end_call": false
+    }
+   }
+  },
+  {
+   "say": "आपका जिम उनसे बेहतर कैसे है?",
+   "tags": [
+    "interest"
+   ],
+   "must": {
+    "must": {
+     "end_call": false
+    }
+   }
+  }
+ ]
+}

@@ -1,0 +1,38 @@
+{
+ "id": "hardship-low-en",
+ "class": "hardship",
+ "campaign": "claude-pro",
+ "lang": "en",
+ "opening_language": "en",
+ "source": "feeling low in English",
+ "turns": [
+  {
+   "say": "yes",
+   "tags": [
+    "interest"
+   ]
+  },
+  {
+   "say": "honestly I've been feeling really low this month and money is tight",
+   "tags": [
+    "hardship"
+   ],
+   "must": {
+    "must": {
+     "end_call": false
+    }
+   }
+  },
+  {
+   "say": "it's just a lot right now",
+   "tags": [
+    "hardship"
+   ],
+   "must": {
+    "must": {
+     "end_call": false
+    }
+   }
+  }
+ ]
+}

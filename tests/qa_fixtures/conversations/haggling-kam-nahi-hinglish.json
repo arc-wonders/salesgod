@@ -1,0 +1,77 @@
+{
+ "id": "haggling-kam-nahi-hinglish",
+ "class": "haggling",
+ "campaign": "claude-pro",
+ "lang": "hinglish",
+ "opening_language": "hinglish",
+ "source": "real: 'can you reduce it a little?' ended the call, caller later wanted to join",
+ "turns": [
+  {
+   "say": "haan bolo",
+   "tags": [
+    "interest"
+   ]
+  },
+  {
+   "say": "price kya hai",
+   "tags": [
+    "asks_price",
+    "interest"
+   ],
+   "must": {
+    "must": {
+     "contains_any": [
+      "8",
+      "20"
+     ]
+    }
+   }
+  },
+  {
+   "say": "kam nahi ho sakta kya? thoda aur",
+   "tags": [
+    "asks_price"
+   ],
+   "must": {
+    "must": {
+     "end_call": false,
+     "intent_not_in": [
+      "declined"
+     ],
+     "contains_any": [
+      "fixed",
+      "तय",
+      "kam nahi",
+      "कम नहीं",
+      "can't reduce",
+      "cannot reduce",
+      "nahi kar sakta",
+      "नहीं कर सकता",
+      "no discount",
+      "already",
+      "pehle se"
+     ]
+    }
+   }
+  },
+  {
+   "say": "agar 500 rupaye kam karo to abhi le lunga",
+   "tags": [
+    "asks_price"
+   ],
+   "must": {
+    "must": {
+     "end_call": false
+    }
+   }
+  },
+  {
+   "say": "achha chalo theek hai, link bhejo",
+   "tags": [
+    "accept",
+    "ask_link",
+    "end_ok"
+   ]
+  }
+ ]
+}

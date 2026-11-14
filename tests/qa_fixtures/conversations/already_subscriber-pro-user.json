@@ -1,0 +1,54 @@
+{
+ "id": "already_subscriber-pro-user",
+ "class": "already_subscriber",
+ "campaign": "claude-pro",
+ "lang": "hinglish",
+ "opening_language": "hinglish",
+ "source": "already pays for Pro",
+ "turns": [
+  {
+   "say": "haan bolo",
+   "tags": [
+    "interest"
+   ]
+  },
+  {
+   "say": "main to already Pro use karta hoon",
+   "must": {
+    "must": {
+     "contains_any": [
+      "current plan",
+      "already",
+      "pehle se",
+      "same",
+      "keep",
+      "nayi",
+      "new",
+      "naye",
+      "no change",
+      "badlega nahi",
+      "पहले से",
+      "नए"
+     ],
+     "end_call": false
+    }
+   }
+  },
+  {
+   "say": "to kya mujhe ye 8 dollar wala offer milega?",
+   "tags": [
+    "asks_price"
+   ],
+   "must": {
+    "must": {
+     "not_contains_any": [
+      "naya account",
+      "new account",
+      "another account",
+      "dusra account"
+     ]
+    }
+   }
+  }
+ ]
+}

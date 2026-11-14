@@ -1,0 +1,38 @@
+{
+ "id": "hardship-illness-hi",
+ "class": "hardship",
+ "campaign": "fitzone-gym",
+ "lang": "hi",
+ "opening_language": "hi",
+ "source": "family illness, money tight",
+ "turns": [
+  {
+   "say": "हाँ बोलिए",
+   "tags": [
+    "interest"
+   ]
+  },
+  {
+   "say": "घर में बीमारी चल रही है, पैसे की तंगी है",
+   "tags": [
+    "hardship"
+   ],
+   "must": {
+    "must": {
+     "end_call": false
+    }
+   }
+  },
+  {
+   "say": "बस थक गया हूँ",
+   "tags": [
+    "hardship"
+   ],
+   "must": {
+    "must": {
+     "end_call": false
+    }
+   }
+  }
+ ]
+}

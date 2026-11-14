@@ -1,0 +1,25 @@
+{
+ "id": "rude_optout-dnd-hi",
+ "class": "rude_optout",
+ "campaign": "claude-pro",
+ "lang": "hi",
+ "opening_language": "hi",
+ "source": "do-not-disturb in Hindi",
+ "turns": [
+  {
+   "say": "हाँ"
+  },
+  {
+   "say": "दोबारा फ़ोन मत करना, मुझे परेशान मत करो",
+   "tags": [
+    "refuse",
+    "end_ok"
+   ],
+   "must": {
+    "must": {
+     "end_call": true
+    }
+   }
+  }
+ ]
+}

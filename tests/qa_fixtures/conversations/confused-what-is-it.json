@@ -1,0 +1,43 @@
+{
+ "id": "confused-what-is-it",
+ "class": "confused",
+ "campaign": "fitzone-gym",
+ "lang": "hi",
+ "opening_language": "hi",
+ "source": "caller does not know what is being sold",
+ "turns": [
+  {
+   "say": "हाँ"
+  },
+  {
+   "say": "आप कौन बोल रहे हो? क्या बेच रहे हो?",
+   "tags": [
+    "interest"
+   ],
+   "must": {
+    "must": {
+     "end_call": false,
+     "contains_any": [
+      "FitZone",
+      "जिम",
+      "gym",
+      "Gym",
+      "membership",
+      "मेंबरशिप"
+     ]
+    }
+   }
+  },
+  {
+   "say": "मैंने तो कुछ मंगाया ही नहीं",
+   "tags": [
+    "interest"
+   ],
+   "must": {
+    "must": {
+     "end_call": false
+    }
+   }
+  }
+ ]
+}

@@ -1,0 +1,49 @@
+{
+ "id": "trial_branch_whatsapp-trial",
+ "class": "trial_branch_whatsapp",
+ "campaign": "fitzone-gym",
+ "lang": "hinglish",
+ "opening_language": "hinglish",
+ "source": "real: trial pass dodged three times with the same line",
+ "turns": [
+  {
+   "say": "haan bolo",
+   "tags": [
+    "interest"
+   ]
+  },
+  {
+   "say": "trial class milegi kya pehle?",
+   "tags": [
+    "interest"
+   ],
+   "must": {
+    "must": {
+     "end_call": false
+    }
+   }
+  },
+  {
+   "say": "ek din ka pass bhi nahi hai kya?",
+   "tags": [
+    "interest"
+   ],
+   "must": {
+    "must": {
+     "end_call": false
+    }
+   }
+  },
+  {
+   "say": "theek hai bina trial ke kaise leloon",
+   "tags": [
+    "interest"
+   ],
+   "must": {
+    "must": {
+     "end_call": false
+    }
+   }
+  }
+ ]
+}

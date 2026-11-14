@@ -1,0 +1,35 @@
+{
+ "id": "busy-driving",
+ "class": "busy",
+ "campaign": "claude-pro",
+ "lang": "hinglish",
+ "opening_language": "hinglish",
+ "source": "busy caller must get a callback offer, not a pitch",
+ "turns": [
+  {
+   "say": "hello",
+   "tags": [
+    "tags_none"
+   ]
+  },
+  {
+   "say": "main gaadi chala raha hoon, baad mein call karo",
+   "tags": [
+    "refuse",
+    "end_ok"
+   ],
+   "must": {
+    "must": {
+     "contains_any": [
+      "baad",
+      "later",
+      "call",
+      "time",
+      "safe",
+      "drive"
+     ]
+    }
+   }
+  }
+ ]
+}

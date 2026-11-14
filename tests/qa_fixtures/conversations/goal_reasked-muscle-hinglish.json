@@ -1,0 +1,37 @@
+{
+ "id": "goal_reasked-muscle-hinglish",
+ "class": "goal_reasked",
+ "campaign": "fitzone-gym",
+ "lang": "hinglish",
+ "opening_language": "hinglish",
+ "source": "goal told in the first sentence",
+ "turns": [
+  {
+   "say": "haan bolo",
+   "tags": [
+    "interest"
+   ]
+  },
+  {
+   "say": "mujhe muscle banana hai, powerlifting karta hoon",
+   "tags": [
+    "interest",
+    "answered_goal"
+   ]
+  },
+  {
+   "say": "kitne din aana chahiye?",
+   "tags": [
+    "interest",
+    "answered_goal"
+   ]
+  },
+  {
+   "say": "aur diet ka kuch milta hai?",
+   "tags": [
+    "interest",
+    "answered_goal"
+   ]
+  }
+ ]
+}

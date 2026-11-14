@@ -1,0 +1,74 @@
+{
+ "id": "included_price-trainer-hinglish",
+ "class": "included_price",
+ "campaign": "fitzone-gym",
+ "lang": "hinglish",
+ "opening_language": "hinglish",
+ "source": "real: 'trainer kitne ka' got the membership price four times",
+ "turns": [
+  {
+   "say": "haan bolo",
+   "tags": [
+    "interest"
+   ]
+  },
+  {
+   "say": "trainer ke alag se kitne paise lagenge",
+   "tags": [
+    "asks_price",
+    "interest"
+   ],
+   "must": {
+    "must": {
+     "contains_any": [
+      "included",
+      "shamil",
+      "शामिल",
+      "alag keemat nahi",
+      "अलग कीमत नहीं",
+      "no separate",
+      "milta",
+      "मिलता",
+      "milti",
+      "मिलती"
+     ],
+     "not_contains_any": [
+      "2999"
+     ]
+    }
+   }
+  },
+  {
+   "say": "aur trainer session ka kya rate hai",
+   "tags": [
+    "asks_price",
+    "interest"
+   ],
+   "must": {
+    "must": {
+     "contains_any": [
+      "included",
+      "shamil",
+      "शामिल",
+      "alag keemat nahi",
+      "अलग कीमत नहीं",
+      "no separate",
+      "milta",
+      "मिलता",
+      "milti",
+      "मिलती"
+     ],
+     "not_contains_any": [
+      "2999"
+     ]
+    }
+   }
+  },
+  {
+   "say": "ok theek hai",
+   "tags": [
+    "interest"
+   ]
+  }
+ ]
+}

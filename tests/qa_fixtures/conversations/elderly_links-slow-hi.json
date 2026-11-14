@@ -1,0 +1,44 @@
+{
+ "id": "elderly_links-slow-hi",
+ "class": "elderly_links",
+ "campaign": "fitzone-gym",
+ "lang": "hi",
+ "opening_language": "hi",
+ "source": "elderly asks to slow down",
+ "turns": [
+  {
+   "say": "हाँ बेटा बोलो",
+   "tags": [
+    "interest"
+   ]
+  },
+  {
+   "say": "बेटा धीरे बोलो, मुझे ये सब समझ नहीं आता",
+   "tags": [
+    "interest"
+   ],
+   "must": {
+    "must": {
+     "end_call": false
+    }
+   }
+  },
+  {
+   "say": "मैसेज में क्या आएगा? मुझे तो मैसेज पढ़ना भी नहीं आता",
+   "tags": [
+    "refuse"
+   ],
+   "must": {
+    "must": {
+     "end_call": false
+    }
+   }
+  },
+  {
+   "say": "ठीक है बेटा रखती हूँ",
+   "tags": [
+    "end_ok"
+   ]
+  }
+ ]
+}

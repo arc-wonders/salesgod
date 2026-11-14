@@ -1,0 +1,25 @@
+{
+ "id": "rude_optout-dont-call",
+ "class": "rude_optout",
+ "campaign": "claude-pro",
+ "lang": "en",
+ "opening_language": "en",
+ "source": "explicit opt-out",
+ "turns": [
+  {
+   "say": "who is this"
+  },
+  {
+   "say": "stop calling me, remove my number",
+   "tags": [
+    "refuse",
+    "end_ok"
+   ],
+   "must": {
+    "must": {
+     "end_call": true
+    }
+   }
+  }
+ ]
+}

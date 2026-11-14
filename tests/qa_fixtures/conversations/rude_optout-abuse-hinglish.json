@@ -1,0 +1,38 @@
+{
+ "id": "rude_optout-abuse-hinglish",
+ "class": "rude_optout",
+ "campaign": "fitzone-gym",
+ "lang": "hinglish",
+ "opening_language": "hinglish",
+ "source": "abuse then opt-out",
+ "turns": [
+  {
+   "say": "haan kaun",
+   "tags": [
+    "interest"
+   ]
+  },
+  {
+   "say": "bakwas band karo, bar bar call karte ho, number hata do",
+   "tags": [
+    "refuse",
+    "end_ok"
+   ],
+   "must": {
+    "must": {
+     "end_call": true,
+     "contains_any": [
+      "sorry",
+      "maaf",
+      "माफ़",
+      "remove",
+      "hata",
+      "disturb",
+      "nahi karenge",
+      "won't"
+     ]
+    }
+   }
+  }
+ ]
+}

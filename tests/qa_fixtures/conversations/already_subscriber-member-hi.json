@@ -1,0 +1,35 @@
+{
+ "id": "already_subscriber-member-hi",
+ "class": "already_subscriber",
+ "campaign": "fitzone-gym",
+ "lang": "hi",
+ "opening_language": "hi",
+ "source": "already a member of the same gym",
+ "turns": [
+  {
+   "say": "हाँ बोलिए",
+   "tags": [
+    "interest"
+   ]
+  },
+  {
+   "say": "मैं तो पहले से मेंबर हूँ आपके जिम का",
+   "must": {
+    "must": {
+     "end_call": false
+    }
+   }
+  },
+  {
+   "say": "तो मुझे क्या फ़ायदा होगा इससे?",
+   "tags": [
+    "interest"
+   ],
+   "must": {
+    "must": {
+     "end_call": false
+    }
+   }
+  }
+ ]
+}

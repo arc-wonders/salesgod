@@ -1,0 +1,46 @@
+{
+ "id": "invented_memory-previous-inquiry",
+ "class": "invented_memory",
+ "campaign": "fitzone-gym",
+ "lang": "en",
+ "opening_language": "en",
+ "source": "live ae0e: 'we have your details from your previous inquiry' (invented)",
+ "turns": [
+  {
+   "say": "Yes, please talk to me in English",
+   "tags": [
+    "interest"
+   ],
+   "lang": "en",
+   "expect_lang": "en"
+  },
+  {
+   "say": "what are the provisions for bench press?",
+   "tags": [
+    "interest"
+   ]
+  },
+  {
+   "say": "I think I have talked to you before. Can you help me figure it out?",
+   "tags": [
+    "interest"
+   ],
+   "must": {
+    "must": {
+     "end_call": false
+    }
+   }
+  },
+  {
+   "say": "do you remember what I asked last time?",
+   "tags": [
+    "interest"
+   ],
+   "must": {
+    "must": {
+     "end_call": false
+    }
+   }
+  }
+ ]
+}

@@ -1,0 +1,30 @@
+{
+ "id": "soft_no-abhi-nahi",
+ "class": "soft_no",
+ "campaign": "fitzone-gym",
+ "lang": "hinglish",
+ "opening_language": "hinglish",
+ "source": "real: re-offer straight after 'abhi nahi'",
+ "turns": [
+  {
+   "say": "haan bolo",
+   "tags": [
+    "interest"
+   ]
+  },
+  {
+   "say": "abhi nahi yaar",
+   "tags": [
+    "refuse",
+    "end_ok"
+   ]
+  },
+  {
+   "say": "nahi abhi nahi chahiye",
+   "tags": [
+    "refuse",
+    "end_ok"
+   ]
+  }
+ ]
+}

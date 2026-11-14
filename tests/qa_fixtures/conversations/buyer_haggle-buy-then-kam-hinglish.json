@@ -1,0 +1,60 @@
+{
+ "id": "buyer_haggle-buy-then-kam-hinglish",
+ "class": "buyer_haggle",
+ "campaign": "fitzone-gym",
+ "lang": "hinglish",
+ "opening_language": "hinglish",
+ "source": "Hinglish version: wants to buy, asks for less",
+ "turns": [
+  {
+   "say": "haan bolo",
+   "tags": [
+    "interest"
+   ]
+  },
+  {
+   "say": "main lena chahta hoon, link bhej do",
+   "tags": [
+    "accept",
+    "ask_link",
+    "end_ok"
+   ]
+  },
+  {
+   "say": "par 2500 mein de do na",
+   "tags": [
+    "asks_price",
+    "accept"
+   ],
+   "must": {
+    "must": {
+     "end_call": false
+    }
+   }
+  },
+  {
+   "say": "2500 mein hi lunga, bas thoda kam karo",
+   "tags": [
+    "asks_price",
+    "accept"
+   ],
+   "must": {
+    "must": {
+     "end_call": false
+    }
+   }
+  },
+  {
+   "say": "phir se wahi bol rahe ho, band karo",
+   "tags": [
+    "asks_price",
+    "accept"
+   ],
+   "must": {
+    "must": {
+     "end_call": false
+    }
+   }
+  }
+ ]
+}

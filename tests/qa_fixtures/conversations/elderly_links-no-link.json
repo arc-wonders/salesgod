@@ -1,0 +1,34 @@
+{
+ "id": "elderly_links-no-link",
+ "class": "elderly_links",
+ "campaign": "claude-pro",
+ "lang": "hinglish",
+ "opening_language": "hinglish",
+ "source": "persona elderly: cannot open links",
+ "turns": [
+  {
+   "say": "haan beta bolo",
+   "tags": [
+    "interest"
+   ]
+  },
+  {
+   "say": "beta mujhe phone pe link kholna nahi aata",
+   "tags": [
+    "refuse"
+   ],
+   "must": {
+    "must": {
+     "end_call": false
+    }
+   }
+  },
+  {
+   "say": "mere bete ko bolna padega, mujhse nahi hoga",
+   "tags": [
+    "refuse",
+    "end_ok"
+   ]
+  }
+ ]
+}

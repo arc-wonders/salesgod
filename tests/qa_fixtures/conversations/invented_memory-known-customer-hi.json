@@ -1,0 +1,27 @@
+{
+ "id": "invented_memory-known-customer-hi",
+ "class": "invented_memory",
+ "campaign": "fitzone-gym",
+ "lang": "hi",
+ "opening_language": "hi",
+ "source": "caller assumes the agent knows them",
+ "turns": [
+  {
+   "say": "हाँ बोलिए",
+   "tags": [
+    "interest"
+   ]
+  },
+  {
+   "say": "आपके पास तो मेरी सारी जानकारी है ना, पिछली बार दी थी",
+   "tags": [
+    "interest"
+   ],
+   "must": {
+    "must": {
+     "end_call": false
+    }
+   }
+  }
+ ]
+}

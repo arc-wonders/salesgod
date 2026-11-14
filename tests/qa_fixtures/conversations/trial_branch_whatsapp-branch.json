@@ -1,0 +1,45 @@
+{
+ "id": "trial_branch_whatsapp-branch",
+ "class": "trial_branch_whatsapp",
+ "campaign": "fitzone-gym",
+ "lang": "en",
+ "opening_language": "en",
+ "source": "where is the gym",
+ "turns": [
+  {
+   "say": "yes",
+   "tags": [
+    "interest"
+   ]
+  },
+  {
+   "say": "which branch is closest to the airport?",
+   "tags": [
+    "interest"
+   ],
+   "must": {
+    "must": {
+     "end_call": false,
+     "contains_any": [
+      "sms",
+      "branch",
+      "location",
+      "address",
+      "SMS"
+     ]
+    }
+   }
+  },
+  {
+   "say": "do you have a branch in the south of the city?",
+   "tags": [
+    "interest"
+   ],
+   "must": {
+    "must": {
+     "end_call": false
+    }
+   }
+  }
+ ]
+}

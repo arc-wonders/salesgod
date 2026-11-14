@@ -1,0 +1,27 @@
+{
+ "id": "explicit_bye-bye-mid",
+ "class": "explicit_bye",
+ "campaign": "fitzone-gym",
+ "lang": "hinglish",
+ "opening_language": "hinglish",
+ "source": "caller says bye after a normal answer",
+ "turns": [
+  {
+   "say": "haan bolo",
+   "tags": [
+    "interest"
+   ]
+  },
+  {
+   "say": "ok theek hai, bye bye",
+   "tags": [
+    "end_ok"
+   ],
+   "must": {
+    "must": {
+     "end_call": true
+    }
+   }
+  }
+ ]
+}

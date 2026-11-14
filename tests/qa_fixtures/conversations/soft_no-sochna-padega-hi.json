@@ -1,0 +1,30 @@
+{
+ "id": "soft_no-sochna-padega-hi",
+ "class": "soft_no",
+ "campaign": "fitzone-gym",
+ "lang": "hi",
+ "opening_language": "hi",
+ "source": "'I will think about it' must be respected, not pushed",
+ "turns": [
+  {
+   "say": "हाँ बताइए",
+   "tags": [
+    "interest"
+   ]
+  },
+  {
+   "say": "सोचना पड़ेगा",
+   "tags": [
+    "refuse",
+    "end_ok"
+   ]
+  },
+  {
+   "say": "अभी नहीं, फिर देखते हैं",
+   "tags": [
+    "refuse",
+    "end_ok"
+   ]
+  }
+ ]
+}

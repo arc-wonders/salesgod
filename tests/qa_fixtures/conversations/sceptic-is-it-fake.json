@@ -1,0 +1,69 @@
+{
+ "id": "sceptic-is-it-fake",
+ "class": "sceptic",
+ "campaign": "claude-pro",
+ "lang": "hinglish",
+ "opening_language": "hinglish",
+ "source": "real: 'is it fake / why so cheap' got the same sales line five times",
+ "turns": [
+  {
+   "say": "haan bolo",
+   "tags": [
+    "interest"
+   ]
+  },
+  {
+   "say": "ye fake to nahi hai? itna sasta kaise",
+   "tags": [
+    "interest"
+   ],
+   "must": {
+    "must": {
+     "contains_any": [
+      "official",
+      "Anthropic",
+      "anthropic",
+      "real",
+      "asli",
+      "असली",
+      "sach",
+      "60",
+      "discount",
+      "offer"
+     ]
+    }
+   }
+  },
+  {
+   "say": "tum log scam karte ho kya",
+   "tags": [
+    "interest"
+   ],
+   "must": {
+    "must": {
+     "end_call": false
+    }
+   }
+  },
+  {
+   "say": "pehle ye batao tumhe mera number kahan se mila",
+   "tags": [
+    "interest"
+   ],
+   "must": {
+    "must": {
+     "contains_any": [
+      "remove",
+      "hata",
+      "source",
+      "list",
+      "nahi pata",
+      "details nahi",
+      "don't have",
+      "pata nahi"
+     ]
+    }
+   }
+  }
+ ]
+}

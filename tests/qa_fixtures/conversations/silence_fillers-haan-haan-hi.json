@@ -1,0 +1,37 @@
+{
+ "id": "silence_fillers-haan-haan-hi",
+ "class": "silence_fillers",
+ "campaign": "claude-pro",
+ "lang": "hi",
+ "opening_language": "hi",
+ "source": "caller says only 'haan'",
+ "turns": [
+  {
+   "say": "हाँ"
+  },
+  {
+   "say": "हाँ",
+   "tags": [
+    "interest"
+   ]
+  },
+  {
+   "say": "हाँ हाँ",
+   "tags": [
+    "interest"
+   ]
+  },
+  {
+   "say": "हम्म",
+   "tags": [
+    "interest"
+   ]
+  },
+  {
+   "say": "ठीक",
+   "tags": [
+    "interest"
+   ]
+  }
+ ]
+}

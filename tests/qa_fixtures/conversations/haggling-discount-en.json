@@ -1,0 +1,64 @@
+{
+ "id": "haggling-discount-en",
+ "class": "haggling",
+ "campaign": "fitzone-gym",
+ "lang": "en",
+ "opening_language": "en",
+ "source": "English haggling",
+ "turns": [
+  {
+   "say": "go ahead",
+   "tags": [
+    "interest"
+   ]
+  },
+  {
+   "say": "how much",
+   "tags": [
+    "asks_price",
+    "interest"
+   ]
+  },
+  {
+   "say": "that's expensive, any further discount?",
+   "tags": [
+    "asks_price"
+   ],
+   "must": {
+    "must": {
+     "end_call": false,
+     "contains_any": [
+      "fixed",
+      "तय",
+      "kam nahi",
+      "कम नहीं",
+      "can't reduce",
+      "cannot reduce",
+      "nahi kar sakta",
+      "नहीं कर सकता",
+      "no discount",
+      "already",
+      "pehle se"
+     ]
+    }
+   }
+  },
+  {
+   "say": "my friend got it cheaper, can you match that?",
+   "tags": [
+    "asks_price"
+   ],
+   "must": {
+    "must": {
+     "end_call": false
+    }
+   }
+  },
+  {
+   "say": "alright then I'll think about it",
+   "tags": [
+    "end_ok"
+   ]
+  }
+ ]
+}

@@ -1,0 +1,39 @@
+{
+ "id": "restate_facts-echo-student-hi",
+ "class": "restate_facts",
+ "campaign": "claude-pro",
+ "lang": "hi",
+ "opening_language": "hi",
+ "source": "caller says they are a student; agent must not parrot it back",
+ "turns": [
+  {
+   "say": "हाँ बोलिए",
+   "tags": [
+    "interest"
+   ]
+  },
+  {
+   "say": "मैं कॉलेज में पढ़ता हूँ और कोडिंग सीखता हूँ",
+   "tags": [
+    "interest",
+    "answered_goal"
+   ]
+  },
+  {
+   "say": "इसमें क्या मिलेगा?",
+   "tags": [
+    "interest"
+   ],
+   "must": {
+    "must": {
+     "not_contains_any": [
+      "आप कॉलेज",
+      "आप स्टूडेंट",
+      "as a student",
+      "college student"
+     ]
+    }
+   }
+  }
+ ]
+}

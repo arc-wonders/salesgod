@@ -1,0 +1,35 @@
+{
+ "id": "callback-evening-en",
+ "class": "callback",
+ "campaign": "claude-pro",
+ "lang": "en",
+ "opening_language": "en",
+ "source": "callback at a given time",
+ "turns": [
+  {
+   "say": "hi",
+   "tags": [
+    "interest"
+   ]
+  },
+  {
+   "say": "could you call me back this evening around 7?",
+   "tags": [
+    "refuse",
+    "end_ok"
+   ],
+   "must": {
+    "must": {
+     "contains_any": [
+      "evening",
+      "7",
+      "call",
+      "later",
+      "sure",
+      "time"
+     ]
+    }
+   }
+  }
+ ]
+}

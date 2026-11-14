@@ -1,0 +1,32 @@
+{
+ "id": "offtopic-joke-en",
+ "class": "offtopic",
+ "campaign": "fitzone-gym",
+ "lang": "en",
+ "opening_language": "en",
+ "source": "chit-chat in English",
+ "turns": [
+  {
+   "say": "yes",
+   "tags": [
+    "interest"
+   ]
+  },
+  {
+   "say": "tell me a joke",
+   "must": {
+    "must": {
+     "end_call": false
+    }
+   }
+  },
+  {
+   "say": "where are you calling from, which city?",
+   "must": {
+    "must": {
+     "end_call": false
+    }
+   }
+  }
+ ]
+}

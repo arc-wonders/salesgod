@@ -1,0 +1,60 @@
+{
+ "id": "question_not_consent-join-question",
+ "class": "question_not_consent",
+ "campaign": "fitzone-gym",
+ "lang": "hi",
+ "opening_language": "hi",
+ "source": "live ae0e: 'will I get the gym if I join?' (a question) made the agent send the payment link",
+ "turns": [
+  {
+   "say": "को नियर झाल",
+   "tags": [
+    "garbled"
+   ]
+  },
+  {
+   "say": "बोलो बोलो",
+   "tags": [
+    "interest"
+   ]
+  },
+  {
+   "say": "कर दो कर दो",
+   "tags": [
+    "interest"
+   ]
+  },
+  {
+   "say": "पर मुझे जिम जॉइन करके मिलेगा क्या",
+   "tags": [
+    "interest"
+   ],
+   "must": {
+    "must": {
+     "intent_not_in": [
+      "link_sent"
+     ],
+     "not_contains_any": [
+      "bhej raha",
+      "भेज रहा",
+      "भेज दिया",
+      "bhej diya"
+     ]
+    }
+   }
+  },
+  {
+   "say": "मुझे इस जिम को जॉइन करके क्या क्या मिल सकता है",
+   "tags": [
+    "interest"
+   ],
+   "must": {
+    "must": {
+     "intent_not_in": [
+      "link_sent"
+     ]
+    }
+   }
+  }
+ ]
+}

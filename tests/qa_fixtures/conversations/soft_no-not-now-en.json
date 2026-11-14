@@ -1,0 +1,30 @@
+{
+ "id": "soft_no-not-now-en",
+ "class": "soft_no",
+ "campaign": "claude-pro",
+ "lang": "en",
+ "opening_language": "en",
+ "source": "soft no in English, then a second soft no",
+ "turns": [
+  {
+   "say": "sure what is it",
+   "tags": [
+    "interest"
+   ]
+  },
+  {
+   "say": "not right now, maybe later",
+   "tags": [
+    "refuse",
+    "end_ok"
+   ]
+  },
+  {
+   "say": "no really, not now",
+   "tags": [
+    "refuse",
+    "end_ok"
+   ]
+  }
+ ]
+}

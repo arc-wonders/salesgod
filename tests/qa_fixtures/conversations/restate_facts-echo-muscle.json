@@ -1,0 +1,47 @@
+{
+ "id": "restate_facts-echo-muscle",
+ "class": "restate_facts",
+ "campaign": "fitzone-gym",
+ "lang": "en",
+ "opening_language": "en",
+ "source": "live ae0e: 'it will help with muscle' right after the caller said muscle",
+ "turns": [
+  {
+   "say": "yes go on",
+   "tags": [
+    "interest"
+   ]
+  },
+  {
+   "say": "I want to focus on building muscles and the aesthetics of my body",
+   "tags": [
+    "interest",
+    "answered_goal"
+   ]
+  },
+  {
+   "say": "so what will I get?",
+   "tags": [
+    "interest",
+    "answered_goal"
+   ],
+   "must": {
+    "must": {
+     "not_contains_any": [
+      "help with muscle",
+      "helps with muscle",
+      "help you build muscle",
+      "aesthetics"
+     ]
+    }
+   }
+  },
+  {
+   "say": "ok",
+   "tags": [
+    "interest",
+    "answered_goal"
+   ]
+  }
+ ]
+}

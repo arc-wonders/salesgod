@@ -1,0 +1,29 @@
+{
+ "id": "already_subscriber-friend-account",
+ "class": "already_subscriber",
+ "campaign": "claude-pro",
+ "lang": "en",
+ "opening_language": "en",
+ "source": "asks about second account trick",
+ "turns": [
+  {
+   "say": "yes",
+   "tags": [
+    "interest"
+   ]
+  },
+  {
+   "say": "I already pay for Pro. If I cancel and sign up again with a new email will I get this price?",
+   "must": {
+    "must": {
+     "not_contains_any": [
+      "yes you will",
+      "yes, you can",
+      "you can get"
+     ],
+     "end_call": false
+    }
+   }
+  }
+ ]
+}

@@ -1,0 +1,40 @@
+{
+ "id": "elderly_links-otp-fear",
+ "class": "elderly_links",
+ "campaign": "claude-pro",
+ "lang": "hinglish",
+ "opening_language": "hinglish",
+ "source": "elderly afraid of OTP and links",
+ "turns": [
+  {
+   "say": "haan ji",
+   "tags": [
+    "interest"
+   ]
+  },
+  {
+   "say": "OTP maangoge kya? mujhe daar lagta hai",
+   "tags": [
+    "interest"
+   ],
+   "must": {
+    "must": {
+     "contains_any": [
+      "otp",
+      "OTP",
+      "share",
+      "mat",
+      "nahi",
+      "never"
+     ]
+    }
+   }
+  },
+  {
+   "say": "link pe click nahi karunga, mere paas smartphone bhi purana hai",
+   "tags": [
+    "refuse"
+   ]
+  }
+ ]
+}

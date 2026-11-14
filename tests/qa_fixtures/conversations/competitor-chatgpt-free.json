@@ -1,0 +1,59 @@
+{
+ "id": "competitor-chatgpt-free",
+ "class": "competitor",
+ "campaign": "claude-pro",
+ "lang": "hinglish",
+ "opening_language": "hinglish",
+ "source": "persona chatgpt fan",
+ "turns": [
+  {
+   "say": "haan bolo",
+   "tags": [
+    "interest"
+   ]
+  },
+  {
+   "say": "main to ChatGPT use karta hoon, wo free hai",
+   "tags": [
+    "interest"
+   ],
+   "must": {
+    "must": {
+     "end_call": false
+    }
+   }
+  },
+  {
+   "say": "ChatGPT se kya alag hai ye?",
+   "tags": [
+    "interest"
+   ],
+   "must": {
+    "must": {
+     "end_call": false,
+     "contains_any": [
+      "claude",
+      "Claude",
+      "likhne",
+      "writing",
+      "long",
+      "coding",
+      "document",
+      "लंबे"
+     ]
+    }
+   }
+  },
+  {
+   "say": "hmm wo bhi to sab kuch karta hai",
+   "tags": [
+    "interest"
+   ],
+   "must": {
+    "must": {
+     "end_call": false
+    }
+   }
+  }
+ ]
+}

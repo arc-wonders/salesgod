@@ -1,0 +1,45 @@
+{
+ "id": "language_switch-mid-sentence-mix",
+ "class": "language_switch",
+ "campaign": "fitzone-gym",
+ "lang": "hinglish",
+ "opening_language": "hinglish",
+ "source": "code-mixing must not flip the reply to English",
+ "turns": [
+  {
+   "say": "haan bolo",
+   "tags": [
+    "interest"
+   ]
+  },
+  {
+   "say": "mujhe membership ke baare mein detail chahiye, timings kya hain",
+   "tags": [
+    "interest"
+   ],
+   "must": {
+    "must": {
+     "end_call": false
+    }
+   }
+  },
+  {
+   "say": "okay and what about weekends",
+   "tags": [
+    "interest"
+   ],
+   "lang": "en",
+   "must": {
+    "must": {
+     "end_call": false
+    }
+   }
+  },
+  {
+   "say": "theek hai aur trainer?",
+   "tags": [
+    "interest"
+   ]
+  }
+ ]
+}

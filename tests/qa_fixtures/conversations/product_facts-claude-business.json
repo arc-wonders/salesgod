@@ -1,0 +1,55 @@
+{
+ "id": "product_facts-claude-business",
+ "class": "product_facts",
+ "campaign": "claude-pro",
+ "lang": "hinglish",
+ "opening_language": "hinglish",
+ "source": "shop owner: GST / Tally",
+ "turns": [
+  {
+   "say": "haan boliye",
+   "tags": [
+    "interest"
+   ]
+  },
+  {
+   "say": "main dukaan chalata hoon, GST ka hisaab kar dega?",
+   "tags": [
+    "interest"
+   ],
+   "must": {
+    "must": {
+     "contains_any": [
+      "GST",
+      "gst",
+      "bill",
+      "hisaab",
+      "udhaari",
+      "madad"
+     ]
+    }
+   }
+  },
+  {
+   "say": "Tally ki jagah le lega kya?",
+   "tags": [
+    "interest"
+   ],
+   "must": {
+    "must": {
+     "contains_any": [
+      "tally",
+      "Tally",
+      "replace",
+      "nahi",
+      "not",
+      "saath",
+      "alongside",
+      "टैली",
+      "टेली"
+     ]
+    }
+   }
+  }
+ ]
+}

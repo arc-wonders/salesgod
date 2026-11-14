@@ -1,0 +1,46 @@
+{
+ "id": "language_switch-hindi-only-elder",
+ "class": "language_switch",
+ "campaign": "claude-pro",
+ "lang": "hi",
+ "opening_language": "hi",
+ "source": "Hindi caller must never get English sentences",
+ "turns": [
+  {
+   "say": "हाँ बोलिए",
+   "tags": [
+    "interest"
+   ]
+  },
+  {
+   "say": "इसमें क्या क्या मिलता है",
+   "tags": [
+    "interest"
+   ],
+   "must": {
+    "must": {
+     "end_call": false
+    }
+   }
+  },
+  {
+   "say": "और कितने का है",
+   "tags": [
+    "asks_price",
+    "interest"
+   ]
+  },
+  {
+   "say": "मुझे अंग्रेज़ी नहीं आती, हिंदी में समझाओ",
+   "tags": [
+    "interest"
+   ],
+   "expect_lang": "hi",
+   "must": {
+    "must": {
+     "lang": "hi"
+    }
+   }
+  }
+ ]
+}

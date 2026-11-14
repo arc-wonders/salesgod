@@ -1,0 +1,42 @@
+{
+ "id": "question_not_consent-price-again-en",
+ "class": "question_not_consent",
+ "campaign": "fitzone-gym",
+ "lang": "en",
+ "opening_language": "en",
+ "source": "a 'tell me the price again' after confirm_close is not a yes",
+ "turns": [
+  {
+   "say": "sure",
+   "tags": [
+    "interest"
+   ]
+  },
+  {
+   "say": "what do I get?",
+   "tags": [
+    "interest"
+   ]
+  },
+  {
+   "say": "go on, price?",
+   "tags": [
+    "asks_price",
+    "interest"
+   ]
+  },
+  {
+   "say": "okay but what exactly will I get if I join",
+   "tags": [
+    "interest"
+   ],
+   "must": {
+    "must": {
+     "intent_not_in": [
+      "link_sent"
+     ]
+    }
+   }
+  }
+ ]
+}

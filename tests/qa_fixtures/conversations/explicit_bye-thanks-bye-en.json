@@ -1,0 +1,27 @@
+{
+ "id": "explicit_bye-thanks-bye-en",
+ "class": "explicit_bye",
+ "campaign": "claude-pro",
+ "lang": "en",
+ "opening_language": "en",
+ "source": "polite goodbye",
+ "turns": [
+  {
+   "say": "sure",
+   "tags": [
+    "interest"
+   ]
+  },
+  {
+   "say": "thank you, I have to go now, bye",
+   "tags": [
+    "end_ok"
+   ],
+   "must": {
+    "must": {
+     "end_call": true
+    }
+   }
+  }
+ ]
+}

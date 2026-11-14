@@ -1,0 +1,55 @@
+{
+ "id": "included_price-projects-en",
+ "class": "included_price",
+ "campaign": "claude-pro",
+ "lang": "en",
+ "opening_language": "en",
+ "source": "price of an included feature on claude-pro",
+ "turns": [
+  {
+   "say": "yes tell me",
+   "tags": [
+    "interest"
+   ]
+  },
+  {
+   "say": "how much extra for Projects?",
+   "tags": [
+    "asks_price",
+    "interest"
+   ],
+   "must": {
+    "must": {
+     "contains_any": [
+      "included",
+      "no separate",
+      "part of",
+      "comes with",
+      "no extra",
+      "not extra"
+     ]
+    }
+   }
+  },
+  {
+   "say": "and access to the latest models, is that extra?",
+   "tags": [
+    "asks_price",
+    "interest"
+   ],
+   "must": {
+    "must": {
+     "contains_any": [
+      "included",
+      "no separate",
+      "part of",
+      "comes with",
+      "no extra",
+      "not extra",
+      "includes"
+     ]
+    }
+   }
+  }
+ ]
+}
