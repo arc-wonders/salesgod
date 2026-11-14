@@ -464,12 +464,7 @@
      "branch",
      "ब्रांच",
      "location",
-     "kahan",
-     "कहाँ",
-     "कहां",
      "address",
-     "पता",
-     "near",
      "gurgaon",
      "gurugram",
      "गुरुग्राम",
@@ -480,8 +475,11 @@
      "साकेत",
      "sector",
      "सेक्टर",
+     "re:(gym|jim|जिम|centre|center|branch|ब्रांच|jagah|जगह).{0,25}(kahan|kahaan|kidhar|कहाँ|कहां)|(kahan|kahaan|कहाँ|कहां).{0,20}(hai|है|located|pe hai|par hai)\\b(?!.{0,30}(number|नंबर))",
+     "re:\\bnear(est)?\\b.{0,12}(me|my|home|ghar|branch|us|here)|(mere|मेरे) (ghar|घर|paas|पास)",
      "nearest",
-     "पास"
+     "आपका पता",
+     "aapka pata"
     ],
     "answer": "We have three branches in Delhi NCR: Saket in Delhi, Sector 29 in Gurugram and Sector 62 in Noida; there is no branch in Sector 49 Gurugram, the nearest is Sector 29",
     "answer_hi": "दिल्ली NCR में हमारी तीन ब्रांच हैं: दिल्ली में साकेत, गुरुग्राम में सेक्टर 29 और नोएडा में सेक्टर 62; गुरुग्राम के सेक्टर 49 में ब्रांच नहीं है, सबसे पास सेक्टर 29 है",
@@ -716,8 +714,8 @@
   "cancel_any_time": null,
   "info_source": {
    "en": "the gym team at the nearest branch can tell you",
-   "hi": "नज़दीकी ब्रांच पर जिम की टीम आपको बता सकती है",
-   "hinglish": "nazdeeki branch par gym ki team aapko bata sakti hai"
+   "hi": "नज़दीकी ब्रांच पर जिम की टीम से पूछ लीजिए",
+   "hinglish": "nazdeeki branch par gym ki team se pooch lijiye"
   },
   "description": "operator demo facts: FitZone is the operator's own demo gym, not a real company. Every fact in this sheet (plans, branches, policies, rates) is authored demo data; the operator confirms or replaces it (see docs/PRODUCT_FACTS_TODO.md).",
   "negotiation": {

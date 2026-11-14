@@ -417,8 +417,14 @@ _WHO = re.compile(
     r"कौन (बोल|बात)|(आप|तुम) कौन|कौन हो\b|कहाँ से (बोल|कॉल)|कहां से (बोल|कॉल)|किस कंपनी|"
     r"who.?s this|who is it|^\W*(\S+\W+){0,4}(कौन है|kaun hai)\W*(\S+\W*){0,4}$", re.IGNORECASE)
 _NUMBER_SOURCE = re.compile(
-    r"(where|how) did you get my number|got my number|my number from|number kaha|number kahan|number kaise mila|"
-    r"नंबर (कहाँ|कहां|कैसे)|मेरा नंबर (कहाँ|कहां|किसने|कैसे)", re.IGNORECASE)
+    r"(where|how|from where|whom) did you (get|take|find|got) (my|this) (number|contact|phone)|got my (number|contact)|my number from|"
+    r"which (list|database|data) .{0,25}(number|contact)|(number|contact) .{0,20}(which|what) (list|database)|who gave you (my|this) (number|contact)|"
+    r"(number|nambar|nmber|नंबर|नम्बर) (kaha|kahan|kahaan|kaise|kaisey|kisne|kis ne|kidhar|कहाँ|कहां|कैसे|किसने|किसके)|"
+    r"(mera|meri|mere|मेरा|मेरी|मेरे) (number|nambar|contact|नंबर|नम्बर|कॉन्टैक्ट).{0,25}(kaha|kahan|kaise|kisne|kisse|liya|mila|diya|कहाँ|कहां|कैसे|किसने|लिया|मिला|दिया)|"
+    r"(kisne|किसने|kaise|कैसे|kahan se|कहाँ से|कहां से).{0,25}(mera|मेरा|meri|मेरी).{0,10}(number|नंबर|contact)", re.IGNORECASE)
+# "yes, remove it" after "shall I remove your number?" (every spelling of hata/hatao/remove/delete/kar do)
+_OPTOUT_YES = re.compile(r"hat(a|ao|aa|o)\b|hata\s*(do|dijiye|dena|de|den|dijiyega)|हटा|हटाओ|हटा(दो|दीजिए|दीजिये|देना)|remove|delete|"
+                         r"\byes\b|\bhaan?\b|\bhaa\b|हाँ|हां|ठीक|theek|ok(ay)?\b|sure|please|kar do|कर दो|kardo|bilkul|बिल्कुल|zaroor|ज़रूर|जरूर", re.I)
 _SENSITIVE_DIGITS = re.compile(r"\d{6,}|(\d[ -]?){8,}")
 _SENSITIVE = re.compile(r"\botp\b|ओटीपी|\bcvv\b|सीवीवी|card number|कार्ड नंबर|card ka number|कार्ड का नंबर|"
                         r"upi pin|यूपीआई पिन|\bpin\b|पिन (नंबर|है)|password|पासवर्ड|\d{6,}|(\d[ -]?){8,}", re.IGNORECASE)
@@ -719,6 +725,8 @@ class ProductSalesDomain:
 
     def _faq_match(self, text: str) -> FAQ | None:
         low = text.lower()
+        if _NUMBER_SOURCE.search(low):
+            return None  # "where did you get my number?" is not a branch/location question ("kahan" must not pull the branch answer)
         for f, kws in self._faq:
             if any(re.search(k, low) for k in kws):
                 return f
@@ -1597,7 +1605,8 @@ class ProductSalesDomain:
         p = self.p
         if d.get("pending") == "optout_offer":  # we asked "shall I remove your number?"
             d["pending"] = d.pop("before_optout", "") or "intro"
-            if intent == "affirm" or re.search(r"hata (do|dijiye)|हटा (दो|दीजिए|दीजिये)|remove it|yes", text, re.I):
+            if (intent == "affirm" or _OPTOUT_YES.search(text)) and not re.search(
+                    r"\b(no|nahi|nahin|mat|don.?t|do not)\b|नहीं|नही|मत", text, re.I):
                 return self._opt_out_plan(d)
         if _OPT_OUT.search(text) and not (_LATER.search(text) and not re.search(r"dobara|dubara|दोबारा|दुबारा|never|कभी", text, re.I)):
             return self._opt_out_plan(d)
@@ -1631,10 +1640,17 @@ class ProductSalesDomain:
                             fallback=_tpl(pre["en"] + "I'm {agent}, an AI assistant calling for {seller} about an offer on {product}. " + ("Do you have two minutes?" if intro else "Please go on."),
                                           pre["hi"] + "मैं {agent} हूँ, {seller} की तरफ़ से एक AI असिस्टेंट, {product} के एक ऑफर के बारे में कॉल किया है। " + ("दो मिनट बात कर सकते हैं?" if intro else "बताइए।"),
                                           pre["hinglish"] + "Main {agent} hoon, {seller} ki taraf se ek AI assistant, {product} ke ek offer ke baare mein call kiya hai. " + ("Do minute baat kar sakte hain?" if intro else "Bataiye.")))
-        if _NUMBER_SOURCE.search(text) and d.get("asked_number_source") != "1":
+        if _NUMBER_SOURCE.search(text):
+            again = d.get("asked_number_source") == "1"
             d["asked_number_source"] = "1"
             d["before_optout"] = d.get("pending", "")
             d["pending"] = "optout_offer"
+            if again:
+                return TurnPlan(intent="number_source", llm_allowed=False, facts=ident,
+                                objective="They asked where the number came from again: repeat the honest answer in fewer words, offer removal",
+                                fallback=_tpl("As I said, it was on a calling list and I can't tell which one. I can take your number off it right now. Shall I?",
+                                              "जैसा बताया, ये एक कॉलिंग लिस्ट में था और मुझे नहीं पता कौन सी। मैं अभी आपका नंबर हटा सकता हूँ। हटा दूँ?",
+                                              "Jaisa bataya, ye ek calling list mein tha aur mujhe nahi pata kaun si. Main abhi aapka number hata sakta hoon. Hata doon?"))
             return TurnPlan(intent="number_source", llm_allowed=False, facts=ident,
                             objective="Say where the number came from honestly and offer to remove it",
                             fallback=_tpl("Honestly, your number was on a calling list I was given, and I don't have details of where the list came from. If you don't want these calls, I can remove it right now. Shall I remove it?",
