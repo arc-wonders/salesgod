@@ -712,7 +712,9 @@ class CallSession:
         sess = getattr(getattr(self, "pipeline", None), "sessions", {}).get(getattr(self, "session_id", ""))
         link = (sess.dialog.get("payment_link_url") if sess is not None else "") or p.payment_link  # business API link
         text = p.sms_text.format_map(_SafeMap({"seller": p.seller_name, "product": p.product_name,
-                                               "offer_price": p.offer_price, "link": link}))
+                                               # the price the caller agreed in negotiation, else the offer
+                                               "offer_price": (sess.dialog.get("agreed_offer_price") if sess is not None else None)
+                                               or p.offer_price, "link": link}))
         res = await self.app.plivo.send_sms(self.call.to, text)
         self.call.sms.append({"text": text, "to": self.call.to, "at": time.time(), **res})
         self.event("sms", res)
