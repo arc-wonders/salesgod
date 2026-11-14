@@ -245,6 +245,9 @@ _NEGOTIATE = re.compile(r"कम (नहीं |नही )?(कर|हो)|औ�
                         r"\breduce\b|bargain|negotiat|discount (do|de|aur|mil)|(some|any|a little|more) discount|can i get (a )?discount|"
                         r"सस्ता कर|sasta kar|और डिस्काउंट|डिस्काउंट (दो|दे|मिल)", re.I)
 
+from ...signals import NEGOTIATE_MORE as _NEGOTIATE_MORE  # noqa: E402
+_NEGOTIATE = re.compile(_NEGOTIATE.pattern + "|" + _NEGOTIATE_MORE, re.I)
+
 
 def _is_counter_offer(text: str, product) -> bool:
     """The customer proposes their own price ("2 डॉलर में चाहिए") or asks for a lower one."""

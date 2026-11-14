@@ -181,3 +181,12 @@ def build_vocabulary(domain: Any, classifier: Any = None) -> IntentVocabulary:
     except ValueError:
         pass
     return IntentVocabulary(labels=labels, guide=guide, aliases=aliases, rule_first=rule_first, gated=gated)
+
+
+# more ways to ask for a lower price / another offer, in hi / en / hinglish; "nahi" inside is still a question
+NEGOTIATE_MORE = (r"(सस्ता|सस्ती|सस्ते|कम|चीप)\s*(नहीं|नही|ना)?\s*(कर|हो|मिल|कीजिए)|और\s*(सस्ता|सस्ती|सस्ते|कम|चीप)|"
+                  r"डिस्काउंट\s*(नहीं|नही)?\s*(मिल|दो|दे|हो)|कोई\s*(और|दूसरा|दूसरी)\s*(ऑफर|offer|प्लान|डील)|"
+                  r"\b(kam|sasta|sasti|cheap|cheaper)\s*(nahi |nahin |nhi |na )?(kar|ho|mil)|\b(aur|more)\s*(sasta|sasti|kam|cheap)|"
+                  r"\bdiscount\s*(nahi |nahin |nhi )?(mil|do|de|aur|ho)|"
+                  r"\b(can.?t|cannot|couldn.?t|won.?t|not able to)\s+(you\s+)?(do\s+it\s+|make\s+it\s+|give\s+(me\s+)?|get\s+)?(any\s+)?(cheaper|lower|less|a\s+discount|discount)|"
+                  r"\bkoi\s+(aur|dusra|doosra|other)\s+(offer|plan|deal)|\bany\s+other\s+(offer|deal|plan)|\bthoda\s+kam")

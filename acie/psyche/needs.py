@@ -54,6 +54,8 @@ NO = re.compile(r"नहीं चाहिए|नही चाहिए|नह�
 # asking for a lower price is negotiation (a question about the price), never a decline, even with "नहीं" in it
 NEGOTIATE = re.compile(r"कम (नहीं |नही )?(कर|हो)|और कम|थोड़ा कम|थोडा कम|बोरा सा कम|कुछ कम|kam (nahi |nhi )?(kar|ho)|thoda kam|cheaper|lower (the )?price|"
                        r"\breduce\b|bargain|(some|any|a little|more) discount|discount (do|de|aur|mil)|सस्ता कर|sasta kar|और डिस्काउंट", _I)
+from ..signals import NEGOTIATE_MORE  # noqa: E402
+NEGOTIATE = re.compile(NEGOTIATE.pattern + "|" + NEGOTIATE_MORE, _I)
 BARE_NO = {"no", "nope", "nahi", "nahin", "nai", "na", "नहीं", "नही", "ना", "ने", "नो"}
 LATER = re.compile(r"\b(later|call me back|call back|call me later|some other time|another time|not now|abhi nahi|baad mein|baad me)\b|"
                    r"बाद में|बाद मे|अभी नहीं|अभी मत|कल कॉल|कल फोन|फिर कभी|बाद में कॉल", _I)
