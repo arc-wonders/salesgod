@@ -72,8 +72,7 @@ def test_only_the_true_last_step_says_final_and_only_once():
     assert finals == [4]                                                                    # the 2,449 step, nowhere else
     for r in out[1:4]:
         assert not FINAL_WORDS.search(r.text["hinglish"])
-    for r in out[2:4]:
-        assert "mushkil" in r.text["hinglish"]                                              # "isse neeche mushkil hai", not a false "last offer"
+    assert sum("mushkil" in r.text["hinglish"] for r in out[1:4]) == 1                      # "isse neeche mushkil hai" once per call, never a false "last offer"
 
 
 def test_counter_below_the_floor_is_a_no_to_that_number_then_the_next_step_never_below():

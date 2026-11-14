@@ -294,7 +294,8 @@ class ACIEPipeline:
             return plan
         if plan.intent in _GUARD_KEEP or plan.intent.startswith(("safety", "distress", "concern")) or plan.reference \
                 or (plan.decision or "").startswith(("garbled input", "audio check", "negotiation")) \
-                or plan.intent in ("confirm_close", "price_floor"):  # the negotiation, floor and confirmation lines carry the price on purpose
+                or plan.intent in ("confirm_close", "price_floor") \
+                or (plan.intent == "link_sent" and not plan.lead):  # a plain link confirmation (at the agreed price) is never swapped for a fact; the negotiation, floor and confirmation lines carry the price on purpose
             return plan  # (a garbled-line "say it again" and the audio answer are the point of the turn, never rewritten)
         if not (not plan.llm_allowed or isinstance(self.backend, TemplateBackend)):
             return plan

@@ -639,6 +639,7 @@ class ProductSalesDomain:
             # the Hinglish pitch is still the Claude default while the Hindi one was written for this product
             product = product.model_copy(update={"pitch_hinglish": ""})
         self.p = product
+        self._p0 = product  # the product as configured: every negotiated price is derived from it, never stacked
         if playbook is None and product.playbook_tree:
             from ... import playbook as pbm
             try:
@@ -890,9 +891,11 @@ class ProductSalesDomain:
         tone = tone_rules.effective_tone(getattr(self.p, "tone_level", "mid"), d, text, self.customer.age if self.customer else self.customer_age)
         plan.tone_level = tone
         toned = d.pop("_toned", None) == "1"
-        if toned or plan.intent in tone_rules.SKIP_INTENTS or d.get("sad_hold") == "1" or not plan.fallback:
+        if plan.intent in tone_rules.SKIP_INTENTS or d.get("sad_hold") == "1" or not plan.fallback:
             return
-        plan.fallback = tone_rules.restyle(plan.fallback, tone)
+        if not toned:
+            plan.fallback = tone_rules.restyle(plan.fallback, tone)
+        plan.fallback = tone_rules.address(plan.fallback, tone, tone_rules.who(self.customer_name or (self.customer.name if self.customer else "")))
 
     # ------------------------------------------------------------------ business API, constraints, next best action
 
@@ -1766,6 +1769,8 @@ class ProductSalesDomain:
             return None
         if r.toned:
             d["_toned"] = "1"
+        if r.offer and r.offer.get("price") and r.offer["price"] != self._p0.economics.list_price:
+            self.p = self._p0.model_copy(update=self._price_update(float(r.offer["price"])))  # every later price line says this offer
         r.state.save(d)
         d["pending"] = "neg_close" if r.offer else "close"
         if r.offer:
@@ -1773,6 +1778,33 @@ class ProductSalesDomain:
         return TurnPlan(intent=r.intent, llm_allowed=False, decision="negotiation: " + r.state.last, end_call=False, fallback=r.text,
                         facts={"offer": Fact(value=self._terms(lang), description="the offer as one phrase", must_mention=False)},
                         objective=r.note or "Answer the price talk honestly; no pressure, no invented discount")
+
+    def _price_update(self, price: float, d: dict | None = None) -> dict:
+        """The product fields that carry the price (terms, offer price, discount), at the ledger's current or agreed offer. Always derived
+        from the configured product (self._p0), so a price said later in the call can never fall back to the list price, in any tone."""
+        eco = self._p0.economics
+        if not (price and eco.list_price and price != eco.list_price):
+            return {}
+        new_p = f"{eco.currency}{int(round(price)):,}"
+        old_forms = [f"{eco.currency}{int(round(eco.list_price)):,}", f"{int(round(eco.list_price)):,}", str(int(round(eco.list_price)))]
+
+        def _swap(t: str) -> str:
+            for f in old_forms:
+                if f in t:
+                    return t.replace(f, new_p if f.startswith(eco.currency) else new_p.lstrip(eco.currency), 1)
+            return t
+        upd: dict = {}
+        if eco.price_terms:
+            upd["terms"] = {l: eco.price_terms[l].format(price=new_p) for l in eco.price_terms}
+        elif self._p0.terms:
+            upd["terms"] = {l: _swap(t) for l, t in self._p0.terms.items()}
+        upd["offer_price"] = _swap(self._p0.offer_price)
+        orig = re.findall(r"\d+", self._p0.original_price.replace(",", ""))
+        if orig and self._p0.discount and int(orig[0]) > price:
+            upd["discount"] = f"{int(round((1 - price / int(orig[0])) * 100))}% off"
+        if d is not None:
+            d["agreed_offer_price"] = upd["offer_price"]
+        return upd
 
     def _apply_neg_offer(self, d: dict) -> None:
         """The caller said yes to a concession: the agreed price goes into the terms and the offer price (so the confirmation, the link and
@@ -1787,28 +1819,13 @@ class ProductSalesDomain:
         perk_cost = sum(x.cost for x in eco.ladder if x.kind == "perk" and x.id == o.get("perk"))
         if eco.list_price and price < eco.profit_floor + perk_cost:
             price = eco.profit_floor + perk_cost  # never below the floor (the promised perk's cost included), whatever was said
-        upd = {}
-        if price and eco.list_price and price != eco.list_price:
-            new_p = f"{eco.currency}{int(round(price)):,}"
-            old_forms = [f"{eco.currency}{int(round(eco.list_price)):,}", f"{int(round(eco.list_price)):,}", str(int(round(eco.list_price)))]
-
-            def _swap(t: str) -> str:
-                for f in old_forms:
-                    if f in t:
-                        return t.replace(f, new_p if f.startswith(eco.currency) else new_p.lstrip(eco.currency), 1)
-                return t
-            if eco.price_terms:
-                upd["terms"] = {l: eco.price_terms[l].format(price=new_p) for l in eco.price_terms}
-            elif self.p.terms:
-                upd["terms"] = {l: _swap(t) for l, t in self.p.terms.items()}
-            upd["offer_price"] = _swap(self.p.offer_price) if any(f in self.p.offer_price for f in old_forms) else self.p.offer_price
-            d["agreed_offer_price"] = upd["offer_price"]  # voice/call.py may send this in the SMS instead of the list offer
+        upd = self._price_update(price, d)
         perk = next((x for x in eco.ladder if x.id == o.get("perk") and x.kind == "perk"), None)
         if perk is not None:
             base = upd.get("terms") or {l: honest.terms_text(self.p, l) for l in ("en", "hi", "hinglish")}
             upd["terms"] = {l: base[l] + ", " + (perk.short.get(l) or perk.text.get(l, "")) for l in base}
         if upd:
-            self.p = self.p.model_copy(update=upd)
+            self.p = self._p0.model_copy(update=upd)
         if price:
             d["closed_price"] = f"{price:.2f}"
             d["list_price"] = f"{eco.list_price:.2f}"
@@ -1990,7 +2007,8 @@ class ProductSalesDomain:
         st = negotiation.NegState.load(d)
         if st.price:
             on_table.add(int(st.price))
-        return n in on_table and bool(honest.SEND_REQ.search(text) or _BUY.search(text) or _is_question(text))
+        return n in on_table and bool(honest.SEND_REQ.search(text) or _BUY.search(text) or _is_question(text)
+                                      or re.search(r"kar\s?do|karo|de\s?do|chalega|theek|ठीक|le lunga|le leta|done|ok\b", text, re.I))
 
     def _has_free_plan(self) -> bool:
         """Only a product whose own facts mention a free plan may say "the free plan will do" (a gym has a free trial pass, not a free plan)."""
@@ -2118,12 +2136,16 @@ class ProductSalesDomain:
                             # the template speaks the answer (approved FAQ line, or the honest "I don't have that"), never a bare "anything else?"
                             fallback={l: self._answer_text(question, l) or ANYTHING_ELSE[i] for i, l in enumerate(("en", "hi", "hinglish"))})
         site = self.p.official_site
+        agreed = float(d.get("closed_price") or 0)
+        at = f" at {self.p.economics.currency}{int(round(agreed)):,}" if agreed else ""
+        at_hi = f" {self.p.economics.currency}{int(round(agreed)):,} पर" if agreed else ""
+        at_hl = f" {self.p.economics.currency}{int(round(agreed)):,} par" if agreed else ""
         return TurnPlan(intent="link_sent", decision="payment link sent", end_call=False, llm_allowed=False,
                         facts={},
-                        objective="Confirm the link is coming by SMS to this number; thank them",
-                        fallback=_tpl("Great! I'm sending the payment link by SMS to this number now. Open it to pay securely" + (f"; if it doesn't arrive in a few minutes, the offer is also on {site}" if site else "") + ". Take your time, I'm here if you have a question.",
-                                      "बढ़िया! मैं अभी इसी नंबर पर SMS से पेमेंट लिंक भेज रहा हूँ। उसे खोलकर सुरक्षित पेमेंट कर सकते हैं। आराम से देखिए, कोई सवाल हो तो मैं यहीं हूँ।",
-                                      "Badhiya! Main abhi isi number pe SMS se payment link bhej raha hoon. Use khol ke secure payment kar sakte hain. Aaram se dekhiye, koi sawal ho to main yahin hoon."))
+                        objective="Confirm the link is coming by SMS to this number, at the agreed price; thank them",
+                        fallback=_tpl("Great! I'm sending the payment link by SMS to this number now" + at + ". Open it to pay securely" + (f"; if it doesn't arrive in a few minutes, the offer is also on {site}" if site else "") + ". Take your time, I'm here if you have a question.",
+                                      "बढ़िया!" + at_hi + " मैं अभी इसी नंबर पर SMS से पेमेंट लिंक भेज रहा हूँ। उसे खोलकर सुरक्षित पेमेंट कर सकते हैं। आराम से देखिए, कोई सवाल हो तो मैं यहीं हूँ।",
+                                      "Badhiya!" + at_hl + " main abhi isi number pe SMS se payment link bhej raha hoon. Use khol ke secure payment kar sakte hain. Aaram se dekhiye, koi sawal ho to main yahin hoon."))
 
     def _price_plan(self, lang: str = "en", known: bool = False) -> TurnPlan:
         """The full offer, then (only if we still don't know) what they'd use it for. `known`: they already told us."""
