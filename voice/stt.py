@@ -65,7 +65,7 @@ class WhisperSTT:
             share_en = None
         mirror_en = lang == "hi" and hint is None and prefer == "en" and share_en is not None and share_en >= 0.15
         mirror_hi = lang == "en" and hint is None and prefer != "en"
-        if lang == "hi" and self.hi_model is not None and not mirror_en:
+        if lang == "hi" and self.hi_model is not None and not mirror_en and self._clearly_hindi(audio, share_en):
             return self._filter(audio, self._run_hi(audio), "hi")
         segs = self._run(audio, lang, prompt)
         if mirror_en:
@@ -84,9 +84,24 @@ class WhisperSTT:
             score = lambda ss: float(np.mean([x.avg_logprob for x in ss])) if ss else -9.0
             if score(hi_segs) + 0.15 >= score(segs):
                 segs, lang = hi_segs, "hi"
-        if lang == "hi" and self.hi_model is not None:
+        if lang == "hi" and self.hi_model is not None and self._clearly_hindi(audio, share_en):
             segs = self._run_hi(audio)  # the language comparison above used large-v3; the words come from the Hindi model
         return self._filter(audio, segs, lang)
+
+    def _clearly_hindi(self, audio: np.ndarray, share_en: float | None) -> bool:
+        """The Hindi model cannot write English: it turned an English caller's "Currently, I am going towards building
+        a lean physique" into "मतब वो जो मुझे फिटनेस बनते हैं" once the call's language had flipped to Hindi (replay of
+        2c4ec7a4ff), and large-v3 forced to Hindi still writes English, so the call could recover. So the Hindi model
+        only gets turns long enough to judge (>= 1.6 s) that large-v3 hears as clearly Hindi; everything else, short
+        "हाँ/नहीं" included, stays on large-v3 exactly as before."""
+        if len(audio) < int(1.6 * 16000):
+            return False
+        if share_en is None:  # language was hinted (short-turn rule or the caller asked): check it here
+            _, _, probs = self.model.detect_language(audio)
+            p = dict(probs or [])
+            en, hi = p.get("en", 0.0), p.get("hi", 0.0) + p.get("ur", 0.0)
+            share_en = en / ((en + hi) or 1.0)
+        return share_en < 0.35
 
     def _run_hi(self, audio: np.ndarray) -> list:
         segments, _ = self.hi_model.transcribe(
