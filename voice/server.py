@@ -189,7 +189,8 @@ class App:
             call.context = sess.context.model_dump(exclude={"events"})
         if sess is not None:  # end of call -> long-term memory update
             prof = await pipeline.store.load(call.customer_id)
-            pipeline.feedback.end_session(prof)
+            pipeline.feedback.end_session(prof, sess)
+            await pipeline.feedback.remember(sess, prof)
             await pipeline.store.save(prof)
         self.save(call)
         self.broadcast({"type": "status", "call": call.public()})
