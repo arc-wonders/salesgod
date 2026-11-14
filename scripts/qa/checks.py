@@ -315,4 +315,19 @@ def numbers_in_product(prod_raw: dict) -> set[str]:
     """Every digit group anywhere in the product record, plus a small set of harmless ones (helpline, 1-2)."""
     text = flat(json.dumps(prod_raw, ensure_ascii=False))
     nums = set(re.findall(r"\d+", text))
+    eco = prod_raw.get("economics") or {}
+    if eco.get("list_price"):  # prices the negotiation ladder derives from the economics (steps, final, per-day)
+        from acie.decision import negotiation as _n
+        from acie.decision.domains.product_sales import Economics
+        try:
+            e = Economics.model_validate(eco)
+            if _n.ladder_enabled(type("P", (), {"economics": e})()):
+                g = _n._grid(e.list_price)  # every friendly price between the floor and the list (steps, midpoints, rounded counters)
+                nums |= {str(x) for x in _n.ladder_prices(e.list_price, e.profit_floor)}
+                nums |= {str(v) for v in range(int(e.profit_floor), int(e.list_price) + 1) if (v + 1) % g == 0}
+                pd = _n.per_day(e)
+                if pd:
+                    nums.add(str(int(round(pd))))
+        except Exception:
+            pass
     return nums | {"1", "2", "14416", "112", "5", "11"}

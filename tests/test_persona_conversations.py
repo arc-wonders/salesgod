@@ -458,24 +458,27 @@ def test_economics_floor_and_ladder_live_in_the_gym_config_and_stay_above_the_fl
 def test_haggle_walks_the_ladder_in_order_and_a_yes_locks_the_price_above_the_floor():
     out, _, sess = talk(["haan bolo", "kitne ka hai", "thoda kam karo", "kam karo na", "aur kam", "ab bhi mehenga hai"], GYM)
     texts = [t for _, t, _ in out[2:]]
-    assert "₹2,999" in texts[0] and "₹2,800" not in texts[0]          # first push: value, anchor at list
-    assert "hafte ki membership" in texts[1] and "₹2,800" in texts[2] and "personal trainer" not in texts[2]  # one perk per sale, then prices
+    assert "₹2,999" not in texts[0] and "₹2,799" not in texts[0]          # first push: a warm no with value, no cut yet
+    assert "₹2,799" in texts[1] and "₹2,649" in texts[2] and "₹2,549" in texts[3]  # then one shrinking step per push
     assert len(set(texts)) == len(texts) and all("₹2,000" not in t for t in texts)
     out, _, sess = talk(["haan bolo", "kitne ka hai", "thoda kam karo", "kam karo na", "aur kam", "ab bhi mehenga hai", "haan theek hai, kar do"], GYM)
-    assert out[-1][0] == "confirm_close" and "₹2,700" in out[-1][1]
+    assert out[-1][0] == "confirm_close" and "₹2,549" in out[-1][1]
     assert float(sess.dialog["closed_price"]) >= float(sess.dialog["profit_floor"]) == 2400.0
 
 
-@pytest.mark.parametrize("line", ["2500 mein de do", "₹2,500 pe done?", "2500 में दे दो"])
-def test_counter_at_or_above_the_floor_is_accepted_at_once(line):
-    out, _, sess = talk(["haan bolo", "kitne ka hai", line, "haan"], GYM)
-    assert "2,500" in out[2][1] and out[3][0] == "confirm_close" and "₹2,500" in out[3][1]
-    assert float(sess.dialog["closed_price"]) == 2500.0 and float(sess.dialog["margin_pct"]) == 20.0
+def test_counter_at_or_above_the_floor_is_met_then_accepted_never_at_once_on_the_first_push():
+    out, _, sess = talk(["haan bolo", "kitne ka hai"] + ["2500 mein de do"] * 6 + ["haan"], GYM)
+    assert "₹2,500" in out[2][1] and "₹2,999" not in out[2][1].split("?")[-1] and out[2][0] == "negotiation"  # first push: a no to their number
+    assert "₹2,749" in out[3][1]                                              # then the middle of 2,999 and 2,500, friendly
+    assert "₹2,649" in out[4][1] and "₹2,599" in out[5][1] and "₹2,549" in out[6][1]   # meeting in the middle each time, never up
+    assert "₹2,500" in out[7][1] and "pakka" in out[7][1]                    # their number clears the floor and our next step: accepted
+    assert out[-1][0] == "confirm_close" and "₹2,500" in out[-1][1]
+    assert float(sess.dialog["closed_price"]) == 2500.0 and float(sess.dialog["margin_pct"]) >= 20.0 * 0.99
 
 
-def test_counter_below_the_floor_gets_a_perk_not_a_price_below_the_floor():
-    out, _, sess = talk(["haan bolo", "kitne ka hai", "1000 mein do"], GYM)
-    assert "jod deta" in out[2][1] and "₹1,000" not in out[2][1] and "₹2,999" in out[2][1]
+def test_counter_below_the_floor_never_gets_a_price_below_the_floor():
+    out, _, sess = talk(["haan bolo", "kitne ka hai", "1000 mein do", "1000 mein do"], GYM)
+    assert "₹1,000" in out[2][1] and "₹2,999" not in out[2][1] and "₹2,799" in out[3][1]
     from acie.decision import negotiation
     st = negotiation.NegState()
     prices = []
@@ -497,9 +500,9 @@ def test_ladder_replies_in_hindi_and_english_and_deterministic():
     a = [negotiation.step(GYM, "कम करो", st, "", None)]
     r1 = negotiation.step(GYM, "कम करो", negotiation.NegState(), "", None)
     r2 = negotiation.step(GYM, "कम करो", negotiation.NegState(), "", None)
-    assert r1.text == r2.text and "₹2,999" in r1.text["hi"] and "₹2,999" in r1.text["en"]
-    r = negotiation.step(GYM, "2600 mein do", negotiation.NegState(), "", None)
-    assert "₹2,600" in r.text["en"] and "₹2,600" in r.text["hi"] and "₹2,600" in r.text["hinglish"]
+    assert r1.text == r2.text and r1.text["hi"] and r1.text["en"] and "?" in r1.text["hi"]
+    r = negotiation.step(GYM, "3000 mein do", negotiation.NegState(), "", None)  # at or above our offer: accepted at once, at our offer
+    assert "₹2,999" in r.text["en"] and "₹2,999" in r.text["hi"] and "₹2,999" in r.text["hinglish"]
 
 
 def test_sale_credit_scales_with_margin_and_is_zero_in_hardship_or_below_floor():
