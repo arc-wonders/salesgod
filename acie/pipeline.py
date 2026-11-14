@@ -41,7 +41,8 @@ class ACIEPipeline:
     def __init__(self, decision: DecisionEngine, backend: ExpressionBackend | None = None,
                  store: ProfileStore | None = None, estimator: HumanStateEstimator | None = None,
                  policy: AdaptationPolicy | None = None, compiler: PromptCompiler | None = None,
-                 feedback: FeedbackEngine | None = None, buffer_reply: bool = False, nlu=None):
+                 feedback: FeedbackEngine | None = None, buffer_reply: bool = False, nlu=None,
+                 session_store=None):
         # buffer_reply: validate the whole reply before releasing any of it. On a phone call this
         # avoids speaking half an LLM reply and then the safe template (the customer would hear
         # the same facts twice). Replies are 1-2 sentences, so the extra wait is small.
@@ -56,7 +57,16 @@ class ACIEPipeline:
         self.policy = policy or AdaptationPolicy()
         self.compiler = compiler or PromptCompiler()
         self.feedback = feedback or FeedbackEngine()
-        self.sessions: dict[str, SessionState] = {}  # -> Redis in production
+        self.sessions: dict[str, SessionState] = {}  # live-call cache
+        # optional durable copy (acie.store.sessions): loaded at turn start if this process has not seen the
+        # session yet (restart mid-call), saved at turn end. None = today's in-process behaviour.
+        self.session_store = session_store
+
+    async def forget_session(self, session_id: str) -> SessionState | None:
+        sess = self.sessions.pop(session_id, None)
+        if self.session_store is not None:
+            await self.session_store.delete(session_id)
+        return sess
 
     def session(self, turn: TurnInput) -> SessionState:
         if turn.session_id not in self.sessions:
@@ -105,6 +115,10 @@ class ACIEPipeline:
         def mark(name: str) -> None:
             t[name] = round((time.perf_counter() - t0) * 1000, 2)
 
+        if self.session_store is not None and turn.session_id not in self.sessions:
+            saved = await self.session_store.get(turn.session_id)
+            if saved is not None:
+                self.sessions[turn.session_id] = saved
         session = self.session(turn)
         (intent, state), profile = await asyncio.gather(self._stream_a(turn, session), self.store.load(turn.customer_id))
         mark("understand")
@@ -275,6 +289,11 @@ class ACIEPipeline:
         if plan.end_call:
             self.feedback.end_session(profile)
         await self.store.save(profile)
+        if self.session_store is not None:
+            try:
+                await self.session_store.put(session)
+            except Exception:  # the durable copy must never break a live call
+                pass
 
         return TurnResult(text=text, plan=plan, state=state, expression=expr,
                           validation=validator.report(), timings_ms=t)

@@ -1,0 +1,23 @@
+# Optional infra for ACIE. Nothing here is needed for the default (in-process) setup.
+#   docker compose up -d           # then set the ACIE_* variables in deploy/README.md
+# Host ports are offset (16379/15432/14222) so they never clash with a local redis/postgres/nats.
+services:
+  redis:
+    image: redis:7
+    ports: ["16379:6379"]
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes: ["redis-data:/data"]
+  postgres:
+    image: pgvector/pgvector:pg16
+    ports: ["15432:5432"]
+    environment:
+      POSTGRES_USER: acie
+      POSTGRES_PASSWORD: acie
+      POSTGRES_DB: acie
+    volumes: ["pg-data:/var/lib/postgresql/data"]
+  nats:
+    image: nats:2
+    ports: ["14222:4222"]
+volumes:
+  redis-data:
+  pg-data:
