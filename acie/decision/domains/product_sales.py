@@ -596,7 +596,8 @@ _TERMS_Q = re.compile(r"refund|रिफंड|रिफण्ड|money back|pai
                       r"transfer|ट्रांसफर|\bshare\b|sharing|शेयर|freeze", re.I)
 # "human nahi chahiye, aap hi batao": a negated hand-off is not a hand-off
 _NO_HUMAN = re.compile(r"(human|insaan|insan|इंसान|person|aadmi|आदमी|manager|मैनेजर)\s*(se\s*)?(nahi|nahin|na|mat|नहीं|ना|मत)\b|"
-                       r"(no|don.?t (need|want)( a)?|not)\s+(a\s+)?(human|person|real person|manager)|aap hi (batao|bataiye|bolo)|आप ही (बताओ|बताइए)", re.I)
+                       r"(no|don.?t (need|want)( a)?|not)\s+(a\s+)?(human|person|real person|manager)|aap hi (batao|bataiye|bolo)|आप ही (बताओ|बताइए)|"
+                       r"(human|insaan|insan|इंसान|aadmi|आदमी)\s+(ko|को)\s+(rehne|rahne|रहने)\s+(do|दो|dijiye|दीजिए)|tum hi batao|tu hi bata|तुम ही बताओ", re.I)
 # the caller wants the call over (also polite: "आप फोन रख दीजिए", "main phone rakh rahi hoon")
 _HARD_PAY = re.compile(r"mushkil|मुश्किल|nahi ho (payega|paega|sakta|sakti)|नहीं हो (पाएगा|सकता)|can.?t (pay|afford|do)|too (much|high|expensive)|"
                        r"bahut zyada|बहुत ज़्यादा|nahi de (sakta|sakti|paunga|paungi)|नहीं दे (सकता|सकती)", re.I)
