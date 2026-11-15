@@ -733,10 +733,16 @@ class CallSession:
         except Exception:
             p = None
         names = [x for x in ((p.product_name, p.seller_name) if p else ()) if x]
+        try:  # the options and places a booking names ("VIP Lounge", "Delhi"): "Danny" for Delhi on c1d9da4eca
+            from acie.decision.order import stt_vocabulary
+            names += [x for x in (stt_vocabulary(p) if p else []) if x not in names]
+        except Exception:
+            pass
         topics = [w for w in (getattr(p, "topic_words", None) or [])][:12] if p else []
         hi = ", ".join(names + topics + ["ऑफर", "कीमत", "कितने का", "हाँ", "नहीं", "ठीक है", "लिंक भेज दो", "पेमेंट", "बताइए"])
         en = ", ".join(names + topics + ["offer", "price", "how much", "yes", "no", "send the link", "payment"])
-        return {"hi": hi, "en": en}
+        # entity names only (VOICE_STT_PROMPT=entities): no generic phrases, which leaked into unclear audio ("लिंक भेज दो")
+        return {"hi": hi, "en": en, "entities_hi": ", ".join(names), "entities_en": ", ".join(names)}
 
     async def transcribe(self, audio: np.ndarray, hint: str | None, prefer: str | None):
         stt = self.app.stt
@@ -744,7 +750,10 @@ class CallSession:
             try:
                 # vocabulary hint OFF by default: on real calls it leaked into unclear audio ("ज़ुम्बा, लिंक भेज दो",
                 # "पेमेंट पेमेंट पेमेंट") even though it lowered CER on clean test speech. VOICE_STT_PROMPT=1 to try it.
-                hint_words = getattr(self, "stt_prompts", None) if os.getenv("VOICE_STT_PROMPT") == "1" else None
+                mode = os.getenv("VOICE_STT_PROMPT", "")
+                sp = getattr(self, "stt_prompts", None) or {}
+                hint_words = ({"hi": sp.get("hi"), "en": sp.get("en")} if mode == "1" else
+                              {"hi": sp.get("entities_hi"), "en": sp.get("entities_en")} if mode == "entities" and sp else None)
                 out = await stt.transcribe_detail(audio, hint, prefer, hint_words, allow_hi_model=self.hindi_model_ok())
             except TypeError:  # test doubles without the prompt argument
                 out = await stt.transcribe_detail(audio, hint, prefer)

@@ -8,23 +8,23 @@ from __future__ import annotations
 
 GATES = [
     {"id": "safety", "title": "Safety", "rule": "Distress or self-harm: stop selling, give the helpline, stay kind",
-     "intents": ["safety_distress", "safety_followup", "safety_noted", "safety_goodbye"]},
+     "intents": ["safety_distress", "safety_followup", "safety_noted", "safety_goodbye", "safety_concern"]},
     {"id": "compliance", "title": "Compliance", "rule": "Opt-out, card/OTP stop, admit AI, who is calling, number source",
-     "intents": ["opt_out", "opt_out_confirmed", "sensitive_stop", "are_you_ai", "identify", "number_source"]},
+     "intents": ["opt_out", "opt_out_confirmed", "sensitive_stop", "are_you_ai", "identify", "number_source", "constraint_stop"]},
     {"id": "decided", "title": "Already decided", "rule": "After a sale, a no or a callback: answer, never re-sell",
-     "intents": ["link_cancelled", "goodbye_after"]},
+     "intents": ["link_cancelled", "goodbye_after", "repeat_last", "where_were_we"]},
     {"id": "unclear", "title": "Unclear line", "rule": "Garbled or noisy speech: ask again, never sell on it",
      "intents": ["clarify"]},
     {"id": "close", "title": "Consent & close", "rule": "Explicit yes + full terms read back before any link",
-     "intents": ["confirm_close", "confirm_buy", "link_sent"]},
+     "intents": ["confirm_close", "confirm_buy", "link_sent", "pay_at_desk", "negotiation", "order_slot", "pilot_signup"]},
     {"id": "routing", "title": "Routing", "rule": "Callback with time, human handoff, language switch",
-     "intents": ["callback", "human_agent", "language_switch"]},
+     "intents": ["callback", "callback_time", "human_agent", "language_switch"]},
     {"id": "exit", "title": "Refusal & goodbye", "rule": "One soft re-offer at most, then respect the no",
-     "intents": ["reoffer", "declined", "goodbye"]},
+     "intents": ["reoffer", "reason_ask", "declined", "declined_price", "annoyed_exit", "goodbye"]},
     {"id": "scripted", "title": "Scripted steps", "rule": "Opening, operator pitch, exact price line, hello, slow down",
-     "intents": ["opening", "greet", "pitch", "price", "hello", "slow_down"]},
+     "intents": ["opening", "greet", "purpose", "pitch", "price", "hello", "slow_down"]},
     {"id": "conversation", "title": "Conversation", "rule": "Answer first, then the playbook situation's talking points",
-     "intents": ["answer", "small_talk", "personal"]},
+     "intents": ["answer", "small_talk", "personal", "apology", "acknowledge", "step_ask"]},
 ]
 _BY_INTENT = {i: g["id"] for g in GATES for i in g["intents"]}
 

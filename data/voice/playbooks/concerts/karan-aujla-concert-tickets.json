@@ -1,0 +1,834 @@
+{
+ "tenant": "concerts",
+ "product_id": "karan-aujla-concert-tickets",
+ "generated_by": "concert show sheet (authored in session, demo data)",
+ "nodes": [
+  {
+   "id": "asks_price",
+   "title": "asks the ticket price",
+   "when": {
+    "keywords": [
+     "how much",
+     "price",
+     "prices",
+     "\\bcost",
+     "\\brate",
+     "kitne ka",
+     "kitne ki",
+     "kitna (hai|padega|lagega)",
+     "कितने का",
+     "कितने की",
+     "कितना (है|पड़ेगा|लगेगा)",
+     "कीमत",
+     "keemat",
+     "दाम",
+     "\\bdaam"
+    ],
+    "intents": [
+     "price"
+    ],
+    "objections": [],
+    "topics": [
+     "offer_terms"
+    ],
+    "min_buying": null,
+    "max_buying": null,
+    "min_frustration": null,
+    "min_confusion": null
+   },
+   "points": [
+    "Prices are per ticket and the same in all three cities: General Standing ₹1,999, Gold ₹4,999, Fan Pit ₹7,999 and VIP Lounge ₹14,999.",
+    "This week Gold is ₹3,999 instead of ₹4,999, and it's right behind Fan Pit with a clear centre view.",
+    "GST is included and there's no booking fee on our link."
+   ],
+   "ask": "Which city would you come to, and how many tickets do you need?",
+   "points_hi": [
+    "कीमत प्रति टिकट है और तीनों शहरों में एक जैसी: General Standing ₹1,999, Gold ₹4,999, Fan Pit ₹7,999 और VIP Lounge ₹14,999।",
+    "इस हफ़्ते Gold ₹4,999 की जगह ₹3,999 का है, और ये Fan Pit के ठीक पीछे है, बीच से साफ़ view के साथ।",
+    "GST शामिल है और हमारे लिंक पर कोई booking fee नहीं है।"
+   ],
+   "ask_hi": "आप किस शहर वाले शो में आएँगे, और कितने टिकट चाहिए?",
+   "goal": "give every zone's price clearly, highlight the Gold early-bird, learn city and count",
+   "children": []
+  },
+  {
+   "id": "which_zone",
+   "title": "asks which zone is best / the difference between zones",
+   "when": {
+    "keywords": [
+     "which (zone|ticket|one|category|section)",
+     "best (zone|ticket|option|view)",
+     "recommend",
+     "suggest",
+     "difference",
+     "\\bfa?rak",
+     "फ़र्क|फर्क|अंतर",
+     "kaun ?sa (zone|ticket|lu|loon)",
+     "कौन ?सा (ज़ोन|जोन|टिकट)",
+     "sabse (accha|achha|badhiya)"
+    ],
+    "intents": [],
+    "objections": [],
+    "topics": [],
+    "min_buying": null,
+    "max_buying": null,
+    "min_frustration": null,
+    "min_confusion": null
+   },
+   "points": [
+    "Gold is the sweet spot: right behind Fan Pit, slightly raised, clear centre view, and ₹3,999 this week instead of ₹4,999.",
+    "Fan Pit, ₹7,999, is the barricaded pit at the very front, closest to Karan, but it's about 10% left.",
+    "VIP Lounge, ₹14,999, is a covered deck at the side of the stage with seating, buffet dinner and two drink coupons.",
+    "General Standing, ₹1,999, is the back half with two giant screens, the budget pick."
+   ],
+   "ask": "What matters more to you: being close to the stage, a good view on a budget, or sitting comfortably?",
+   "points_hi": [
+    "Gold सबसे बढ़िया बैलेंस है: Fan Pit के ठीक पीछे, थोड़ा ऊँचा, बीच से साफ़ view, और इस हफ़्ते ₹4,999 की जगह ₹3,999।",
+    "Fan Pit ₹7,999 का है, बिल्कुल आगे स्टेज के पास, करण के सबसे क़रीब, पर करीब 10% ही बचे हैं।",
+    "VIP Lounge ₹14,999 का है, स्टेज की साइड में ढका डेक, बैठने की जगह, buffet dinner और दो drink coupons के साथ।",
+    "General Standing ₹1,999 का है, पीछे का हिस्सा दो बड़ी स्क्रीन के साथ, budget वाला option।"
+   ],
+   "ask_hi": "आपके लिए क्या ज़्यादा ज़रूरी है: स्टेज के पास रहना, कम budget में अच्छा view, या आराम से बैठना?",
+   "goal": "match a zone to what they value and name its price",
+   "children": [
+    {
+     "id": "zone_front",
+     "title": "wants to be as close to the stage as possible",
+     "when": {
+      "keywords": [
+       "front",
+       "\\baage\\b",
+       "आगे",
+       "close to (the )?stage",
+       "closest",
+       "near (the )?stage",
+       "stage ke paas",
+       "स्टेज के पास",
+       "fan pit",
+       "फैन पिट"
+      ],
+      "intents": [],
+      "objections": [],
+      "topics": [],
+      "min_buying": null,
+      "max_buying": null,
+      "min_frustration": null,
+      "min_confusion": null
+     },
+     "points": [
+      "Fan Pit is the closest you can get: the barricaded pit right at the stage, ₹7,999 a ticket, 16 and above.",
+      "It has an express entry lane and its own bar and food counters.",
+      "It's down to the last few hundred tickets, about 10% left, so it's the one to decide on quickly."
+     ],
+     "ask": "Shall I note Fan Pit for you, and for which city?",
+     "points_hi": [
+      "सबसे पास Fan Pit है: स्टेज के ठीक सामने घिरा pit, ₹7,999 का एक टिकट, 16 साल और ऊपर के लिए।",
+      "इसमें express entry lane और अपना bar और food counter है।",
+      "इसके आख़िरी कुछ सौ टिकट बचे हैं, करीब 10%, तो इस पर जल्दी फ़ैसला करना ठीक रहेगा।"
+     ],
+     "ask_hi": "क्या मैं आपके लिए Fan Pit नोट कर लूँ, और किस शहर के लिए?",
+     "goal": "sell Fan Pit honestly on closeness and scarcity",
+     "children": []
+    },
+    {
+     "id": "zone_budget",
+     "title": "wants a good option on a budget",
+     "when": {
+      "keywords": [
+       "budget",
+       "बजट",
+       "sasta|सस्ता|cheap",
+       "kam (paise|price|daam)",
+       "कम (पैसे|कीमत)",
+       "afford",
+       "student"
+      ],
+      "intents": [],
+      "objections": [],
+      "topics": [],
+      "min_buying": null,
+      "max_buying": null,
+      "min_frustration": null,
+      "min_confusion": null
+     },
+     "points": [
+      "General Standing is ₹1,999 a ticket, the cheapest, with two giant LED screens so you see everything.",
+      "For a closer view, Gold is ₹3,999 this week instead of ₹4,999, right behind Fan Pit.",
+      "GST is included and there's no booking fee on our link."
+     ],
+     "ask": "Would General Standing work, or is Gold worth the step up for you?",
+     "points_hi": [
+      "General Standing ₹1,999 का एक टिकट है, सबसे सस्ता, दो बड़ी LED स्क्रीन के साथ ताकि सब दिखे।",
+      "थोड़ा पास से देखना हो तो Gold इस हफ़्ते ₹4,999 की जगह ₹3,999 का है, Fan Pit के ठीक पीछे।",
+      "GST शामिल है और हमारे लिंक पर कोई booking fee नहीं है।"
+     ],
+     "ask_hi": "General Standing ठीक रहेगा, या Gold लेना चाहेंगे?",
+     "goal": "offer the cheapest zone and the Gold step-up",
+     "children": []
+    },
+    {
+     "id": "zone_comfort",
+     "title": "wants comfort / seating / no crowd",
+     "when": {
+      "keywords": [
+       "comfort",
+       "seat(ed|ing)?",
+       "baith",
+       "बैठ",
+       "crowd|bheed|भीड़",
+       "\\bvip\\b",
+       "lounge|लाउंज",
+       "parents|mummy|papa|मम्मी|पापा"
+      ],
+      "intents": [],
+      "objections": [],
+      "topics": [],
+      "min_buying": null,
+      "max_buying": null,
+      "min_frustration": null,
+      "min_confusion": null
+     },
+     "points": [
+      "VIP Lounge is the comfortable pick: a covered raised deck at the side of the stage with lounge seating, away from the crowd.",
+      "It has its own gate with express entry, private washrooms, a buffet dinner and two drink coupons, ₹14,999 a ticket.",
+      "About 20% is left."
+     ],
+     "ask": "Would the VIP Lounge suit you, and how many tickets would you need?",
+     "points_hi": [
+      "आराम के लिए VIP Lounge सही है: स्टेज की साइड में ढका ऊँचा डेक, बैठने की lounge seating, भीड़ से दूर।",
+      "इसमें अलग gate और express entry, अलग washrooms, buffet dinner और दो drink coupons हैं, ₹14,999 का एक टिकट।",
+      "करीब 20% बचे हैं।"
+     ],
+     "ask_hi": "क्या VIP Lounge आपके लिए ठीक रहेगा, और कितने टिकट चाहिए?",
+     "goal": "sell VIP Lounge on comfort",
+     "children": []
+    }
+   ]
+  },
+  {
+   "id": "availability",
+   "title": "asks which seats / tickets are still available",
+   "when": {
+    "keywords": [
+     "available",
+     "availability",
+     "sold out",
+     "\\bleft\\b",
+     "bach(a|e|i)\\b",
+     "बच(ा|े|ी)",
+     "बाकी",
+     "khatam ho",
+     "खत्म हो"
+    ],
+    "intents": [],
+    "objections": [],
+    "topics": [],
+    "min_buying": null,
+    "max_buying": null,
+    "min_frustration": null,
+    "min_confusion": null
+   },
+   "points": [
+    "Fan Pit is down to its last few hundred tickets, about 10% left.",
+    "VIP Lounge has about 20% left, Gold about 30% and General Standing about 40%.",
+    "Delhi is selling the fastest of the three shows."
+   ],
+   "ask": "Which city and zone are you looking at, so I can tell you how quickly to decide?",
+   "points_hi": [
+    "Fan Pit के आख़िरी कुछ सौ टिकट बचे हैं, करीब 10%।",
+    "VIP Lounge में करीब 20%, Gold में करीब 30% और General Standing में करीब 40% बचे हैं।",
+    "तीनों में दिल्ली वाला शो सबसे तेज़ी से बिक रहा है।"
+   ],
+   "ask_hi": "आप किस शहर और ज़ोन के बारे में सोच रहे हैं?",
+   "goal": "give honest availability and create gentle urgency without pressure",
+   "children": []
+  },
+  {
+   "id": "zone_location",
+   "title": "asks where the zones / seats are relative to the stage",
+   "when": {
+    "keywords": [
+     "seat number",
+     "numbered",
+     "where is (the )?(fan pit|gold|vip|general)",
+     "stage se",
+     "स्टेज से",
+     "how far",
+     "kitna door",
+     "कितना दूर",
+     "\\bview\\b",
+     "dikhega",
+     "दिखेगा"
+    ],
+    "intents": [],
+    "objections": [],
+    "topics": [],
+    "min_buying": null,
+    "max_buying": null,
+    "min_frustration": null,
+    "min_confusion": null
+   },
+   "points": [
+    "There are no numbered seats; Fan Pit, Gold and General Standing are standing zones, and the VIP Lounge has free lounge seating.",
+    "Fan Pit is right at the stage, Gold is just behind it and slightly raised, General Standing is the back half with two giant screens.",
+    "The VIP Lounge is a covered raised deck at the side of the stage."
+   ],
+   "ask": "Do you want to be close to the stage, or is a clear view enough?",
+   "points_hi": [
+    "सीटें नंबर वाली नहीं हैं; Fan Pit, Gold और General Standing खड़े होने वाले ज़ोन हैं, और VIP Lounge में lounge seating है।",
+    "Fan Pit स्टेज के ठीक सामने है, Gold उसके ठीक पीछे थोड़ा ऊँचा, और General Standing पीछे का आधा हिस्सा दो बड़ी स्क्रीन के साथ।",
+    "VIP Lounge स्टेज की साइड में ढका ऊँचा डेक है।"
+   ],
+   "ask_hi": "आप स्टेज के पास रहना चाहते हैं, या साफ़ view काफ़ी है?",
+   "goal": "paint the venue layout so they can pick a zone",
+   "children": []
+  },
+  {
+   "id": "venue_date",
+   "title": "asks the venue, city, date or location",
+   "when": {
+    "keywords": [
+     "venue",
+     "वेन्यू",
+     "\\bcity\\b|शहर",
+     "delhi|दिल्ली|mumbai|मुंबई|chandigarh|चंडीगढ़",
+     "\\bdates?\\b|तारीख|tareekh",
+     "kab hai|कब है|when is",
+     "\\bwhere\\b|kahan|कहाँ|कहां",
+     "stadium|स्टेडियम"
+    ],
+    "intents": [],
+    "objections": [],
+    "topics": [],
+    "min_buying": null,
+    "max_buying": null,
+    "min_frustration": null,
+    "min_confusion": null
+   },
+   "points": [
+    "Delhi is on Saturday 12 December at Jawaharlal Nehru Stadium.",
+    "Mumbai is on Saturday 19 December at DY Patil Stadium in Navi Mumbai.",
+    "Chandigarh is on Saturday 26 December at the Sector 34 Exhibition Ground.",
+    "Gates open at 4 pm everywhere, and Karan is on stage from about 7:15."
+   ],
+   "ask": "Which of the three is easiest for you?",
+   "points_hi": [
+    "दिल्ली में शनिवार 12 दिसंबर को जवाहरलाल नेहरू स्टेडियम में शो है।",
+    "मुंबई में शनिवार 19 दिसंबर को नवी मुंबई के DY Patil स्टेडियम में।",
+    "चंडीगढ़ में शनिवार 26 दिसंबर को सेक्टर 34 एग्ज़िबिशन ग्राउंड में।",
+    "हर जगह gate शाम 4 बजे खुलते हैं, और करण करीब सवा 7 बजे स्टेज पर आते हैं।"
+   ],
+   "ask_hi": "इन तीनों में से आपके लिए कौन सा आसान रहेगा?",
+   "goal": "give the show sheet and learn the city",
+   "children": []
+  },
+  {
+   "id": "getting_there",
+   "title": "asks how to reach / metro / parking / cab",
+   "when": {
+    "keywords": [
+     "metro|मेट्रो",
+     "parking|पार्किंग",
+     "\\bcab\\b|uber|\\bola\\b",
+     "kaise pahunch|कैसे पहुँच|कैसे पहुंच",
+     "\\breach\\b",
+     "station|स्टेशन",
+     "\\bcar\\b|गाड़ी|gaadi"
+    ],
+    "intents": [],
+    "objections": [],
+    "topics": [],
+    "min_buying": null,
+    "max_buying": null,
+    "min_frustration": null,
+    "min_confusion": null
+   },
+   "points": [
+    "In Delhi, JLN Stadium metro station on the Violet Line is 5 minutes' walk from the gates.",
+    "In Mumbai, Nerul station on the Harbour line is about 10 minutes' walk; in Chandigarh cabs drop you at Gate 1.",
+    "Parking is limited: a pass is ₹300 for a car and ₹100 for a two-wheeler, and our team can add it to the booking."
+   ],
+   "ask": "Will you come by metro, cab or your own car?",
+   "points_hi": [
+    "दिल्ली में वायलेट लाइन का JLN स्टेडियम मेट्रो स्टेशन gate से 5 मिनट पैदल है।",
+    "मुंबई में हार्बर लाइन का नेरुल स्टेशन करीब 10 मिनट पैदल है; चंडीगढ़ में cab आपको Gate 1 पर छोड़ती है।",
+    "पार्किंग सीमित है: pass कार के लिए ₹300 और two-wheeler के लिए ₹100 का है, और हमारी टीम इसे बुकिंग में जोड़ सकती है।"
+   ],
+   "ask_hi": "आप मेट्रो से आएँगे, cab से या अपनी गाड़ी से?",
+   "goal": "remove the travel worry",
+   "children": []
+  },
+  {
+   "id": "group_friends",
+   "title": "booking for a group of friends / family / colleagues",
+   "when": {
+    "keywords": [
+     "friends|dost|दोस्त",
+     "group|ग्रुप",
+     "colleague|office|team",
+     "family|परिवार|फैमिली",
+     "\\b\\d+\\s*(log|लोग|people|tickets?|टिकट)\\b",
+     "together|saath|साथ"
+    ],
+    "intents": [],
+    "objections": [],
+    "topics": [],
+    "min_buying": null,
+    "max_buying": null,
+    "min_frustration": null,
+    "min_confusion": null
+   },
+   "points": [
+    "You can book up to 8 tickets in one order; for a bigger group our team splits it into two orders in the same zone.",
+    "Since the zones are standing, your group enters and stands together.",
+    "The ₹3,999 early-bird Gold price applies to every ticket in the order; there's no separate group discount.",
+    "Each person gets their own QR code on the e-ticket, so nobody has to wait for the others at the gate."
+   ],
+   "ask": "How many of you are coming, and which city?",
+   "points_hi": [
+    "एक ऑर्डर में 8 टिकट तक बुक हो सकते हैं; बड़े ग्रुप के लिए हमारी टीम उसी ज़ोन में दो ऑर्डर बना देती है।",
+    "ज़ोन standing हैं, तो आपका ग्रुप साथ में अंदर जाकर साथ खड़ा हो सकता है।",
+    "₹3,999 वाली early-bird Gold कीमत ऑर्डर के हर टिकट पर लगती है; अलग से ग्रुप डिस्काउंट नहीं है।",
+    "हर व्यक्ति का अपना QR कोड आता है, तो गेट पर किसी को किसी का इंतज़ार नहीं करना पड़ता।"
+   ],
+   "ask_hi": "आप कितने लोग आ रहे हैं, और किस शहर में?",
+   "goal": "size the order and keep the group together",
+   "children": []
+  },
+  {
+   "id": "price_high",
+   "title": "says it's too expensive / haggles",
+   "when": {
+    "keywords": [
+     "expensive",
+     "mehenga|mehnga|महंगा|महँगा",
+     "zyada hai|ज़्यादा है|ज्यादा है",
+     "kam karo|कम करो|kam kar do",
+     "discount",
+     "sasta karo|सस्ता करो",
+     "afford",
+     "budget nahi"
+    ],
+    "intents": [],
+    "objections": [
+     "price"
+    ],
+    "topics": [],
+    "min_buying": null,
+    "max_buying": null,
+    "min_frustration": null,
+    "min_confusion": null
+   },
+   "points": [
+    "Gold is already ₹1,000 off this week: ₹3,999 instead of ₹4,999, with GST included and no booking fee.",
+    "If you want to spend less, General Standing is ₹1,999 with two giant screens.",
+    "The early-bird price ends on Sunday 22 November."
+   ],
+   "ask": "Which works better for you: Gold at ₹3,999, or General Standing at ₹1,999?",
+   "points_hi": [
+    "Gold पर इस हफ़्ते पहले से ₹1,000 की छूट है: ₹4,999 की जगह ₹3,999, GST शामिल और कोई booking fee नहीं।",
+    "कम खर्च करना हो तो General Standing ₹1,999 का है, दो बड़ी स्क्रीन के साथ।",
+    "Early-bird कीमत रविवार 22 नवंबर को ख़त्म हो जाएगी।"
+   ],
+   "ask_hi": "आपके लिए क्या ठीक रहेगा: ₹3,999 वाला Gold, या ₹1,999 वाला General Standing?",
+   "goal": "hold value, offer the cheaper zone",
+   "children": []
+  },
+  {
+   "id": "trust",
+   "title": "doubts it's genuine / asks if it's official",
+   "when": {
+    "keywords": [
+     "fake|nakli|नकली",
+     "scam|fraud|फ्रॉड|धोखा",
+     "genuine|असली|asli",
+     "official|ऑफिशियल",
+     "authori[sz]ed",
+     "legit",
+     "who are you|kaun bol|कौन बोल",
+     "trust|भरोसा"
+    ],
+    "intents": [],
+    "objections": [
+     "trust"
+    ],
+    "topics": [],
+    "min_buying": null,
+    "max_buying": null,
+    "min_frustration": null,
+    "min_confusion": null
+   },
+   "points": [
+    "Fair question: I'm calling from Gigwala Tickets, and our team sells tickets for this event.",
+    "Nothing is charged on this call; you pay only through the secure payment link our team sends.",
+    "Your e-ticket comes to your email with a QR code for each person, and it's scanned at the gate like every other ticket.",
+    "If the show is cancelled you get a full refund to the same account."
+   ],
+   "ask": "Would it help if our team sends the payment link so you can check everything before paying?",
+   "points_hi": [
+    "अच्छा सवाल है: मैं Gigwala Tickets से बोल रहा हूँ, हमारी टीम इस इवेंट के टिकट बेचती है।",
+    "इस कॉल पर कुछ नहीं कटता; पेमेंट सिर्फ़ हमारी टीम के भेजे सुरक्षित लिंक से होता है।",
+    "आपका e-ticket हर व्यक्ति के QR कोड के साथ ईमेल पर आता है, और गेट पर बाकी सब टिकटों की तरह स्कैन होता है।",
+    "अगर शो cancel हो जाए तो पूरा पैसा उसी अकाउंट में वापस आता है।"
+   ],
+   "ask_hi": "क्या हमारी टीम पेमेंट लिंक भेज दे, ताकि आप पेमेंट से पहले सब देख लें?",
+   "goal": "build trust without claiming to be official",
+   "children": []
+  },
+  {
+   "id": "decide_later",
+   "title": "wants to think / decide later",
+   "when": {
+    "keywords": [
+     "think about it|soch(ta|ti|ke|kar)|सोच",
+     "later|baad mein|बाद में",
+     "not now|abhi nahi|अभी नहीं",
+     "decide|tay kar",
+     "kal bata|कल बता",
+     "friends se pooch|दोस्तों से पूछ"
+    ],
+    "intents": [
+     "callback"
+    ],
+    "objections": [
+     "timing"
+    ],
+    "topics": [],
+    "min_buying": null,
+    "max_buying": null,
+    "min_frustration": null,
+    "min_confusion": null
+   },
+   "points": [
+    "Of course, take your time; nothing is booked or charged on this call.",
+    "Just so you know, the ₹3,999 Gold price is only till Sunday 22 November, and Fan Pit has about 10% left.",
+    "If you're checking with friends, everyone can be in one order of up to 8 tickets."
+   ],
+   "ask": "Shall I have our team call you back at a time that suits you?",
+   "points_hi": [
+    "बिल्कुल, आराम से सोचिए; इस कॉल पर कुछ बुक या चार्ज नहीं होता।",
+    "बस बता दूँ, ₹3,999 वाली Gold कीमत रविवार 22 नवंबर तक ही है, और Fan Pit में करीब 10% बचे हैं।",
+    "अगर दोस्तों से पूछ रहे हैं, तो 8 टिकट तक सब एक ही ऑर्डर में आ सकते हैं।"
+   ],
+   "ask_hi": "क्या हमारी टीम आपको आपके सुविधा वाले समय पर कॉल करे?",
+   "goal": "respect the pause, state the deadline honestly once",
+   "children": []
+  },
+  {
+   "id": "already_bought",
+   "title": "already has tickets",
+   "when": {
+    "keywords": [
+     "already (bought|booked|have|got)",
+     "le liya|ले लिया",
+     "kharid liya|खरीद लिया",
+     "book kar (liya|chuka)|बुक कर (लिया|चुका)"
+    ],
+    "intents": [],
+    "objections": [],
+    "topics": [],
+    "min_buying": null,
+    "max_buying": null,
+    "min_frustration": null,
+    "min_confusion": null
+   },
+   "points": [
+    "Great, then you're all set for the show!",
+    "If a friend still needs a ticket, they can be in an order of up to 8, and Gold is ₹3,999 this week."
+   ],
+   "ask": "Is anyone else in your group still without a ticket?",
+   "points_hi": [
+    "बढ़िया, फिर तो आप शो के लिए तैयार हैं!",
+    "अगर किसी दोस्त को अभी टिकट चाहिए, तो 8 टिकट तक एक ऑर्डर में हो सकते हैं, और Gold इस हफ़्ते ₹3,999 का है।"
+   ],
+   "ask_hi": "क्या आपके ग्रुप में किसी और को अभी टिकट चाहिए?",
+   "goal": "congratulate, at most one light referral question, then let them go",
+   "children": []
+  },
+  {
+   "id": "wants_vip",
+   "title": "wants VIP / premium / the best experience",
+   "when": {
+    "keywords": [
+     "\\bvip\\b|वीआईपी",
+     "lounge|लाउंज",
+     "premium|luxury",
+     "best experience",
+     "सबसे अच्छा अनुभव"
+    ],
+    "intents": [],
+    "objections": [],
+    "topics": [],
+    "min_buying": null,
+    "max_buying": null,
+    "min_frustration": null,
+    "min_confusion": null
+   },
+   "points": [
+    "VIP Lounge is ₹14,999 a ticket: a covered raised deck at the side of the stage with lounge seating.",
+    "It has its own gate with express entry and private washrooms.",
+    "A buffet dinner and two drink coupons are included, and about 20% is left."
+   ],
+   "ask": "How many VIP Lounge tickets would you need, and for which city?",
+   "points_hi": [
+    "VIP Lounge ₹14,999 का एक टिकट है: स्टेज की साइड में ढका ऊँचा डेक, lounge seating के साथ।",
+    "इसमें अलग gate, express entry और अलग washrooms हैं।",
+    "Buffet dinner और दो drink coupons शामिल हैं, और करीब 20% बचे हैं।"
+   ],
+   "ask_hi": "आपको VIP Lounge के कितने टिकट चाहिए, और किस शहर के लिए?",
+   "goal": "sell the VIP Lounge on comfort and inclusions",
+   "children": []
+  },
+  {
+   "id": "refund_question",
+   "title": "asks about refund / cancellation / transfer / rain",
+   "when": {
+    "keywords": [
+     "refund|रिफंड",
+     "cancel|कैंसल|रद्द",
+     "postpone",
+     "transfer|ट्रांसफर",
+     "resell|resale|बेच",
+     "\\brain|baarish|बारिश",
+     "money back|paise wapas|पैसे वापस"
+    ],
+    "intents": [],
+    "objections": [],
+    "topics": [],
+    "min_buying": null,
+    "max_buying": null,
+    "min_frustration": null,
+    "min_confusion": null
+   },
+   "points": [
+    "Tickets can't be cancelled or refunded once booked.",
+    "If the show is cancelled, including a weather call-off, you get a full refund within 7 to 10 working days; if it's postponed, your ticket works for the new date.",
+    "If you can't go, you can transfer the ticket to a friend for free, once, up to 48 hours before the show."
+   ],
+   "ask": "Does that answer it, or is there a date clash you're worried about?",
+   "points_hi": [
+    "एक बार बुक होने के बाद टिकट cancel या refund नहीं होते।",
+    "अगर शो cancel हो, मौसम की वजह से भी, तो 7 से 10 working days में पूरा पैसा वापस मिलता है; postpone हो तो टिकट नई तारीख़ पर चलेगा।",
+    "अगर आप न जा पाएँ, तो शो से 48 घंटे पहले तक एक बार, फ्री में, टिकट किसी दोस्त को ट्रांसफर कर सकते हैं।"
+   ],
+   "ask_hi": "क्या इससे आपका सवाल हल हुआ, या किसी तारीख़ की दिक्कत की चिंता है?",
+   "goal": "state the policy plainly, offer the transfer reassurance",
+   "children": []
+  },
+  {
+   "id": "kids_age",
+   "title": "asks about kids / age limit",
+   "when": {
+    "keywords": [
+     "\\bkids?\\b|children|child",
+     "bachch|बच्च",
+     "\\bson\\b|daughter|बेटा|बेटी",
+     "\\bage\\b|उम्र|umar",
+     "saal ka|साल का|years old",
+     "minor|teenager"
+    ],
+    "intents": [],
+    "objections": [],
+    "topics": [],
+    "min_buying": null,
+    "max_buying": null,
+    "min_frustration": null,
+    "min_confusion": null
+   },
+   "points": [
+    "Children under 5 aren't allowed, because it's very loud and crowded.",
+    "Everyone 5 and above needs their own ticket, and under-18s must be with an adult in the same zone.",
+    "Fan Pit is 16 and above only, so with a younger child Gold or VIP Lounge works better."
+   ],
+   "ask": "How old is the child coming with you?",
+   "points_hi": [
+    "5 साल से छोटे बच्चों की इजाज़त नहीं है, क्योंकि बहुत शोर और भीड़ होती है।",
+    "5 साल और उससे ऊपर सबको अपना टिकट चाहिए, और 18 से कम उम्र वालों के साथ उसी ज़ोन में कोई बड़ा होना चाहिए।",
+    "Fan Pit सिर्फ़ 16 साल और ऊपर के लिए है, तो छोटे बच्चे के साथ Gold या VIP Lounge बेहतर है।"
+   ],
+   "ask_hi": "आपके साथ आने वाला बच्चा कितने साल का है?",
+   "goal": "give the age rules and steer to a suitable zone",
+   "children": []
+  },
+  {
+   "id": "entry_rules",
+   "title": "asks about entry rules / ID / bags / food",
+   "when": {
+    "keywords": [
+     "\\bid\\b|aadhaar|aadhar|आधार",
+     "\\bentry\\b|एंट्री",
+     "\\bbags?\\b|बैग|backpack",
+     "carry|le ja|ले जा",
+     "allowed",
+     "food|khana|खाना|water|पानी",
+     "power bank|camera|कैमरा"
+    ],
+    "intents": [],
+    "objections": [],
+    "topics": [],
+    "min_buying": null,
+    "max_buying": null,
+    "min_frustration": null,
+    "min_confusion": null
+   },
+   "points": [
+    "At the gate you show the QR on your e-ticket and an original government photo ID, and get a wristband for your zone.",
+    "Small bags only, no backpacks; no outside food, bottles, power banks, professional cameras or selfie sticks; phones are fine.",
+    "Every zone has veg and non-veg food stalls and free drinking-water points; there's no re-entry once you leave."
+   ],
+   "ask": "Anything else you'd like to know before you pick your zone?",
+   "points_hi": [
+    "गेट पर e-ticket का QR और असली सरकारी फ़ोटो ID दिखाइए, और अपने ज़ोन का wristband लीजिए।",
+    "सिर्फ़ छोटे बैग, बैकपैक नहीं; बाहर का खाना, बोतल, पावर बैंक, प्रोफ़ेशनल कैमरा या सेल्फ़ी स्टिक नहीं; फ़ोन ले जा सकते हैं।",
+    "हर ज़ोन में veg और non-veg food stalls और मुफ़्त पानी है; एक बार बाहर निकलने के बाद दोबारा एंट्री नहीं होती।"
+   ],
+   "ask_hi": "ज़ोन चुनने से पहले कुछ और जानना चाहेंगे?",
+   "goal": "answer entry rules crisply",
+   "children": []
+  },
+  {
+   "id": "how_to_book",
+   "title": "asks how to book / ready to buy",
+   "when": {
+    "keywords": [
+     "\\bbook\\b|बुक",
+     "booking|बुकिंग",
+     "kaise (le|lu|loon|kharid)|कैसे (लें|लूँ|खरीद)",
+     "how (do|can) i (buy|book|get)",
+     "payment link|पेमेंट लिंक",
+     "\\bpay\\b|पेमेंट",
+     "le lunga|ले लूँगा|chahiye|चाहिए"
+    ],
+    "intents": [],
+    "objections": [],
+    "topics": [],
+    "min_buying": 0.5,
+    "max_buying": null,
+    "min_frustration": null,
+    "min_confusion": null
+   },
+   "points": [
+    "Tell me the city, the zone and how many tickets, and our team will send you a secure payment link.",
+    "You can pay by UPI, card or net banking; nothing is charged on this call.",
+    "Within about 15 minutes the e-ticket with a QR code for each person and the GST invoice come to your email."
+   ],
+   "ask": "Which city, which zone and how many tickets shall I note?",
+   "points_hi": [
+    "मुझे शहर, ज़ोन और कितने टिकट चाहिए बता दीजिए, और हमारी टीम आपको एक सुरक्षित पेमेंट लिंक भेज देगी।",
+    "आप UPI, कार्ड या नेट बैंकिंग से पेमेंट कर सकते हैं; इस कॉल पर कुछ नहीं कटता।",
+    "करीब 15 मिनट में हर व्यक्ति के QR कोड वाला e-ticket और GST invoice आपके ईमेल पर आ जाता है।"
+   ],
+   "ask_hi": "कौन सा शहर, कौन सा ज़ोन और कितने टिकट नोट करूँ?",
+   "goal": "collect city, zone and count, then offer the payment link",
+   "children": []
+  },
+  {
+   "id": "fan_talk",
+   "title": "talks about being a fan / favourite songs",
+   "when": {
+    "keywords": [
+     "\\bfan\\b|फैन",
+     "favou?rite|pasand|पसंद",
+     "song|gaana|गाना|गाने",
+     "softly|tauba|admirin|winning speech|wavy",
+     "love (his|karan)|bahut accha gata"
+    ],
+    "intents": [
+     "personal",
+     "small_talk"
+    ],
+    "objections": [],
+    "topics": [],
+    "min_buying": null,
+    "max_buying": null,
+    "min_frustration": null,
+    "min_confusion": null
+   },
+   "points": [
+    "It's a full two-hour set with a live band, from about 7:15, so expect his biggest hits; the setlist isn't announced yet.",
+    "For a fan, Fan Pit is the closest you can get, ₹7,999, but only about 10% is left; Gold, right behind it, is ₹3,999 this week.",
+    "There's no meet-and-greet with any ticket, so the front zones are as close as it gets."
+   ],
+   "ask": "Would you want to be right at the front, or is Gold close enough for you?",
+   "points_hi": [
+    "ये live band के साथ पूरे दो घंटे का शो है, करीब सवा 7 बजे से, तो उनके सबसे बड़े hits की उम्मीद रखिए; setlist अभी announce नहीं हुई है।",
+    "एक fan के लिए Fan Pit सबसे पास है, ₹7,999 का, पर करीब 10% ही बचे हैं; उसके ठीक पीछे Gold इस हफ़्ते ₹3,999 का है।",
+    "किसी भी टिकट के साथ meet-and-greet नहीं है, तो आगे वाले ज़ोन ही सबसे पास हैं।"
+   ],
+   "ask_hi": "आप बिल्कुल आगे रहना चाहेंगे, या Gold आपके लिए काफ़ी पास है?",
+   "goal": "share their excitement, then turn it into a zone choice",
+   "children": []
+  },
+  {
+   "id": "off_wall",
+   "title": "asks something unusual: meet-and-greet, pets, dress code, wheelchair, drinks",
+   "when": {
+    "keywords": [
+     "meet|backstage|autograph",
+     "\\bdogs?\\b|\\bpets?\\b|kutta|कुत्ता",
+     "dress code|kya pehen|क्या पहन",
+     "wheelchair|व्हीलचेयर|disabled|divyang|दिव्यांग",
+     "alcohol|beer|daaru|दारू|sharab|शराब",
+     "smok|cigarette"
+    ],
+    "intents": [],
+    "objections": [],
+    "topics": [],
+    "min_buying": null,
+    "max_buying": null,
+    "min_frustration": null,
+    "min_confusion": null
+   },
+   "points": [
+    "There's no meet-and-greet or backstage access with any ticket.",
+    "Pets aren't allowed, only trained service animals; there's no dress code, just wear comfortable shoes.",
+    "Every venue has a wheelchair-accessible gate and a raised platform next to Gold; alcohol is only at the Fan Pit and VIP Lounge bars, for legal drinking age with ID."
+   ],
+   "ask": "Is there anything else that would help you decide?",
+   "points_hi": [
+    "किसी भी टिकट के साथ meet-and-greet या backstage नहीं है।",
+    "पालतू जानवर मना हैं, सिर्फ़ सर्विस एनिमल की इजाज़त है; कोई dress code नहीं, बस आरामदायक जूते पहनिए।",
+    "हर venue पर व्हीलचेयर के लिए अलग gate और Gold के पास ऊँचा platform है; शराब सिर्फ़ Fan Pit और VIP Lounge के bar पर, क़ानूनी उम्र वालों को ID पर।"
+   ],
+   "ask_hi": "और कुछ जो आपको फ़ैसला करने में मदद करे?",
+   "goal": "answer honestly from the sheet, then steer back",
+   "children": []
+  },
+  {
+   "id": "not_a_fan",
+   "title": "not a fan / not interested in concerts",
+   "when": {
+    "keywords": [
+     "not a fan",
+     "don.?t (like|listen)",
+     "pasand nahi|पसंद नहीं",
+     "concert (nahi|not)",
+     "not interested|interest nahi|नहीं चाहिए|nahi chahiye"
+    ],
+    "intents": [
+     "deny"
+    ],
+    "objections": [
+     "need"
+    ],
+    "topics": [],
+    "min_buying": null,
+    "max_buying": null,
+    "min_frustration": null,
+    "min_confusion": null
+   },
+   "points": [
+    "No problem at all, thanks for telling me.",
+    "If a friend or someone at home is a fan, tickets can be transferred to them for free, once."
+   ],
+   "ask": "Shall I let you go, or is there someone you know who'd love to go?",
+   "points_hi": [
+    "कोई बात नहीं, बताने के लिए शुक्रिया।",
+    "अगर कोई दोस्त या घर में कोई fan है, तो टिकट एक बार फ्री में उनके नाम ट्रांसफर हो सकता है।"
+   ],
+   "ask_hi": "क्या मैं आपको छोड़ दूँ, या आपके जानने वालों में कोई जाना चाहेगा?",
+   "goal": "accept the no gracefully; at most one gift angle",
+   "children": []
+  }
+ ]
+}

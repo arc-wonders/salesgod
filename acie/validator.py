@@ -56,6 +56,21 @@ _CODES = (("invented placeholder", "invented_slot"), ("price repeated", "price_r
           ("re-asked question", "reasked_question"), ("repeated opener", "repeated_opener"))
 
 
+def _dedupe_slot_edges(out: str, values: list[str]) -> str:
+    """A word doubled where a slot value meets the sentence: "a {product} membership" with product = "FitZone membership" ->
+    "a FitZone membership" (call c9960ed17d spoke "FitZone membership membership"); "FitZone {product}" likewise."""
+    for v in values:
+        words = str(v or "").split()
+        if not words:
+            continue
+        last, first = words[-1].strip(".,;:!?"), words[0].strip(".,;:!?")
+        if len(last) >= 3 and re.search(r"[^\W\d_]", last):
+            out = re.sub(re.escape(v) + r"\s+" + re.escape(last) + r"(?![\w\u0900-\u097f])", lambda m: v, out, flags=re.I)
+        if len(first) >= 3 and re.search(r"[^\W\d_]", first):
+            out = re.sub(r"(?<![\w\u0900-\u097f])" + re.escape(first) + r"\s+(?=" + re.escape(v) + r")", "", out, flags=re.I)
+    return out
+
+
 class StreamingValidator:
     def __init__(self, plan: TurnPlan, expr: ExpressionParams, trusted: bool = False, customer_text: str = "",
                  rule_packs=None, known=None):
@@ -127,8 +142,10 @@ class StreamingValidator:
         self.issue_codes.append(code)
 
     def fill(self, text: str) -> str:
+        used = [self.plan.facts[k].value for k in dict.fromkeys(_SLOT.findall(text)) if k in self.plan.facts]
         out = _SLOT.sub(lambda m: self.plan.facts[m.group(1)].value if m.group(1) in self.plan.facts else "", text)
-        return re.sub(r"\b(off|छूट)( \1)+\b", r"\1", out)  # "{discount} off" -> "60% off off"
+        out = re.sub(r"\b(off|छूट)( \1)+\b", r"\1", out)  # "{discount} off" -> "60% off off"
+        return _dedupe_slot_edges(out, used)
 
     # ------------------------------------------------------------- internals
 
@@ -145,6 +162,26 @@ class StreamingValidator:
             if any(n in self.plan.facts and not str(self.plan.facts[n].value or "").strip() for n in _SLOT.findall(s)):
                 self.add_issue(f"empty slot dropped: {s!r}", "empty_slot")
                 continue  # never speak a sentence with an empty slot ("Right now it's ." on a product with no price)
+            if not self.trusted and self.known is not None and not self.emitted and len(_SLOT.sub("", s).split()) >= 3 \
+                    and self.known[1].opener_used(_SLOT.sub("", s)):
+                # starts the way an earlier reply started (same first words): call c9960ed17d replaced a kind "I am really sorry to hear
+                # that..." with "Sorry, I didn't quite get that". Strip the opener instead: a short filler sentence is dropped, a leading
+                # filler phrase is swapped / dropped (CustomerFacts.rotate_opener), the rest of the reply is kept
+                lang = getattr(self.expr, "language", "en")
+                rot = self.known[1].rotate_opener(s, lang)
+                lead = re.match(r"^\s*([^,;:.!?।]{1,30}?)[,;:]\s+(\S.*)$", s)
+                if rot and rot != s:
+                    self.add_issue(f"repeated opener reworded: {s!r}", "repeated_opener")
+                    s = rot
+                elif lead and len(lead.group(1).split()) <= 3 and len(lead.group(2).split()) >= 3:
+                    self.add_issue(f"repeated opener stripped: {lead.group(1)!r}", "repeated_opener")
+                    rest = lead.group(2)
+                    s = rest[0].upper() + rest[1:] if lang != "hi" else rest
+                elif len(_SLOT.sub("", s).split()) <= 6 and not s.rstrip().endswith("?"):
+                    self.add_issue(f"repeated opener dropped: {s!r}", "repeated_opener")
+                    continue
+                else:
+                    self.add_issue(f"repeated opener kept: {s[:40]!r}", "repeated_opener")
             problem = self._check(s)
             if problem:
                 self.add_issue(f"{problem}: {s!r}", self._code_for(problem))
@@ -207,8 +244,7 @@ class StreamingValidator:
                 return "restated fact"
             if facts.reasks(bare):
                 return "re-asked question"
-            if not self.emitted and facts.opener_used(bare) and len(bare.split()) >= 3:
-                return "repeated opener"  # starts the way an earlier reply started (same first words)
+            # (a repeated opener is handled in _accept: a short filler opener is dropped and the rest kept)
         if self.plan.lead and re.search(r"\$|₹|रुपय|रुपए|रुपये|डॉलर|dollar|rupe|rupay|\d+ ?%", bare, re.I):
             return "price repeated after the exact price line"
         if "offer" in self.plan.facts and "{offer}" in s:

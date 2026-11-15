@@ -22,6 +22,17 @@ import httpx
 from pydantic import BaseModel, Field
 
 
+def _kw(k: str) -> str:
+    """A keyword fragment matched as a word: it starts at a word start ("lose" never inside "close"), and a short plain word (<= 4
+    letters) also ends at a word end ("pet" never inside "petitions": call f79a90af02 got "wants to lose weight" from "price petitions")."""
+    if not k or not re.match(r"[A-Za-z]", k):
+        return k
+    out = r"(?<![A-Za-z])" + k
+    if re.fullmatch(r"[A-Za-z]{1,4}", k):
+        out += r"(?![A-Za-z])"
+    return out
+
+
 class When(BaseModel):
     """Signals that point to this node. Any match adds to the score; ranges must hold if given."""
     keywords: list[str] = Field(default_factory=list)  # regex fragments, matched on the customer's words
@@ -64,7 +75,8 @@ class Playbook(BaseModel):
         from .signals import as_signals
         nlu = as_signals(nlu)  # TurnSignals (or a legacy Understanding, coerced): the playbook never sees a provider's object
         w, score = n.when, 0.0
-        if any(re.search(k, low, re.I) for k in w.keywords if k):
+        hit = any(re.search(_kw(k), low, re.I) for k in w.keywords if k)
+        if hit:
             score += 2.5
         if intent and intent in w.intents:
             score += 1.0
@@ -73,6 +85,7 @@ class Playbook(BaseModel):
                 score += 1.0
             if nlu.objection != "none" and nlu.objection in w.objections:
                 score += 2.0
+                hit = True
             if nlu.question_topic != "none" and nlu.question_topic in w.topics:
                 score += 0.5
             ok = ((w.min_buying is None or nlu.buying_signal >= w.min_buying)
@@ -83,6 +96,11 @@ class Playbook(BaseModel):
                 return None
             if any(v is not None for v in (w.min_buying, w.min_frustration, w.min_confusion)):
                 score += 1.5  # a signal-defined node whose signal holds
+                hit = True
+        if not hit and w.keywords:
+            # the situation must come from what the caller said (their words or a clear objection/signal), never from the intent
+            # label alone ("I see." became "asks why they should join"; call c9960ed17d)
+            return min(score, 1.5)
         return score
 
     def pick(self, text: str, nlu=None, intent: str = "") -> tuple[Node | None, float]:

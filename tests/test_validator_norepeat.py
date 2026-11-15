@@ -60,7 +60,9 @@ def test_new_sentence_passes_with_known_block():
 def test_repeated_opener_fails_and_new_opener_passes():
     led, f = SaidLedger(), CustomerFacts()
     f.learn_agent("Great news, the offer is on.")
-    v, _ = run("Great news, there is also a trainer.", known=(led, f))
+    v, out = run("Great news, there is also a trainer.", known=(led, f))
     assert "repeated_opener" in v.issue_codes
+    # the repeated opener is stripped and the rest kept (call c9960ed17d: never the whole reply swapped for "didn't get that")
+    assert out == ["There is also a trainer."] and not v.used_fallback
     v, out = run("There is also a trainer session every week.", known=(led, f))
     assert out and not v.used_fallback

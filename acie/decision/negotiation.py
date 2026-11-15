@@ -68,12 +68,21 @@ _PER_DAY_Q = re.compile(r"(per|a|each|every|ek|roz|rozana)\s*(day|din)\b|\broz(a
 _NOT_A_PRICE_DAYS = re.compile(r"\b(baje|o.?clock|am|pm|sessions?)\b", _I)
 _PER_DAY_PAY = re.compile(r"pay|payment|instal|monthly|full|rather|instead|lump|ek saath|bajaye|jagah|seedha|\bjust\b|only|sirf|bas", _I)
 _NUM = re.compile(r"\d[\d,]*")
-_NOT_A_PRICE = re.compile(r"\b(?:days?|din|months?|mahine|weeks?|hafte|sessions?|minutes?|baje|bje|o.?clock|am|pm)\b", _I)
+_NOT_A_PRICE = re.compile(r"\b(?:days?|din|months?|mahine|weeks?|hafte|sessions?|minutes?|baje|bje|o.?clock|am|pm)\b|"
+                          r"\d\s*(?:of us\b|of them\b|pickets?|tickets?|tikat|pass(?:es)?|seats?|people|persons?|members?|log|logon|bande|टिकट|पास|सीट|लोग)(?![a-z])", _I)
+
+
+# "no discount? that's fine", "I didn't ask for a discount", "fits my budget": the caller says the price is OK - not a push
+_NO_PUSH = re.compile(r"(discount|डिस्काउंट|छूट)\s*(nahi|nahin|नहीं|नही)\s*(hai|है|h)?\s*,?\s*(to|toh|तो)?\s*(bhi\s*)?(thik|theek|ठीक|koi baat nahi|कोई बात नहीं|chalega|चलेगा|fine|ok)|"
+                      r"(did ?n.?t|did not|never|not) ask(ing)? (you )?for (a |any )?discount|(do ?n.?t|do not) (need|want) (a |any )?discount|no discount (is )?(needed|required|fine|ok)|"
+                      r"(for|in|within|fits?) (my |the |our )?budget\b|budget (mein|me|में) (hai|है|fit)|"
+                      # choosing the top option is not a price objection (call c1d9da4eca: "the most expensive one for my family" got the haggle line)
+                      r"\b(the )?(most expensive|costliest|priciest|premium|best|top) (one|option|zone|ticket|tickets|seat|seats|tier|plan|package|category)\b", _I)
 
 
 def detect(text: str) -> str | None:
     """The negotiation type for this line, or None when it is not price talk."""
-    t = text.lower()
+    t = _NO_PUSH.sub(" ", text.lower())
     if not _PER_DAY_Q.search(t):
         t = dl._UNIT_AFTER.sub(" ", t)  # "5 sets of 10 reps", "21 km", "5 baje": not amounts
     if _PER_DAY_Q.search(t) and _PER_DAY_PAY.search(t) and re.search(r"\d", t) and not _NOT_A_PRICE_DAYS.search(t):
@@ -244,6 +253,7 @@ _LOWER_ASK = re.compile(r"kam kar|कम कर|\bsasta|सस्त|discount|�
 
 
 def explicit_push(text: str) -> bool:
+    text = _NO_PUSH.sub(" ", text)
     return bool(_PUSH.search(text)) or counter_number(text) is not None and detect(text) == "counter_offer"
 
 

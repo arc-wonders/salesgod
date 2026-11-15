@@ -2,7 +2,8 @@
  "version": 1,
  "tenant_defaults": {
   "anthropic": "arjun",
-  "fitzone": "arjun"
+  "fitzone": "arjun",
+  "salesgod": "salesgod"
  },
  "voices": [],
  "agents": [
@@ -75,6 +76,41 @@
    "description": "Stock female persona (Hindi / Hinglish / English)",
    "created_at": 1794702507.1089268,
    "updated_at": 1794702507.1089268
+  },
+  {
+   "id": "salesgod",
+   "tenant": "salesgod",
+   "display_name": "SalesGod",
+   "gender": "male",
+   "languages": [
+    "hi",
+    "hinglish",
+    "en"
+   ],
+   "voices": {
+    "hi": {
+     "voice_id": "6209a5682085409fa935f901f0bce950",
+     "model": "s2.1-pro-free"
+    },
+    "hinglish": {
+     "voice_id": "6209a5682085409fa935f901f0bce950",
+     "model": "s2.1-pro-free"
+    },
+    "en": {
+     "voice_id": "ea47f73b0b9c458cb121997ac6e3f619",
+     "model": "s2.1-pro-free"
+    }
+   },
+   "backup_voice": {
+    "voice_id": "015e4f0be89c4c7b834ac30876597fc0",
+    "model": "s2.1-pro-free"
+   },
+   "speaking_rate": 1.0,
+   "tone_level": "mid",
+   "greeting_style": "standard",
+   "description": "Self-pitching persona: SalesGod sells SalesGod (male, Hindi / Hinglish / English, same voices as Arjun)",
+   "created_at": 1794717534.2771192,
+   "updated_at": 1794717534.2771192
   }
  ]
 }

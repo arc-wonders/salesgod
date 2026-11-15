@@ -26,6 +26,7 @@ chahiye bolo bataiye batao sunao suno samajh aaya aana milega milta price rate f
 time baad abhi kal aaj subah shaam raat baje din mahine hafte saal ghar kaam aur ya par lekin to bhi hi bas toh
 the a an is are am was were be i you we me my your it this that these those and or but if so to of in on at for with from not do does did can could will would
 please sorry what why how when where who which price cost much many call back later now today tomorrow money pay link send want need like know tell
+ओके थैंक थैंक्स थैंक्यू यू नेक्स्ट सॉरी प्लीज़ प्लीज वेट गुड नाइस कूल डन फाइन राइट येस यस नो सर ग्रेट वाओ वाउ ओह आई वी डेमो पिच हिंदी इंग्लिश सेल पेन लाइन बोलो
 के की का को से में पर लिए बारे बात काम चीज़ चीज कोडिंग पढ़ाई ऑफिस नौकरी स्टूडेंट सोचना पड़ेगा सोचूँगा सोचूंगा बेटा बेटी जी सर मैडम देखते देखेंगे बाद फिर बस रखो रख रखिए फ़ोन फोन bas rakho rakh phone fon mean hear audible sound voice line speak hindi english hmm hm hmmm acha achha accha अच्छा हम्म हम्मम umm uh refund upi cancel branch timing parking
 """.split())
 

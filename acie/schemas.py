@@ -186,6 +186,8 @@ class TurnPlan(BaseModel):
     # validator rule packs for this product/plan (acie/rules): e.g. ["sales_compliance", "banking"]. Empty = none.
     rule_packs: list[str] = Field(default_factory=list)
     tone_level: str = ""  # professional | mid | casual: the register of this reply (set by the domain; "" = mid)
+    # a longer reply the caller asked for (a live pitch of any item: 2-4 sentences); None = the pipeline's usual word budget
+    max_words: int | None = None
 
 
 # --------------------------------------------------------------------------- session

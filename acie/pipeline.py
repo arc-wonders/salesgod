@@ -51,6 +51,8 @@ _FILLER_OPEN = re.compile(r"^(aapke sawal ka jawab (yeh |ye )?(hai )?(ki |hai ki
                           r"आपके सवाल का जवाब देते हुए,? |to answer your question,? |the answer to your question is,? )", re.I)
 _ASKS_HINDI = re.compile(r"(hindi|हिंदी|हिन्दी)\s*(mein|me|में|मे)\b|(hindi|हिंदी)\s+(bol|baat|बोल|बात)|speak (in )?hindi|talk (in )?hindi", re.I)
 _ASKS_ENGLISH = re.compile(r"(english|इंग्लिश|अंग्रेज़ी|अंग्रेजी)\s*(mein|me|में|मे)\s*(baat|bol|बात|बोल|samjha|समझा)|(speak|talk|reply|continue) (in )?english|in english please", re.I)
+_ONE_LINE_DEMO = re.compile(r"\b(?:one|ek|1|a|single|just a)\s+(?:line|sentence|lines)\b[^.?!]{0,15}\b(?:hindi|हिंदी)|\b(?:hindi|हिंदी)\b[^.?!]{0,12}\b(?:one|ek|a) (?:line|sentence)|"
+                            r"\bsay (?:something|it|that|one line|a line) in hindi|हिंदी में (?:एक )?लाइन", re.I)
 _ABOUT_IT = re.compile(r"(karta|karti|kar sakta|kar sakti|sakta|sakti|samajhta|samjhta) (hai|h)\b|करता है|करती है|कर सकता|"
                        r"सकता है|समझता है|\b(does|can|will) (it|claude)\b|support|\b(usse|isse|usme|isme|use|ise)\b|उससे|इससे|इसमें|उसमें", re.IGNORECASE)
 
@@ -70,11 +72,36 @@ _GOAL_WORDS = re.compile(r"muscle|bulk|मसल|बॉडी|body ?build|weight
 _FILLER = {"haan", "han", "ha", "ji", "ok", "okay", "yes", "yeah", "hmm", "hm", "acha", "achha", "accha", "theek", "thik", "hai", "hello", "हाँ", "हां",
            "जी", "ओके", "ठीक", "है", "हम्म", "अच्छा", "हेलो", "bolo", "बोलो", "bataiye", "बताइए", "please", "sure", "nahi", "नहीं", "no"}
 
+_RECORDED = re.compile(r"call is (being )?recorded|रिकॉर्ड हो रही|record ho rahi|कॉल की रिकॉर्डिंग|call ki recording", re.I)
+_RECORDED_LINE = {"en": "This call is recorded.", "hi": "ये कॉल रिकॉर्ड हो रही है।", "hinglish": "Ye call record ho rahi hai."}
+_LANG_NAME = {"en": "English", "hi": "Hindi in Devanagari script", "hinglish": "Hinglish in Roman script"}
+# a reply that is only an apology ("I am so sorry, I did not mean to sound rude at all.") leaves the caller hanging: offer a way forward
+_APOLOGY = re.compile(r"\b(sorry|apologi[sz]e|apologies|my (mistake|bad)|did ?n.?t mean|didn.?t intend|maaf|galti)\b|माफ़|माफ|गलती|ग़लती", re.I)
+_WAY_FORWARD = {"en": "I'll slow down. What would you like to know?",
+                "hi": {"male": "मैं आराम से बताता हूँ। आप क्या जानना चाहेंगे?", "female": "मैं आराम से बताती हूँ। आप क्या जानना चाहेंगे?"},
+                "hinglish": {"male": "Main aaram se batata hoon. Aap kya jaanna chahenge?", "female": "Main aaram se batati hoon. Aap kya jaanna chahenge?"}}
+
+
+def bare_apology(reply: list[str]) -> bool:
+    sents = [x for r in reply for x in re.split(r"(?<=[.!?।])\s+", (r or "").strip()) if x]
+    return bool(sents) and all(_APOLOGY.search(x) and not _DIDNT.search(x) for x in sents) and not any(x.rstrip().endswith("?") for x in sents) \
+        and len(" ".join(sents).split()) <= 30
+
+
+def way_forward(lang: str, gender: str = "male") -> str:
+    v = _WAY_FORWARD.get(lang) or _WAY_FORWARD["en"]
+    return v if isinstance(v, str) else v.get(gender or "male", v["male"])
+
+
 SentenceSink = Callable[[str], Awaitable[None] | None]
 
 # deterministic "no repeating context" guard (see _facts_guard). Plans that are compliance wording or a safety reply never change.
-_GUARD_KEEP = frozenset({"opening", "language_switch", "opt_out", "opt_out_confirmed", "declined", "callback", "callback_time", "human_agent", "identify",
-                         "are_you_ai", "number_source", "sensitive_stop", "slow_down", "link_cancelled", "confirm_buy", "constraint_stop"})
+# content the caller explicitly asked for (a live pitch of any item, a one-line demo): never trimmed by the question budget, the
+# repeated-question filter or the product facts guard (call 1d5573e7dc: "sell me a pen" was cut to "Nice tries on the classic pen challenge!")
+_ASKED_FOR = frozenset({"pitch_demo"})
+_GUARD_KEEP = frozenset({"opening", "order_slot", "pitch_demo", "language_switch", "opt_out", "opt_out_confirmed", "declined", "callback", "callback_time", "human_agent", "identify",
+                         "are_you_ai", "number_source", "sensitive_stop", "slow_down", "link_cancelled", "confirm_buy", "constraint_stop",
+                         "purpose", "pay_at_desk", "goodbye_after"})
 _FIRM_END = frozenset({"declined", "opt_out", "opt_out_confirmed", "callback", "human_agent"})  # intents that may end the call by themselves
 _DIDNT = re.compile(r"didn.?t (quite )?(get|catch)|say (that )?(it )?(once more|again)|दोबारा|phir se bol|samajh nahi paya|सुन नहीं पाया|समझ नहीं पाया|"
                     r"dobara bol|ek baar phir|एक बार फिर|सुनाई नहीं|sunai nahi|ठीक से सुन|theek se sun", re.I)
@@ -82,6 +109,9 @@ _UNKNOWN = re.compile(r"don.?t have (that|any)|won.?t guess|not sure about that|
                       r"nothing more on that|that is really all|rather not guess|jaankari mere paas nahi|pakka nahi|nahi bata sakta|bas itna hi|"
                       r"जानकारी मेरे पास नहीं|पक्का नहीं|नहीं बता सकता|बस इतना ही|अंदाज़ा नहीं", re.I)
 _FAREWELL = re.compile(r"धन्यवाद|शुक्रिया|दिन शुभ|thank you|thanks for|have a (nice|good|great) day|take care|goodbye|bye\b|dhanyavaad|din accha|din achha|alvida", re.I)
+_FALSE_ALARM = re.compile(r"\b(i.?m|i am) (totally |completely |perfectly |absolutely )?(fine|ok(ay)?|alright|good)\b|i was (just |only )?asking|what are you (saying|talking)|"
+                          r"wrong (number|person)|your system is (broken|wrong)|(ठीक|theek|thik) (हूँ|हूं|hoon|hun|hu)|(मैं|main|mai) (तो )?(बस|bas|sirf|सिर्फ़|सिर्फ) .{0,60}(पूछ|pooch|puch)|"
+                          r"(ये|yeh|ye|aap) (क्या|kya) (कह|keh|bol|बोल) (रहे|rahe)|सिस्टम खराब|system kharab", re.I)
 _REASSURED = re.compile(
     r"ठीक\s*(हूँ|हूं|हु|है)|theek\s*(hoon|hun|hu|hai)|thik\s*(hoon|hun|hu|hai)|\bi\s*'?a?m\s+(fine|ok|okay|good|alright|all right)\b|"
     r"\b(just|only)\s+(asking|wanted|want|checking)|\bbas\s+\w+\s+(puch|pooch|bata|jaan)|\bbas\s+(fees|price|rate|kimat)|बस\s+\S+\s+(पूछ|बता|जान)|"
@@ -231,6 +261,9 @@ class ACIEPipeline:
         """The caller must know who is calling and that it is a sales call about the product. If a barge-in cut the
         opening/pitch before they heard it, the next agent turn says it first, briefly (once per cut)."""
         ctx = session.context
+        if plan.intent == "purpose":  # the opening's purpose step says who / why / recorded itself
+            session.dialog.pop("_purpose_due", None)
+            return plan
         if session.dialog.get("_purpose_due") != "1" or ("who_is_calling" in ctx.told and "what_the_product_is" in ctx.told):
             session.dialog.pop("_purpose_due", None)
             return plan
@@ -241,6 +274,9 @@ class ACIEPipeline:
         if not texts:
             return plan
         session.dialog.pop("_purpose_due", None)
+        if "call_recorded" not in ctx.told and os.getenv("ACIE_RAPPORT_OPENING", "1") != "0":  # the recording notice was never heard either
+            texts = {l: t + " " + _RECORDED_LINE.get(l, _RECORDED_LINE["en"]) for l, t in texts.items()}
+            ctx.told.append("call_recorded")
         lead = {l: (t + " " + ((plan.lead or {}).get(l) or "")).strip() for l, t in texts.items()}
         for what in ("who_is_calling", "what_the_product_is"):
             if what not in ctx.told:
@@ -291,6 +327,8 @@ class ACIEPipeline:
                       "payment_link": "link" in low or "लिंक" in heard}.get(what, heard_ratio >= 0.9)
                 if ok and what not in getattr(ctx, kind):
                     getattr(ctx, kind).append(what)
+            if _RECORDED.search(heard) and "call_recorded" not in ctx.told:
+                ctx.told.append("call_recorded")
             if any(t and t in heard for t in (self.purpose_texts() or {}).values()):  # the purpose line itself was heard
                 for what in ("who_is_calling", "what_the_product_is"):
                     if what not in ctx.told:
@@ -308,6 +346,8 @@ class ACIEPipeline:
                 ctx.told.remove("who_is_calling")
             if "what_the_product_is" in ctx.told and not (product and product.lower().split()[0] in low):
                 ctx.told.remove("what_the_product_is")
+            if "call_recorded" in ctx.told and not _RECORDED.search(heard):
+                ctx.told.remove("call_recorded")
             if heard:
                 ctx.last_agent_line = heard
         for u in reversed(sess.history):  # the transcript the LLM sees: only the heard words
@@ -663,6 +703,7 @@ class ACIEPipeline:
         ledger.add_move("handback")
         g = self._agent_gender()
         session.dialog["pending"] = "pitch"  # their next yes means "tell me what's included", never a confirmation
+        session.dialog["handback_open"] = "1"  # the domain answers that yes with what's included (no price)
         return TurnPlan(intent="apology", objective="Own that you rushed, then ask whether they want to hear what's included or stop",
                         llm_allowed=False, decision="style:own_and_hand_back",
                         fallback={l: style_mod.pick("HANDBACK", l, n, g) for l in ("en", "hi", "hinglish")})
@@ -674,8 +715,9 @@ class ACIEPipeline:
             g = getattr(getattr(self.decision.domain, "p", None), "agent_gender", "") or ""
         return g if g in ("male", "female") else ""
 
-    _STYLE_KEEP_ASK = frozenset({"negotiation", "confirm_close", "link_sent", "price_floor", "callback", "callback_time", "opening", "clarify",
-                                 "reason_ask", "language_switch", "opt_out", "declined", "human_agent", "identify", "are_you_ai"})
+    _STYLE_KEEP_ASK = frozenset({"negotiation", "order_slot", "pitch_demo", "confirm_close", "link_sent", "price_floor", "callback", "callback_time", "opening", "clarify",
+                                 "reason_ask", "language_switch", "opt_out", "declined", "human_agent", "identify", "are_you_ai", "purpose", "pitch",
+                                 "pay_at_desk"})
     _ASKS_PRICE = re.compile(r"price|cost|kitne|कितन|कीमत|rate|how much|fees?|फ़ीस|फीस|charge|paisa|पैसे|₹|\d", re.I)
 
     def _style_keeps_asks(self, plan) -> bool:
@@ -828,7 +870,7 @@ class ACIEPipeline:
                 lead = style_mod.pick(key, l, b["leads"], g)
             old_lead = (plan.lead or {}).get(l) or ""
             first = probe.fill(old_lead or (keep[0] if keep else ""))
-            if lead and re.match(r"(sorry|i.?m sorry|you.?re right|माफ़|माफ|maaf|aap sahi|आप सही|that.?s okay|right|okay|ok|got it|ji|जी|achha|अच्छा|"
+            if lead and re.match(r"(great|perfect|glad|badhiya|बढ़िया|sorry|i.?m sorry|you.?re right|माफ़|माफ|maaf|aap sahi|आप सही|that.?s okay|right|okay|ok|got it|ji|जी|achha|अच्छा|"
                                  r"hmm|हम्म|sure|of course|no problem|fair|ठीक|theek|lagta|लगता|sounds like)\b", first, re.I):
                 lead = ""  # the line already opens with an acknowledgement: no stacked fillers
             if lead:
@@ -846,7 +888,7 @@ class ACIEPipeline:
 
     # ------------------------------------------------------------------ length budget (owner, 15 Nov: "replies are far too long")
 
-    _LEN_EXEMPT = frozenset({"opening", "opt_out", "opt_out_confirmed", "are_you_ai", "number_source", "identify", "human_agent",
+    _LEN_EXEMPT = frozenset({"opening", "pitch_demo", "opt_out", "opt_out_confirmed", "are_you_ai", "number_source", "identify", "human_agent",
                              "sensitive_stop", "constraint_stop", "repeat_last", "where_were_we", "language_switch", "link_sent",
                              "declined", "goodbye", "callback", "callback_time", "personal"})
     _LEN_TERMS = frozenset({"price", "confirm_close", "negotiation", "price_floor", "reoffer"})
@@ -861,7 +903,9 @@ class ACIEPipeline:
         short = False
         if dialog is not None and os.getenv("ACIE_LENGTH_CAP", "0") != "1" and getattr(self.decision.domain, "name", "") == "product_sales":
             st = style_mod.Style.from_json(dialog.get(style_mod.STYLE_KEY))
-            short = st is not None and st.style in ("brief", "calm", "dry-honest")  # a hurried / rude / sarcastic caller: short, always
+            # a hurried / rude / sarcastic caller: short, always (not the "brief" of a confused / garbled line: that is about simple
+            # words, and cutting it left "With a FitZone membership membership." on call c9960ed17d)
+            short = st is not None and (st.style in ("calm", "dry-honest") or (st.style == "brief" and st.row == 8))
         if not short and (os.getenv("ACIE_LENGTH_CAP", "0") != "1" or getattr(self.decision.domain, "name", "") != "product_sales"):
             return None
         if plan.intent in self._LEN_EXEMPT or plan.intent.startswith(("safety", "distress", "concern")):
@@ -870,7 +914,8 @@ class ACIEPipeline:
         if dec.startswith(("style:backchannel", "fragment")):
             return {"w": 6, "s": 1, "terms": False}
         terms = plan.intent in self._LEN_TERMS or dec.startswith("negotiation")
-        return {"w": 25 if is_question(customer_text) else 22, "s": 2, "terms": terms}
+        # with the owner's cap off, the short mode only drops whole extra sentences: it never cuts inside one (no fragments)
+        return {"w": 25 if is_question(customer_text) else 22, "s": 2, "terms": terms, "whole": os.getenv("ACIE_LENGTH_CAP", "0") != "1"}
 
     def _fit_length(self, text: str, cap: dict, spent: dict) -> str:
         """Keep whole sentences while they fit; the first sentence of the turn is always spoken (cut at a clause boundary
@@ -900,7 +945,7 @@ class ACIEPipeline:
                     w = len(part.split())
                 out.append(part)  # a price said inside an answer stays
             elif spent["s"] == 0:  # the first sentence of content (after at most a short filler) is always spoken
-                if spent["w"] + w > cap["w"]:
+                if spent["w"] + w > cap["w"] and not cap.get("whole"):
                     part = self._clause_cut(part, max(cap["w"] - spent["w"], 4))
                     if cap["w"] <= 6 and len(part.split()) > cap["w"] and not self._NUM.search(part):
                         part = " ".join(part.split()[:cap["w"]]).rstrip(",;:") + "."  # an ack: words only, no numbers to break
@@ -908,7 +953,7 @@ class ACIEPipeline:
                 out.append(part)
             elif spent["s"] < cap["s"] and spent["w"] + w <= cap["w"]:
                 out.append(part)
-            elif spent["s"] < cap["s"] and cap["w"] - spent["w"] >= 4 and \
+            elif spent["s"] < cap["s"] and cap["w"] - spent["w"] >= 4 and not cap.get("whole") and \
                     len((cut := self._clause_cut(part, cap["w"] - spent["w"])).split()) <= cap["w"] - spent["w"]:
                 part, w = cut, len(cut.split())  # the main clause of the second sentence still fits
                 out.append(part)
@@ -940,12 +985,23 @@ class ACIEPipeline:
             return sent  # a question is asked whole or not at all
         for m in re.finditer(r"[,;:]\s|\s[-–]\s", sent):
             pre = sent[:m.start()].rstrip()
-            if len(pre.split()) <= limit and len(pre.split()) >= min(4, max(2, limit // 2)):
+            if len(pre.split()) <= limit and len(pre.split()) >= min(4, max(2, limit // 2)) and not ACIEPipeline._fragment(pre):
                 best = pre
         if not best:
             return sent
         end = "।" if re.search(r"[\u0900-\u097f]", best) and not re.search(r"[A-Za-z]{3,}\s*$", best) else "."
         return best + end
+
+    _FRAG_START = re.compile(r"^\W*(with|for|if|when|whenever|because|since|as|while|although|though|unless|until|after|before|so that|like|plus|"
+                             r"and|but|or|to|at|in|on|from|by|of|about|instead of|including|especially|which|who|that|where|jab|agar|kyunki|ki|"
+                             r"अगर|जब|क्योंकि|कि|और|लेकिन)\b", re.I)
+    _FRAG_END = re.compile(r"\b(a|an|the|and|or|but|with|for|to|of|in|on|at|your|my|our|their|is|are|ki|ka|ke|aur|का|की|के|और)\W*$", re.I)
+
+    @classmethod
+    def _fragment(cls, clause: str) -> bool:
+        """A clause that cannot stand alone as a spoken sentence ("With a FitZone membership", "If you join this week")."""
+        # (an opening phrase followed by its main clause - "At FitZone, you get yoga classes" - stands; the phrase alone does not)
+        return bool((cls._FRAG_START.search(clause) and not re.search(r"[,;:]\s", clause)) or cls._FRAG_END.search(clause))
 
     def _keep_call_open(self, plan, expr, session: SessionState, ledger: SaidLedger, facts: CustomerFacts, text: str):
         """The call ends only on an explicit bye / opt-out / firm no (and the crisis and handoff plans). A link that was just sent, or a
@@ -1059,6 +1115,9 @@ class ACIEPipeline:
         mark("understand")
 
         explicit = detect_explicit_requests(turn.text)
+        if "language" in explicit and _ONE_LINE_DEMO.search(turn.text):
+            # "just one line in Hindi" (call d3ac800811) is a demo request: one Hindi line, the call stays in the caller's language
+            explicit.pop("language")
         if "language" in explicit and _ABOUT_IT.search(turn.text):
             # "Hindi mein bhi baat karta hai kya?" asks what the PRODUCT can do, not to switch language
             explicit.pop("language")
@@ -1078,6 +1137,12 @@ class ACIEPipeline:
         # Full distress needs lexical/phonetic evidence >= DISTRESS_T, or concern-band evidence plus the NLU flag. A caller who
         # reassures ("मैं ठीक हूँ") or asks about the product is released: back to normal, no sticky flag, no re-check.
         reassured = bool(_REASSURED.search(turn.text)) or is_question(turn.text)
+        if session.dialog.get("safety_flag") and d_score < CONCERN_T and not nlu_crisis and _FALSE_ALARM.search(turn.text) \
+                and float(session.dialog.get("_safety_trigger", "1") or 1) < 0.9 and session.dialog.get("_safety_turns", "1") == "1":
+            # one borderline match (not clear ideation) and the caller says it was a normal question / they are fine: release, don't
+            # keep reading the helpline (concert call: a metro-station question got Tele-MANAS three times). Clear ideation stays sticky.
+            session.dialog.pop("safety_flag", None)
+            session.dialog["_safety_released"] = "1"
         flagged = bool(session.dialog.get("safety_flag")) or d_score >= DISTRESS_T \
             or (bool(nlu_crisis) and d_score >= CONCERN_T and not reassured)
         nlu_only_concern = bool(nlu_crisis) and d_score < CONCERN_T and not reassured
@@ -1100,10 +1165,13 @@ class ACIEPipeline:
         undo = self._undo_point(session, facts)  # what the context was before this turn (barge-in: keep only what was heard)
         if strat.row == "crisis":  # sticky: once in crisis, never back to business
             if session.dialog.get("safety_flag"):
+                session.dialog["_safety_turns"] = str(int(session.dialog.get("_safety_turns", "1") or 1) + 1)
                 plan = distress_followup_plan(turn.text)
             else:  # never sell to someone in crisis
                 plan = distress_plan()
                 session.dialog["safety_flag"] = "1"
+                session.dialog["_safety_trigger"] = f"{d_score:.2f}" if d_score else "1"
+                session.dialog["_safety_turns"] = "1"
                 session.dialog.pop("pending", None)
                 profile.outcomes.append("safety_distress")
         elif (CONCERN_T <= d_score < DISTRESS_T or nlu_only_concern) and not session.dialog.get("safety_flag") \
@@ -1228,17 +1296,19 @@ class ACIEPipeline:
                 why = "; ".join(i.split(":")[0] for i in validator.issues[-2:])
                 again = await self._regenerate(plan, expr, session, turn.text,
                                                f"Your previous reply was rejected ({why}). Write it again: answer what the "
-                                               "customer asked, in the reply language, and use the {slots} for the offer price.")
+                                               f"customer asked, ONLY in {_LANG_NAME.get(expr.language, 'the reply language')} (even if they "
+                                               "mixed languages), and use the {slots} for the offer price.")
                 if again:
                     validator.add_issue(f"regenerated after: {why}", "regenerated")
                     validator.used_fallback = False
                     reply = again
-            if plan.llm_allowed and len(" ".join(reply).split()) > self.max_reply_words:
+            max_words = getattr(plan, "max_words", None) or self.max_reply_words
+            if plan.llm_allowed and len(" ".join(reply).split()) > max_words:
                 # the LLM ignores "one short sentence" (41-word answers on live call 8): keep the
                 # leading sentences that fit; the ask usually comes last and is re-asked next turn
                 kept, n = [], 0
                 ask = reply[-1] if reply[-1].rstrip().endswith("?") else None  # the closing question is kept
-                budget = self.max_reply_words - (len(ask.split()) if ask else 0)
+                budget = max_words - (len(ask.split()) if ask else 0)
                 for s in reply[:-1] if ask else reply:
                     if kept and n + len(s.split()) > budget:
                         break
@@ -1246,7 +1316,8 @@ class ACIEPipeline:
                     n += len(s.split())
                 if ask:
                     kept.append(ask)
-                validator.add_issue(f"trimmed reply from {len(reply)} to {len(kept)} sentences", "trimmed")
+                if len(kept) < len(reply):
+                    validator.add_issue(f"trimmed reply from {len(reply)} to {len(kept)} sentences", "trimmed")
                 reply = kept
             if plan.llm_allowed and reply and not validator.used_fallback:
                 # "Aapke sawal ka jawab hai ki ..." on every turn sounded robotic (student persona)
@@ -1296,7 +1367,7 @@ class ACIEPipeline:
                     reply = kept
                     if not reply:
                         validator.used_fallback = True
-            if plan.llm_allowed and not validator.used_fallback and reply:
+            if plan.llm_allowed and not validator.used_fallback and reply and plan.intent not in _ASKED_FOR:
                 kept = self._drop_repeated_questions(reply, ledger, session)
                 if kept != reply:
                     validator.add_issue("dropped a question the call already asked or answered", "question_repeated")
@@ -1309,7 +1380,8 @@ class ACIEPipeline:
                 if kept != reply:
                     validator.add_issue("style: dropped a question (question budget)", "style_ask")
                     reply = kept
-            if plan.llm_allowed and reply and os.getenv("ACIE_FACTS_GUARD", "1") != "0" and getattr(self.decision.domain, "name", "") == "product_sales":
+            if plan.llm_allowed and reply and os.getenv("ACIE_FACTS_GUARD", "1") != "0" and getattr(self.decision.domain, "name", "") == "product_sales" \
+                    and plan.intent not in _ASKED_FOR:
                 # the model's reply, or the safe template that replaces it, still repeats / restates / re-asks: regenerate once with the
                 # known-block note, then the next unsaid point as a deterministic template (never the same words twice)
                 spoken = validator.fill(render_fallback(plan, expr)) if validator.used_fallback else " ".join(reply)
@@ -1334,6 +1406,9 @@ class ACIEPipeline:
             out_reply = [validator.fill(render_fallback(plan, expr))] if validator.used_fallback else reply
             if out_reply and plan.llm_allowed and getattr(self.decision.domain, "name", "") == "product_sales" and not explicit_bye(turn.text):
                 out_reply = [facts.rotate_opener(out_reply[0], expr.language)] + out_reply[1:]
+                if bare_apology(out_reply) and not plan.end_call:
+                    out_reply = out_reply + [way_forward(expr.language, self._agent_gender(plan) or "male")]
+                    validator.add_issue("bare apology: added a way forward", "way_forward")
             await emit(out_reply)
         else:
             await emit(tail)
@@ -1346,6 +1421,8 @@ class ACIEPipeline:
         if plan.intent not in ("repeat_last", "where_were_we"):  # a replay says nothing new
             self._learn_said(ledger, session, plan, move, text, facts)
         style_mod.note_reply(session.dialog, text)
+        if _RECORDED.search(text) and "call_recorded" not in session.context.told:
+            session.context.told.append("call_recorded")
         p_ = getattr(self.decision.domain, "p", None)
         eco = getattr(p_, "economics", None)
         delta = session.context.after_reply(session.turn_index, turn.text, plan.intent, text, expr.language, session.dialog,

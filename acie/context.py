@@ -66,15 +66,16 @@ _AGENT_EVENTS: dict[str, tuple[str, str]] = {
     "are_you_ai": ("told", "agent_is_an_ai"),
     "identify": ("told", "who_is_calling"),
     "opening": ("told", "who_is_calling"),
+    "purpose": ("told", "purpose_stated"),  # the opening's step 2 (why we call); the pitch still tells what the product is
     "safety_distress": ("promised", "helpline_given_call_stopped"),
     "constraint_stop": ("promised", "call_ended_by_policy"),
 }
-_DECISIONS = {"link_sent": "accepted", "declined": "declined", "declined_price": "declined",
+_DECISIONS = {"link_sent": "accepted", "pay_at_desk": "accepted", "pilot_signup": "accepted", "declined": "declined", "declined_price": "declined",
               "annoyed_exit": "declined", "opt_out": "declined", "opt_out_confirmed": "declined",
               "callback": "later"}
 # terminal paths -> the call's outcome label (what the feedback lane reads next to `decision`):
 # accepted | declined | later | opt_out | safety | human_agent | blocked ("" = still open)
-_OUTCOMES = {"link_sent": "accepted", "declined": "declined", "declined_price": "declined", "annoyed_exit": "declined",
+_OUTCOMES = {"link_sent": "accepted", "pay_at_desk": "accepted", "pilot_signup": "accepted", "declined": "declined", "declined_price": "declined", "annoyed_exit": "declined",
              "callback": "later", "opt_out": "opt_out", "opt_out_confirmed": "opt_out", "safety_distress": "safety",
              "safety_followup": "safety", "safety_goodbye": "safety", "safety_noted": "safety",
              "human_agent": "human_agent", "constraint_stop": "blocked"}
@@ -94,6 +95,7 @@ class SaleChecklist(BaseModel):
     consent: bool = False                   # the customer said yes to buying / to the link
     link_sent: bool = False
     language: str = ""
+    order: dict = Field(default_factory=dict)  # the booking so far (acie/decision/order.py): tier, quantity, location, date, total, status
     updated_turn: int = -1
 
     def lines(self) -> list[str]:
@@ -106,6 +108,11 @@ class SaleChecklist(BaseModel):
             out.append("objections: " + ", ".join(self.objections_raised) + (f" (still open: {', '.join(open_obj)})" if open_obj else " (handled)"))
         if self.agreed_price is not None:
             out.append(f"agreed price: {self.agreed_price:g}")
+        if self.order:
+            o = self.order
+            bits = [f"{k} {o[k]}" for k in ("quantity", "tier", "location", "date") if o.get(k)]
+            if bits:
+                out.append("order so far (never ask for these again): " + ", ".join(bits))
         return out
 
 
@@ -120,6 +127,26 @@ _REFUSE = re.compile(r"too low|below what|can.?t (do|go)|cannot|not possible|bah
 def amounts(text: str) -> list[float]:
     out = []
     for m in _AMOUNT.finditer(text or ""):
+        try:
+            out.append(float(m.group(1).replace(",", "")))
+        except ValueError:
+            pass
+    return out
+
+
+_NOT_MONEY_AFTER = re.compile(r"\s*(?:tickets?|pickets?|passes|pass|seats?|people|persons?|log|jan|members?|memberships?|of us|days?|din|weeks?|months?|mahine|years?|saal|"
+                              r"pm|am|baje|o.?clock|%|th\b|st\b|nd\b|rd\b|january|february|march|april|june|july|august|september|october|november|december|"
+                              r"jan\b|feb\b|mar\b|apr\b|jun\b|jul\b|aug\b|sep\b|oct\b|nov\b|dec\b|टिकट|लोग|दिन|महीने|साल|बजे|दिसंबर|नवंबर)", re.I)
+_NOT_MONEY_BEFORE = re.compile(r"(?:january|february|march|april|may|june|july|august|september|october|november|december|dec|nov|sector|gate|platform|no\.?|number|dated?|on)\s*$", re.I)
+
+
+def price_amounts(text: str) -> list[float]:
+    """Amounts that can be a price: not "5 tickets", "12 December", "7 pm", "Sector 34"."""
+    out = []
+    t = text or ""
+    for m in _AMOUNT.finditer(t):
+        if _NOT_MONEY_AFTER.match(t, m.end()) or _NOT_MONEY_BEFORE.search(t[:m.start()]):
+            continue
         try:
             out.append(float(m.group(1).replace(",", "")))
         except ValueError:
@@ -318,7 +345,11 @@ class CallContext(BaseModel):
         negotiating = intent in ("negotiation", "price_floor") or bool((dialog or {}).get("_neg"))
         hi = list_price * 1.5 if list_price else 10 ** 7
         if negotiating and intent not in _FILLER_INTENTS:
-            for a in amounts(customer_text)[-1:]:
+            # a quantity, a date or a time is never a counter-offer (c1d9da4eca: "5 pickets, VIP zone" left a counter of 12)
+            lo_c = list_price * 0.05 if list_price else 1
+            for a in price_amounts(customer_text)[-1:]:
+                if a < lo_c:
+                    continue
                 if 1 <= a <= hi and not (c.counter_offers and c.counter_offers[-1] == {"turn": turn, "by": "customer", "amount": a}):
                     c.counter_offers.append({"turn": turn, "by": "customer", "amount": a})
             lo = list_price * 0.3 if list_price else 50
@@ -334,6 +365,13 @@ class CallContext(BaseModel):
             try:
                 c.agreed_price = float(self.deal_view["agreed_price"])
             except (TypeError, ValueError):
+                pass
+        raw_order = (dialog or {}).get("_order")
+        if raw_order:
+            try:
+                from .decision.order import load as _order_load
+                c.order = _order_load(dialog).public()
+            except Exception:
                 pass
         c.consent = c.consent or self.decision == "accepted" or intent == "link_sent"
         c.link_sent = "payment_link" in self.promised

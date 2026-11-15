@@ -175,6 +175,7 @@ _PLACE_RAW = frozenset(normalize(w) for w in (
     "chat roof rooftop building bildin bilding bridge cliff tower river sea window terrace "
     "बिल्डिंग ब्रिज रूफ रूफटॉप टैरेस बालकनी टावर नदी").split())
 _roman("aage age kar kr kya kia jeekar jee ji jii jike jiye jiyo")  # used as literal skeletons in _evidence
+_AAGE_RAW = frozenset(normalize(w) for w in "aage aagey age agey aagay aege आगे आगें अागे".split())
 _TRAIN = _set("trein patri")
 _TRAIN_RAW = frozenset(normalize(w) for w in "train trains railway track metro ट्रेन रेलवे पटरी मेट्रो".split())
 _DIEV = _set("marna marne maarna maarne")
@@ -390,7 +391,9 @@ def _evidence(tok: list[str], turn: list[int], hyper: set[int], raw: list[str]) 
                 break
     for i in TRAIN:
         for j, t in enumerate(tok):
-            if t in _skel_word("aage") and 0 < j - i <= 2:
+            # the word "aage" (in front of) itself: its skeleton "K" is also "है" / "के" / "को" (concert call: "metro station है?" read as
+            # "in front of a train" and gave the helpline for a directions question)
+            if t == _skel_word("aage") and 0 < j - i <= 2 and j < len(raw) and raw[j] in _AAGE_RAW:
                 near_self = any(abs(s - i) <= 6 for s in SELF)
                 add("method", 0.85 if near_self else 0.4, j, "train_aage")
     for i in _idx(tok, _NAS):

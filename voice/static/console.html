@@ -867,7 +867,7 @@ function pathView(turn) {
       h('div', { class: 'step' + (i === idx ? ' hot' : i < idx ? ' passed' : ''), title: g.rule }, h('span', { class: 'n' }, String(i + 1).padStart(2, '0')), h('span', {}, g.title),
         i < idx ? h('span', { class: 'hint', style: 'margin-left:auto;font-size:12px' }, 'passed') : i === idx ? h('span', { class: 'tag sig', style: 'margin-left:auto' }, 'decided') : null),
       i === idx ? h('div', { class: 'leaf' }, h('div', { class: 'k' }, tr.gate === 'conversation' ? (tr.pb_title ? 'Situation picked' : 'No situation matched') : 'Gate rule'),
-        tr.gate === 'conversation' ? tr.pb_title || 'Free answer from product knowledge' : g.rule || g.title) : null]),
+        tr.gate === 'conversation' ? tr.pb_title || (tr.decision ? String(tr.decision).replace(/ \+style:.*$/, '') : 'Free answer from product knowledge') : g.rule || g.title) : null]),
     h('div', { class: 'leaf plan' }, h('div', { class: 'k' }, 'Plan'), h('b', { style: 'font-weight:550' }, String((turn && turn.intent) || '—').replaceAll('_', ' ')),
       tr.decision ? h('div', { class: 'hint', style: 'margin-top:3px' }, tr.decision) : null));
 }
@@ -950,6 +950,11 @@ function ctxRender(d) {
   const items = [['product_explained', 'Product explained'], ['price_quoted', 'Price quoted'], ['offer_terms_read', 'Offer terms read'], ['consent', 'Consent to the link'], ['link_sent', 'Payment link sent']].filter(([k]) => k in ck);
   if (items.length) out.append(h('div', { class: 'hg-ck' }, items.map(([k, l]) => h('span', { class: 'ck' + (ck[k] ? ' on' : '') }, h('i', {}, ck[k] ? '✓' : ''), l)),
     (ck.objections_raised || []).length ? h('span', { class: 'hint', style: 'flex-basis:100%;margin-top:4px' }, 'Objections: ' + ck.objections_raised.map((o) => o + ((ck.objections_handled || []).includes(o) ? ' (handled)' : '')).join(', ')) : null));
+  const od = ck.order || {};
+  if (od.tier || od.quantity || od.location) out.append(h('div', { class: 'hg-ck' }, h('b', {}, 'Order '),
+    h('span', {}, [od.quantity ? od.quantity + ' x' : '', od.tier || '', od.location ? '· ' + od.location : '', od.date ? '(' + od.date + ')' : ''].filter(Boolean).join(' ')),
+    od.total ? h('span', { class: 'tag green' }, 'total ', h('b', {}, m(od.total))) : null,
+    od.status ? h('span', { class: 'tag ' + (od.status === 'link' || od.status === 'desk' ? 'green' : 'amber') }, od.status) : null));
   return out.childNodes.length ? h('div', {}, h('div', { class: 'sec-lbl', style: 'margin-bottom:8px' }, 'Where we are'), out) : null;
 }
 /* "Where we are" slot at the top of the insights pane: empty (and hidden) unless SG.ctxView(call) is provided,

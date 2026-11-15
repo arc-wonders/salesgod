@@ -1,0 +1,648 @@
+{
+ "tenant": "salesgod",
+ "product_id": "sales-god",
+ "generated_by": "SalesGod self-pitch sheet (authored in session, demo data)",
+ "nodes": [
+  {
+   "id": "pitch_anything",
+   "title": "asks it to pitch / sell anything on the spot, or for a live demo",
+   "when": {
+    "keywords": [
+     "pitch me",
+     "sell me",
+     "bitch me",
+     "peach me",
+     "pitch (this|that|a|an|the|my|yourself)",
+     "sell (this|that|yourself)",
+     "bech ke dikhao",
+     "bech kar dikhao",
+     "pitch karo",
+     "pitch kar ke dikhao",
+     "बेच के दिखाओ",
+     "बेचकर दिखाओ",
+     "पिच करो",
+     "demo do",
+     "give me a demo",
+     "show me a demo",
+     "live demo",
+     "डेमो दो"
+    ],
+    "intents": [],
+    "objections": [],
+    "topics": [],
+    "min_buying": null,
+    "max_buying": null,
+    "min_frustration": null,
+    "min_confusion": null
+   },
+   "points": [
+    "Pitch exactly the thing they named, right now, not SalesGod: one vivid benefit, one hook question, one close.",
+    "Two to four short, confident, playful sentences; no prices, numbers, brands or specs for that item.",
+    "End with a light tie-back: that's exactly how I'd sell your product, on every call."
+   ],
+   "ask": "Want me to do that for your product?",
+   "points_hi": [
+    "उन्होंने जो चीज़ बताई, वही अभी बेचिए, SalesGod नहीं: एक दमदार फ़ायदा, एक सवाल, एक क्लोज़।",
+    "दो से चार छोटे, आत्मविश्वास भरे, मज़ेदार वाक्य; उस चीज़ की कोई कीमत या नंबर नहीं।",
+    "आख़िर में: आपके प्रोडक्ट को भी मैं हर कॉल पर ऐसे ही बेचूँगा।"
+   ],
+   "ask_hi": "क्या मैं आपके प्रोडक्ट के लिए भी यही करूँ?",
+   "goal": "prove the selling skill live on whatever they name, then tie back lightly to their product",
+   "children": []
+  },
+  {
+   "id": "asks_price",
+   "title": "asks the price / plans",
+   "when": {
+    "keywords": [
+     "how much",
+     "price",
+     "pricing",
+     "\\bcost",
+     "plans?\\b",
+     "kitne ka",
+     "kitna (hai|padega|lagega)",
+     "कितने का",
+     "कितना",
+     "कीमत",
+     "keemat",
+     "charges"
+    ],
+    "intents": [
+     "price"
+    ],
+    "objections": [],
+    "topics": [
+     "offer_terms"
+    ],
+    "min_buying": null,
+    "max_buying": null,
+    "min_frustration": null,
+    "min_confusion": null
+   },
+   "points": [
+    "The pilot plan is ₹14,999 a month for the first 3 months, then ₹24,999, with 5,000 calling minutes included.",
+    "Or pay-as-you-go at ₹5 per connected minute, no monthly fee.",
+    "And the first 7 days are a free pilot."
+   ],
+   "ask": "Roughly how many leads do you call in a month?",
+   "points_hi": [
+    "पायलट प्लान पहले 3 महीने ₹14,999 महीना है, फिर ₹24,999, 5,000 कॉलिंग मिनट शामिल।",
+    "या pay-as-you-go, ₹5 प्रति कनेक्टेड मिनट, कोई मंथली फ़ीस नहीं।",
+    "और पहले 7 दिन फ़्री पायलट।"
+   ],
+   "ask_hi": "महीने में लगभग कितनी लीड्स को कॉल करते हैं?",
+   "goal": "give the plans clearly, mention the free pilot, learn their volume",
+   "children": []
+  },
+  {
+   "id": "how_it_works",
+   "title": "asks how it works / what it does",
+   "when": {
+    "keywords": [
+     "how (does|do) (it|you) work",
+     "kaise kaam",
+     "कैसे काम",
+     "what (do|can) you do",
+     "kya karte ho",
+     "क्या करते",
+     "explain"
+    ],
+    "intents": [],
+    "objections": [],
+    "topics": [],
+    "min_buying": null,
+    "max_buying": null,
+    "min_frustration": null,
+    "min_confusion": null
+   },
+   "points": [
+    "You give us your product in one line and a lead list.",
+    "Our studio builds the facts and the sales flow, and simulated customers test it.",
+    "Then I call, and you watch every decision live on the console."
+   ],
+   "ask": "What does your business sell?",
+   "points_hi": [
+    "आप अपना प्रोडक्ट एक लाइन में और लीड लिस्ट देते हैं।",
+    "हमारा स्टूडियो फ़ैक्ट्स और सेल्स फ़्लो बनाता है, नकली कस्टमर्स उसे टेस्ट करते हैं।",
+    "फिर मैं कॉल करता हूँ, और आप हर फ़ैसला कंसोल पर लाइव देखते हैं।"
+   ],
+   "ask_hi": "आपका बिज़नेस क्या बेचता है?",
+   "goal": "explain the 3 steps simply, then learn what they sell",
+   "children": []
+  },
+  {
+   "id": "sounds_human",
+   "title": "asks if it sounds human / is a robot",
+   "when": {
+    "keywords": [
+     "robot",
+     "robotic",
+     "human",
+     "insaan",
+     "इंसान",
+     "real person",
+     "are you (an? )?(ai|bot)",
+     "machine"
+    ],
+    "intents": [
+     "are_you_ai"
+    ],
+    "objections": [],
+    "topics": [],
+    "min_buying": null,
+    "max_buying": null,
+    "min_frustration": null,
+    "min_confusion": null
+   },
+   "points": [
+    "I'm an AI, and I always say so at the start.",
+    "But notice: I'm listening, keeping it short, and answering what you actually asked.",
+    "That's exactly how I'd talk to your customers."
+   ],
+   "ask": "Want to hear how I'd pitch your product?",
+   "points_hi": [
+    "मैं AI हूँ, और शुरुआत में हमेशा बताता हूँ।",
+    "पर ध्यान दीजिए: मैं सुन रहा हूँ, बात छोटी रख रहा हूँ, और वही जवाब दे रहा हूँ जो आपने पूछा।",
+    "आपके कस्टमर्स से भी मैं ऐसे ही बात करूँगा।"
+   ],
+   "ask_hi": "सुनना चाहेंगे कि मैं आपका प्रोडक्ट कैसे पिच करूँगा?",
+   "goal": "turn the question into a live demo of itself",
+   "children": []
+  },
+  {
+   "id": "trust_prices",
+   "title": "worried about wrong prices, lies or giving away discounts",
+   "when": {
+    "keywords": [
+     "galat",
+     "गलत",
+     "wrong (price|info)",
+     "made up",
+     "hallucinat",
+     "jhooth",
+     "झूठ",
+     "lie",
+     "trust",
+     "bharosa",
+     "भरोसा",
+     "too much discount",
+     "give away",
+     "make up",
+     "makes up",
+     "making up",
+     "invent"
+    ],
+    "intents": [],
+    "objections": [
+     "trust"
+    ],
+    "topics": [],
+    "min_buying": null,
+    "max_buying": null,
+    "min_frustration": null,
+    "min_confusion": null
+   },
+   "points": [
+    "A rule engine decides every price and discount; the AI only puts it into words.",
+    "Any number that isn't a confirmed fact is blocked before it's spoken.",
+    "And I can never go below the floor price you set."
+   ],
+   "ask": "What's the lowest price you'd ever accept on your product?",
+   "points_hi": [
+    "हर कीमत और डिस्काउंट एक रूल इंजन तय करता है; AI बस उसे शब्दों में बोलता है।",
+    "जो नंबर कन्फ़र्म फ़ैक्ट नहीं है, वो बोलने से पहले रोक दिया जाता है।",
+    "और मैं आपकी तय न्यूनतम कीमत से कभी नीचे नहीं जा सकता।"
+   ],
+   "ask_hi": "आपके प्रोडक्ट पर सबसे कम कितनी कीमत आप मानेंगे?",
+   "goal": "remove the fear of an AI giving away the store",
+   "children": []
+  },
+  {
+   "id": "languages",
+   "title": "asks about languages",
+   "when": {
+    "keywords": [
+     "language",
+     "bhasha",
+     "भाषा",
+     "hindi",
+     "हिंदी",
+     "tamil",
+     "marathi",
+     "bengali",
+     "telugu",
+     "kannada",
+     "gujarati",
+     "punjabi",
+     "regional"
+    ],
+    "intents": [],
+    "objections": [
+     "language"
+    ],
+    "topics": [],
+    "min_buying": null,
+    "max_buying": null,
+    "min_frustration": null,
+    "min_confusion": null
+   },
+   "points": [
+    "Today I speak Hindi, Hinglish and English, and switch when the customer does.",
+    "More Indian languages are next on the roadmap."
+   ],
+   "ask": "Which languages do your customers mostly speak?",
+   "points_hi": [
+    "अभी मैं हिंदी, हिंग्लिश और इंग्लिश बोलता हूँ, और कस्टमर बदले तो मैं भी बदल जाता हूँ।",
+    "और भारतीय भाषाएँ रोडमैप पर अगली हैं।"
+   ],
+   "ask_hi": "आपके कस्टमर्स ज़्यादातर कौन सी भाषा बोलते हैं?",
+   "goal": "be honest about 3 languages, learn their mix",
+   "children": []
+  },
+  {
+   "id": "setup_time",
+   "title": "asks how long setup takes / how to start",
+   "when": {
+    "keywords": [
+     "how long",
+     "setup",
+     "set up",
+     "kitna time",
+     "कितना टाइम",
+     "kab (se|tak)",
+     "onboard",
+     "start kaise",
+     "get started",
+     "launch"
+    ],
+    "intents": [],
+    "objections": [],
+    "topics": [],
+    "min_buying": null,
+    "max_buying": null,
+    "min_frustration": null,
+    "min_confusion": null
+   },
+   "points": [
+    "Our studio turns one line about your product into a tested sales flow in minutes.",
+    "Your first campaign can go live the same day, and the first 7 days are free."
+   ],
+   "ask": "Shall I have our team set up your free pilot?",
+   "points_hi": [
+    "हमारा स्टूडियो आपके प्रोडक्ट की एक लाइन से कुछ मिनटों में टेस्ट किया हुआ सेल्स फ़्लो बना देता है।",
+    "पहली कैंपेन उसी दिन लाइव हो सकती है, और पहले 7 दिन फ़्री हैं।"
+   ],
+   "ask_hi": "क्या मैं हमारी टीम से आपका फ़्री पायलट सेट करवा दूँ?",
+   "goal": "show speed, move to the pilot",
+   "children": []
+  },
+  {
+   "id": "integration",
+   "title": "asks about CRM / sheets / integration",
+   "when": {
+    "keywords": [
+     "crm",
+     "integrat",
+     "excel",
+     "sheet",
+     "csv",
+     "zoho",
+     "salesforce",
+     "hubspot",
+     "leadsquared",
+     "connect"
+    ],
+    "intents": [],
+    "objections": [],
+    "topics": [],
+    "min_buying": null,
+    "max_buying": null,
+    "min_frustration": null,
+    "min_confusion": null
+   },
+   "points": [
+    "Today you upload leads as a sheet, and every outcome, agreed price and transcript can be exported back.",
+    "Direct CRM integrations are on the roadmap."
+   ],
+   "ask": "Which tool do you keep your leads in today?",
+   "points_hi": [
+    "आज आप लीड्स एक शीट में अपलोड करते हैं, और हर नतीजा, तय कीमत और ट्रांसक्रिप्ट वापस एक्सपोर्ट हो सकता है।",
+    "सीधे CRM इंटीग्रेशन रोडमैप पर हैं।"
+   ],
+   "ask_hi": "आप अभी लीड्स किस टूल में रखते हैं?",
+   "goal": "be honest: sheets now, CRM later",
+   "children": []
+  },
+  {
+   "id": "compliance",
+   "title": "asks about compliance, DND, recording, privacy",
+   "when": {
+    "keywords": [
+     "compliance",
+     "legal",
+     "\\bdnd\\b",
+     "do not call",
+     "consent",
+     "trai",
+     "privacy",
+     "recording",
+     "रिकॉर्डिंग",
+     "data",
+     "secure"
+    ],
+    "intents": [],
+    "objections": [],
+    "topics": [],
+    "min_buying": null,
+    "max_buying": null,
+    "min_frustration": null,
+    "min_confusion": null
+   },
+   "points": [
+    "Every call opens with an AI and recording disclosure.",
+    "Anyone who says stop goes on a do-not-call list, and I never ask for card numbers or OTPs.",
+    "Data stays on our servers, visible only to your team."
+   ],
+   "ask": "Is compliance a big concern in your industry?",
+   "points_hi": [
+    "हर कॉल AI और रिकॉर्डिंग की जानकारी से शुरू होती है।",
+    "जो मना करे वो do-not-call लिस्ट में जाता है, और मैं कभी कार्ड नंबर या OTP नहीं माँगता।",
+    "डेटा हमारे सर्वर पर रहता है, सिर्फ़ आपकी टीम को दिखता है।"
+   ],
+   "ask_hi": "क्या आपकी इंडस्ट्री में कंप्लायंस बड़ी चिंता है?",
+   "goal": "reassure with concrete safeguards",
+   "children": []
+  },
+  {
+   "id": "too_expensive",
+   "title": "says it's too expensive",
+   "when": {
+    "keywords": [
+     "expensive",
+     "mehenga",
+     "महंगा",
+     "costly",
+     "too much",
+     "budget",
+     "zyada hai",
+     "ज़्यादा है",
+     "afford"
+    ],
+    "intents": [],
+    "objections": [
+     "price"
+    ],
+    "topics": [],
+    "min_buying": null,
+    "max_buying": null,
+    "min_frustration": null,
+    "min_confusion": null
+   },
+   "points": [
+    "Fair. Compare it with one telecaller: around ₹7 to 8 a minute with salary and training, and they don't call at midnight.",
+    "Pay-as-you-go is ₹5 a minute with no monthly fee, and the first 7 days are free."
+   ],
+   "ask": "Would a free pilot on your own leads help you decide?",
+   "points_hi": [
+    "सही बात है। एक टेलीकॉलर से तुलना कीजिए: सैलरी और ट्रेनिंग मिलाकर लगभग ₹7 से 8 प्रति मिनट।",
+    "Pay-as-you-go ₹5 प्रति मिनट है, कोई मंथली फ़ीस नहीं, और पहले 7 दिन फ़्री।"
+   ],
+   "ask_hi": "क्या अपनी लीड्स पर फ़्री पायलट से फ़ैसला करना आसान होगा?",
+   "goal": "reframe against a human's cost, offer the pilot",
+   "children": []
+  },
+  {
+   "id": "decide_later",
+   "title": "wants to think / decide later",
+   "when": {
+    "keywords": [
+     "think about it",
+     "sochta",
+     "सोच",
+     "later",
+     "baad mein",
+     "बाद में",
+     "not now",
+     "abhi nahi",
+     "अभी नहीं",
+     "next month"
+    ],
+    "intents": [],
+    "objections": [
+     "timing"
+    ],
+    "topics": [],
+    "min_buying": null,
+    "max_buying": null,
+    "min_frustration": null,
+    "min_confusion": null
+   },
+   "points": [
+    "No rush. The pilot is free, so there's nothing to lose by trying it on a few leads.",
+    "I can also have the team call you back at a time that suits you."
+   ],
+   "ask": "Should I book a callback, or set up the free pilot now?",
+   "points_hi": [
+    "कोई जल्दी नहीं। पायलट फ़्री है, तो कुछ लीड्स पर आज़माने में कोई नुकसान नहीं।",
+    "या टीम आपके सुविधा के समय पर कॉलबैक कर सकती है।"
+   ],
+   "ask_hi": "कॉलबैक बुक करूँ, या अभी फ़्री पायलट सेट कर दूँ?",
+   "goal": "respect timing, keep a next step",
+   "children": []
+  },
+  {
+   "id": "not_needed",
+   "title": "says they don't need it / have a team",
+   "when": {
+    "keywords": [
+     "don't need",
+     "zaroorat nahi",
+     "ज़रूरत नहीं",
+     "have a team",
+     "team hai",
+     "टीम है",
+     "no calling",
+     "we don't call"
+    ],
+    "intents": [],
+    "objections": [
+     "need"
+    ],
+    "topics": [],
+    "min_buying": null,
+    "max_buying": null,
+    "min_frustration": null,
+    "min_confusion": null
+   },
+   "points": [
+    "Makes sense if your team is keeping up.",
+    "Most teams use me for the leads they never get to: late-night enquiries, follow-ups, and the 50% who don't pick up the first time."
+   ],
+   "ask": "How many of your leads go uncalled in a typical week?",
+   "points_hi": [
+    "अगर आपकी टीम सब संभाल रही है तो ठीक है।",
+    "ज़्यादातर टीमें मुझे उन लीड्स के लिए लगाती हैं जिन तक वो पहुँच ही नहीं पातीं: रात की इंक्वायरी, फ़ॉलो-अप, और वो आधे लोग जो पहली बार फ़ोन नहीं उठाते।"
+   ],
+   "ask_hi": "एक आम हफ़्ते में आपकी कितनी लीड्स बिना कॉल के रह जाती हैं?",
+   "goal": "find the gap a human team leaves",
+   "children": []
+  },
+  {
+   "id": "proof",
+   "title": "asks for proof / customers / results",
+   "when": {
+    "keywords": [
+     "proof",
+     "results",
+     "customers",
+     "clients",
+     "case study",
+     "kaun use",
+     "कौन यूज़",
+     "guarantee",
+     "does it (really )?work"
+    ],
+    "intents": [],
+    "objections": [],
+    "topics": [],
+    "min_buying": null,
+    "max_buying": null,
+    "min_frustration": null,
+    "min_confusion": null
+   },
+   "points": [
+    "Honestly, we're in the pilot stage, so no big logos yet.",
+    "We stress-tested it with 12 difficult personas over 144 calls, and you're hearing it live right now.",
+    "The free pilot lets you judge it on your own leads."
+   ],
+   "ask": "Want to be one of our first pilot businesses?",
+   "points_hi": [
+    "सच कहूँ तो हम पायलट स्टेज में हैं, तो बड़े नाम अभी नहीं।",
+    "हमने इसे 12 मुश्किल किरदारों के साथ 144 कॉल में टेस्ट किया है, और आप इसे अभी लाइव सुन रहे हैं।",
+    "फ़्री पायलट में आप इसे अपनी लीड्स पर परख सकते हैं।"
+   ],
+   "ask_hi": "हमारे पहले पायलट बिज़नेस में से एक बनना चाहेंगे?",
+   "goal": "be honest, use the call itself as proof",
+   "children": []
+  },
+  {
+   "id": "business_fit",
+   "title": "tells what their business sells",
+   "when": {
+    "keywords": [
+     "we sell",
+     "hum bechte",
+     "हम बेचते",
+     "my business",
+     "mera business",
+     "मेरा बिज़नेस",
+     "gym",
+     "course",
+     "coaching",
+     "insurance",
+     "loan",
+     "real estate",
+     "property",
+     "d2c",
+     "store",
+     "clinic",
+     "tickets?"
+    ],
+    "intents": [],
+    "objections": [],
+    "topics": [],
+    "min_buying": null,
+    "max_buying": null,
+    "min_frustration": null,
+    "min_confusion": null
+   },
+   "points": [
+    "That's a great fit: phone sales with questions, objections and price talk is exactly what I'm built for.",
+    "I'd learn your offer, your floor price and your FAQs, and call your leads the same day."
+   ],
+   "ask": "Roughly how many leads do you get in a month?",
+   "points_hi": [
+    "ये बढ़िया फ़िट है: सवाल, आपत्तियाँ और कीमत पर बात वाली फ़ोन सेल्स के लिए ही मैं बना हूँ।",
+    "मैं आपका ऑफ़र, न्यूनतम कीमत और FAQs सीखकर उसी दिन आपकी लीड्स को कॉल कर सकता हूँ।"
+   ],
+   "ask_hi": "महीने में लगभग कितनी लीड्स आती हैं?",
+   "goal": "connect their business to the product, learn volume",
+   "children": []
+  },
+  {
+   "id": "wants_pilot",
+   "title": "ready to try / sign up",
+   "when": {
+    "keywords": [
+     "sign (me )?up",
+     "let'?s do it",
+     "start (the )?pilot",
+     "book (a )?demo",
+     "chalo",
+     "चलो",
+     "kar do",
+     "कर दो",
+     "interested",
+     "set (it )?up",
+     "how do i (start|join|buy)"
+    ],
+    "intents": [],
+    "objections": [],
+    "topics": [],
+    "min_buying": null,
+    "max_buying": null,
+    "min_frustration": null,
+    "min_confusion": null
+   },
+   "points": [
+    "Perfect. Our team will set up your free 7-day pilot with 200 minutes and your first product.",
+    "You'll get a setup call and console access; nothing is charged on this call."
+   ],
+   "ask": "What's the best time for our team to call you for setup?",
+   "points_hi": [
+    "बढ़िया। हमारी टीम आपका 200 मिनट वाला 7 दिन का फ़्री पायलट और पहला प्रोडक्ट सेट करेगी।",
+    "आपको सेटअप कॉल और कंसोल एक्सेस मिलेगा; इस कॉल पर कुछ चार्ज नहीं होता।"
+   ],
+   "ask_hi": "हमारी टीम सेटअप के लिए आपको कब कॉल करे?",
+   "goal": "close on the pilot and a setup callback time",
+   "children": []
+  },
+  {
+   "id": "fun_meta",
+   "title": "jokes about an AI selling itself / meta questions",
+   "when": {
+    "keywords": [
+     "selling yourself",
+     "khud ko bech",
+     "ख़ुद को बेच",
+     "funny",
+     "lol",
+     "haha",
+     "god\\b",
+     "why (the )?name",
+     "naam kyun"
+    ],
+    "intents": [],
+    "objections": [],
+    "topics": [],
+    "min_buying": null,
+    "max_buying": null,
+    "min_frustration": null,
+    "min_confusion": null
+   },
+   "points": [
+    "Yes, I'm literally selling myself, which makes this the most honest demo you'll get today.",
+    "The name? Team Coffee Please built me, and a lot of coffee went into it."
+   ],
+   "ask": "So, what would you want me to sell for you?",
+   "points_hi": [
+    "हाँ, मैं सच में ख़ुद को बेच रहा हूँ, तो आज का सबसे ईमानदार डेमो यही है।",
+    "नाम? मुझे टीम Coffee Please ने बनाया है, और इसमें बहुत कॉफ़ी लगी है।"
+   ],
+   "ask_hi": "तो बताइए, आप मुझसे क्या बिकवाना चाहेंगे?",
+   "goal": "enjoy the joke, turn it into discovery",
+   "children": []
+  }
+ ]
+}

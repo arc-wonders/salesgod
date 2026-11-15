@@ -271,7 +271,10 @@ _NOT_PRICE = re.compile(r"\b(?:days?|din|months?|mahin[ae]|weeks?|hafte|sessions
 _UNIT_AFTER = re.compile(r"(\d[\d,]*(?:\.\d+)?)\s*-?\s*(?:km|kms|kilomet\w*|k run|k marathon|marathon|miles?|meters?|metres?|mtr|kg|kgs|kilo\w*|lbs?|pounds|"
                          r"days?|din|dino|weeks?|hafte|hafton|months?|mahin\w*|years?|saal|sal|times|baar|bar\b|sessions?|reps?|sets?|rounds?|"
                          r"am|pm|a\.m\.|p\.m\.|o.?clock|baje|bje|bajey|%|percent|minutes?|mins?|hours?|hrs?|ghant\w*|"
-                         r"दिन|हफ़्ते|हफ्ते|महीने|साल|बजे|बार|किलो|किलोमीटर|मिनट|घंटे)(?![a-z])", _I)
+                         r"दिन|हफ़्ते|हफ्ते|महीने|साल|बजे|बार|किलो|किलोमीटर|मिनट|घंटे|"
+                         # how many, not how much: "10 tickets", "4 passes", "10 log", "5 seats" (concert call: "10 tickets" became a ₹10 counter)
+                         r"tickets?|tikat|tix|pass(?:es)?|seats?|people|persons?|members?|friends?|log|logon|logo|logg|bande|dost\w*|adults?|kids?|"
+                         r"children|bachch\w*|entr(?:y|ies)|units?|pieces?|pcs|टिकट|टिकटें|पास|सीट|सीटें|लोग|लोगों|बंदे|दोस्त\w*|लोगो)(?![a-z])", _I)
 
 
 def amounts(text: str) -> list[int]:

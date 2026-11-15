@@ -167,20 +167,38 @@
   "karan-aujla-concert-tickets": {
    "Aujla": {
     "hi": "औजला",
-    "en": "Ouj-laa"
-   },
-   "Karan": {
-    "hi": "करण",
-    "en": "Karun"
+    "en": "ojlaa"
    },
    "Fan Pit": {
     "hi": "फ़ैन पिट"
+   },
+   "Karan": {
+    "hi": "करण",
+    "en": "kah-run"
    },
    "Passes": {
     "hi": "पासेज़"
    },
    "VIP": {
     "hi": "वी-आई-पी"
+   },
+   "Gigwala": {
+    "hi": "गिगवाला"
+   },
+   "DY Patil": {
+    "hi": "डी वाई पाटिल"
+   },
+   "QR": {
+    "hi": "क्यू आर"
+   },
+   "GST": {
+    "hi": "जी एस टी"
+   },
+   "GSTIN": {
+    "hi": "जी एस टी आई एन"
+   },
+   "JLN": {
+    "hi": "जे एल एन"
    }
   },
   "fitzone-gym": {

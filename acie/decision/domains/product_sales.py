@@ -26,6 +26,7 @@ from .. import garble
 from .. import honest
 from .. import deal as dealmod
 from .. import negotiation
+from .. import order as ordermod
 from ...rules import tone as tone_rules
 from .. import nba
 from ..engine import KeywordIntentClassifier
@@ -333,6 +334,10 @@ class Product(BaseModel):
     use_playbook: bool = True  # use the pre-generated decision tree (data/voice/playbooks/<tenant>/<id>.json)
     # Declarative rules checked before every plan (acie/decision/constraints.py). Empty = no rules, unchanged behaviour.
     constraints: list[dict] = Field(default_factory=list)
+    # optional operator wording for the two opening steps (acie: _rapport_step), per language, with {name} {agent} {seller} {product}:
+    # {"greet": {"en": "Hi{name}! This is {agent} ..."}, "purpose": {"en": "I'm calling about ... This call is recorded. Interested?"}}.
+    # Empty = the generic lines. The AI disclosure (greet) and the recording notice (purpose) must stay in operator wording too.
+    opening: dict[str, dict[str, str]] = Field(default_factory=dict)
     playbook_tree: str = ""  # optional path of a hand-written tree file (acie.playbook.load_tree), used when no playbook is passed
 
 
@@ -497,7 +502,7 @@ _LANG_TROUBLE = re.compile(r"(do ?n.?t|do not|did ?n.?t|can.?t|cannot|could ?n.?
 # an explicit "buy" - required before the payment link goes out (or a short clean yes, confirmed once)
 _BUY = re.compile(r"\bsend\b|bhej|भेज|le (lunga|lenge|leta|leti|lo)|ले (लूंगा|लूँगा|लेंगे|लेता|लेती|लो)|interested|"
                   r"chahiye|चाहिए|\bbuy\b|kharid|खरीद|subscribe|सब्सक्राइब|sign me up|go ahead|kar do|कर दो|"
-                  r"\bdeal\b|\bdone\b|yes please|let.?s do it|let.?s go|go for it|i.?ll take it|sounds good|"
+                  r"\bdeal\b|(?<!i.m )(?<!i am )\bdone\b|yes please|let.?s do it|let.?s go|go for it|i.?ll take it|sounds good|"
                   r"try (it|kar)|ट्राई कर|कोशिश कर|join (karna|kar|krna)|जॉइन (करना|कर)|join करना|join कर|"
                   r"lena hai|लेना है|le leta|sign up", re.IGNORECASE)
 _PRICE_CORE = re.compile(r"price|cost|how much|kitn|कितन|कीमत|दाम|\brate\b|रेट|\bfees?\b|paise kitne|पैसे कितने", re.I)
@@ -577,6 +582,67 @@ _CONSENT_AGAIN = re.compile(r"^\W*(sure|yes|yeah|yep|ok(ay)?|haan|ha|ji|theek ha
 _ACK_PRAISE = re.compile(r"\b(love it|lovely|nice|cool|great|awesome|wow|interesting|i see|good to know|hmm+|sounds nice|that.?s nice|badhiya|accha laga|बढ़िया|अच्छा लगा)\b", re.I)
 _COMPLAINT = re.compile(r"\brude\b|pushy|too fast|rushing|not listening|didn.?t (even )?ask|did you (even )?ask|without asking|annoying|irritat|"
                         r"stop (selling|pushing)|bak bak|बकबक|bina puche|बिना पूछे|pareshan|परेशान|tameez|तमीज़", re.I)
+# a clear buying signal in the caller's own words ("take my money", "I'll come and pay", "sign me up", "where do I pay?"): the close
+# path decides (call c9960ed17d: "Take my money. I'm coming to your gym to pay" got an unrelated opening-hours line)
+_BUY_SIGNAL = re.compile(r"take my money|(i.?ll|i will|i want to|i wanna|i.?d like to|let me|ready to) (pay|join|buy|sign up|take (it|the offer|the membership))\b|"
+                         r"(i.?m|i am) (coming|going|gonna come|ready|happy|okay|ok|open) (to |in |for )?.{0,30}\b(pay|join|sign up|buy)\b|"
+                         r"(i.?m|i am) open to (coming|join|pay)|sign (me|us|both of us) up|count (me|us) in|\b(i.?m|i am) in(?=\s*([.!,]|$))|book (it|me)\b|where (do|can|should) i (pay|book|buy)|how (do|can|should|to) (i )?(pay|book|buy|purchase|get (the |my )?(tickets?|passes?|it))|"
+                         r"(i.?d like|i want|i wanna|let me|help me) (to )?(book|buy|purchase|get) (the |a |my |\d+ |one |two )?(\w+ )?(tickets?|passes?|seats?|it|membership|plan)|"
+                         r"book (karna|karni|kar do|krna|karwa|karwana|kar dijiye)|बुक (करना|कर दो|करनी|करवा)|kaise book|कैसे बुक|book kaise|बुक कैसे|"
+                         r"(come|coming|walk(ing)? in(to)?|visit(ing)?|drop(ping)? by) .{0,30}\b(to )?(pay|join)\b|"
+                         r"join kar(unga|ungi|enge|na hai)|जॉइन कर(ूँगा|ूंगा|ूँगी|ेंगे|ना है)|(paise|payment|पेमेंट|पैसे) (de|kar) (dunga|doonga|dungi|denge)|"
+                         r"(पैसे|पेमेंट) (दे|कर) (दूँगा|दूंगा|दूँगी|देंगे)|le (lunga|lenge|lungi)\b|ले (लूँगा|लूंगा|लूँगी|लेंगे)", re.I)
+# "sell me a pen", "pitch me this bottle", "pitch yourself", "pen bech ke dikhao"; STT turns "pitch" into "bitch" / "peach" (call 1d5573e7dc)
+_PITCH_VERB = r"(?:pitch|bitch|peach|pich|petch|patch|sell|sale|cell)"
+_PITCH_REQ = re.compile(r"\b" + _PITCH_VERB + r"\s+(?:me|us|to me)\b(?P<a>[^.?!]*)|\b(?:pitch|bitch|peach|sell)\s+(?P<b>(?:this|that|a|an|the|my|your|yourself|you|it)\b[^.?!]*)|"
+                        r"(?P<c>[\w ]{1,30}?)\s+(?:bech|bechke|bechkar|bech ke|bech kar|pitch kar(?:ke| ke)?|pitch karke)\s*(?:ke |kar )?(?:dikhao|dikhaiye|dikha do|batao|karo)|"
+                        r"(?P<d>[\u0900-\u097F ]{1,30}?)\s*(?:बेच|बेचके|बेचकर|बेच के|बेच कर|पिच कर)\s*(?:के |कर )?(?:दिखाओ|दिखाइए|दिखा दो)|"
+                        r"\bpitch (?:karo|kijiye|kar do)\b|पिच करो", re.I)
+_PITCH_HOW = re.compile(r"\bhow (?:do |would |will |can )?you (?:pitch|bitch|peach|sell)\b|show me (?:how you|your) (?:pitch|sell)|pitch (?:skills?|kaisa)", re.I)
+_DEMO_REQ = re.compile(r"\b(?:give|show|do|want|need|see|get|wanna|chahiye|dikhao|do na)\b[^.?!]{0,25}\bdemo\b|\bdemo\b[^.?!]{0,15}\b(?:first|please|now|chahiye|dikhao|do|dijiye|karo)\b|"
+                       r"^\W*(?:a |the |live )?demo\W*$|डेमो (?:दो|दिखाओ|दीजिए|चाहिए)", re.I)
+_DEMO_BOOKING = re.compile(r"\b(?:book|schedule|set ?up|arrange)\b[^.?!]{0,12}\bdemo\b", re.I)
+_HINDI_LINE = re.compile(r"\b(?:one|ek|1|a|single|just a)\s+(?:line|sentence|lines)\b[^.?!]{0,15}\b(?:hindi|हिंदी)|\b(?:hindi|हिंदी)\b[^.?!]{0,12}\b(?:one|ek|a) (?:line|sentence)|"
+                         r"\bsay (?:something|it|that|one line|a line) in hindi|\bhindi (?:mein|me) (?:ek )?(?:line|bolo|bol ke|boliye|sunao)|हिंदी में (?:एक )?(?:लाइन|बोलो|बोलिए|सुनाओ)", re.I)
+_SELF_ITEM = re.compile(r"^(?:yourself|you|your ?self|salesgod|sales god|your product|this product|it|yourselves)$", re.I)
+_ITEM_FILLER = re.compile(r"\b(?:please|again|one more time|once more|now|right now|buddy|bro|yaar|sir|man|dude|for me|to me|okay|ok|then|na|just|quickly|real quick|already)\b", re.I)
+_PILOT_SIGNUP = re.compile(r"(?:sign (?:me|us) up|start|book|want|take|go (?:with|for)|let.?s do|try|activate|set ?up|shuru)[^.?!]{0,25}\b(?:pilot|free trial|trial)\b|"
+                           r"\b(?:pilot|free trial|trial)\b[^.?!]{0,20}\b(?:please|chahiye|karo|kar do|start|shuru|le lunga|lenge)\b|पायलट[^.?!]{0,15}(?:शुरू|चाहिए|कर दो)", re.I)
+_TRUST_Q = re.compile(r"make(?:s)? up (?:a |the )?price|made up|making up|invent(?:s|ed)? (?:a |the )?price|hallucinat|wrong price|galat (?:price|daam|keemat)|गलत (?:कीमत|दाम)|"
+                      r"lie (?:about|to)|jhooth|झूठ|(?:quote|say|give) (?:a )?(?:wrong|fake|random) (?:price|number)", re.I)
+_TIME_ONLY = re.compile(r"^\W*(?:ok(?:ay)?|sure|haan|ha|yes|ji|so|um+)?\W*(?:(?:tomorrow|today|tonight|kal|parso|monday|tuesday|wednesday|thursday|friday|saturday|sunday|"
+                        r"next week|evening|morning|afternoon|shaam|subah|dopahar|at|around|by|after|before|ko|ke|baje|pm|am|p\.m\.|a\.m\.|o.?clock|noon|\d{1,2}(?::\d{2})?|"
+                        r"one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|half|past|thirty|is|fine|works|good|better|call me|then)\W*){1,9}$", re.I)
+_BUY_NEG = re.compile(r"(do ?n.?t|do not|not|never|won.?t|can.?t|nahi|nahin|नहीं|मत|mat)\s+(\w+\s+){0,3}(pay|join|buy|sign|take|interested|ready|de|kar|le|दे|कर|ले)|"
+                      r"\b(if|agar|suppose)\b|अगर|not (now|today|yet)", re.I)
+# paying in person instead of a link (a valid close: the front desk takes it)
+_PAY_OFFLINE = re.compile(r"\boffline\b|in person|in cash|\bcash\b|at the (gym|branch|centre|center|counter|front desk|desk|reception)|"
+                          r"(come|coming|walk(ing)? in(to)?|visit(ing)?|go(ing)?|drop(ping)? by) .{0,30}\b(gym|branch|desk|centre|center|there|counter)\b.{0,30}\b(pay|join)|"
+                          r"(come|coming|walk(ing)? in(to)?|visit(ing)?) .{0,20}\b(to )?(pay|join)\b|(pay|paying|payment) .{0,15}\b(there|offline|in cash|in person|over the counter)\b|"
+                          r"gym (aake|aa ke|jaake|ja ke|aakar) (pay|payment|de|dunga|doonga|karunga)|जिम (आके|आकर|जाके|जाकर) (पेमेंट|पे|दे|दूँगा|करूँगा)|नकद|कैश", re.I)
+def _rapport_on() -> bool:
+    """The step-by-step opening (owner, 15 Nov): greet + how are you, then purpose + recording + permission. ACIE_RAPPORT_OPENING=0 = old one-line opening."""
+    return os.getenv("ACIE_RAPPORT_OPENING", "1") != "0"
+
+
+_FEEL_BAD = re.compile(r"not (so |too |very )?(good|great|well|fine)|bad day|terrible|awful|tired|sick|unwell|stressed|so so|meh|pain|hurts|injur|fever|cold|"
+                       r"dard|दर्द|ghutn|घुटन|bukhar|बुखार|takleef|तकलीफ|"
+                       r"theek nahi|thik nahi|accha nahi|ठीक नहीं|अच्छा नहीं|बुरा|thaka|थका|bimar|बीमार|pareshan|परेशान", re.I)
+_FEEL_OK = re.compile(r"\b(good|great|fine|well|ok(ay)?|alright|all right|not bad|doing good|awesome|fantastic|chill|theek|thik|accha|achha|badhiya|mast|"
+                      r"sab (badhiya|theek|thik))\b|ठीक|अच्छा|बढ़िया|मस्त", re.I)
+_ASK_BACK = re.compile(r"(how|what) about you\b|and you\s*\??\s*$|how are you|how.?s it going|aur aap\s*\??\s*$|aap (kaise|kaisi) (hain|ho)\b|आप (कैसे|कैसी) (हैं|हो)|और आप\s*\??\s*$|tum kaise ho|तुम कैसे हो", re.I)
+_BUSY_NOW = re.compile(r"\bbusy\b|in a meeting|driving|at work right now|not a good time|bad time|can.?t talk|call (me )?later|abhi (nahi|busy)|"
+                       r"baad mein|meeting mein|बिज़ी|बिजी|व्यस्त|मीटिंग|अभी नहीं|बाद में|gaadi chala|गाड़ी चला", re.I)
+_NO_RECORDING_LEAD = frozenset({"opening", "purpose", "number_source", "identify", "are_you_ai", "callback", "callback_time", "declined", "goodbye",
+                                "goodbye_after", "clarify", "hello", "acknowledge", "repeat_last", "where_were_we", "sensitive_stop", "constraint_stop",
+                                "human_agent", "language_switch"})
+_OFFLINE_NEG = re.compile(r"(do ?n.?t|do not|not|no|never|can.?t|cannot|won.?t|nahi|nahin|नहीं)\s+(\w+\s+){0,3}(cash|offline|in person|come|visit|go|walk)\b", re.I)
+# the caller grunts / says one or two words while they never heard why we called
+_GRUNT = re.compile(r"^\W*(ugh+|uh+|um+|hmm+|hm+|huh|what|eh|ah+|oh+|ok(ay)?|no|nah|nope|haan?|ha|ji|kya|क्या|हाँ|हां|जी|अरे|are|hello|हेलो|yes|yeah|sure)"
+                    r"(\W+(ugh+|uh+|um+|hmm+|ok(ay)?|no|yes|yeah|ji|sure|what|kya|क्या|hello|हेलो))?\W*$", re.I)
+_SMALL_HOW = re.compile(r"how are you|how.?s it going|how do you do|are you (feeling )?(good|ok|okay|fine|well)|how (is|was) your day|kaise ho|kaise hain|kaisa hai|कैसे (हो|हैं)|कैसी (हो|हैं)|kya haal|क्या हाल", re.I)
+_SMALL_TIME = re.compile(r"what.?s the time|what time is it|time (right )?now|kitne baje|कितने बजे|time kya|टाइम क्या", re.I)
+_SMALL_WHAT = re.compile(r"what are you (up to|doing)|kya kar rahe|क्या कर रहे", re.I)
 _HELLO = re.compile(r"^\W*(hello|hallo|helo|hi|हेलो|हैलो|हलो|हल्लो)(\W+(hello|हेलो|हैलो|ji|जी|sir|सर))*\W*$", re.I)
 ANYTHING_ELSE = ("Is there anything else you'd like to know?", "और कुछ जानना चाहेंगे?", "Aur kuch jaanna chahenge?")
 
@@ -884,6 +950,8 @@ class ProductSalesDomain:
         if _FIRM_NO.search(text) or _HANGUP_ASK.search(text) or (_GOODBYE_NOW.search(text) and not honest.SEND_REQ.search(text)):
             return None  # "मुझे कुछ नहीं खरीदना, आप फ़ोन रख दीजिए। राम-राम।" is never a yes
         explicit_buy = bool(honest.SEND_REQ.search(text) or _STRONG_BUY.search(text))
+        if (re.match(r"^\W*(no|nope|nah|nahi|nahin|नहीं|नही|ना)\b", text, re.I) or intent == "deny") and not explicit_buy:
+            return None  # "No, I would prefer paying it offline." after "shall I send the link?" is never a yes to the link
         if not explicit_buy and self._recent_complaint(d):
             return None  # "you're rude... did you even ask me?" then "Okay. Love it.": an ack after a complaint is never consent
         asked_close = d.get("last_intent") in ("confirm_close", "confirm_buy", "reoffer") or d.get("link_asked_last") == "1" \
@@ -968,6 +1036,16 @@ class ProductSalesDomain:
         plan = await self._guarded_plan(intent, turn, session)
         plan = await self._answer_before_goodbye(plan, intent, turn, session)
         self._apply_tone(plan, d, turn.text)
+        ctx_ = getattr(session, "context", None)
+        d.pop("_recording_due", None)
+        if _rapport_on() and intent != "greet" and ctx_ is not None and "call_recorded" not in ctx_.told and not plan.end_call \
+                and plan.intent not in _NO_RECORDING_LEAD and not plan.intent.startswith(("safety", "opt_out")) \
+                and not re.search(r"recorded|रिकॉर्डिंग|recording", " ".join(list(plan.fallback.values()) + list((plan.lead or {}).values())), re.I):
+            # the recording notice comes before anything substantive (the opening's step 2 carries it; a caller who jumped ahead
+            # straight to a question gets it in front of the answer)
+            rec = _tpl("Sure, and just so you know, this call is recorded.", "ज़रूर, और बता दूँ, ये कॉल रिकॉर्ड हो रही है।",
+                       "Zaroor, aur bata doon, ye call record ho rahi hai.")
+            plan.lead = {l: (rec[l] + " " + ((plan.lead or {}).get(l) or "")).strip() for l in ("en", "hi", "hinglish")}
         u = self._nlu(d)
         if u is not None and u.objection != "none":
             d.setdefault("_objection", u.objection)
@@ -1145,6 +1223,17 @@ class ProductSalesDomain:
             name = f" {self.customer_name}" if self.customer_name else ""
             facts = {**self._base(), "agent": Fact(value=p.agent_name, description="your name"),
                      "seller": Fact(value=p.seller_name, description="your company")}
+            if _rapport_on():
+                # owner (15 Nov): connect first. Step 1 = greet + who + AI disclosure + how are you; the purpose, the recording notice and
+                # the permission question come next turn (_rapport_step), after their answer
+                d["pending"] = "rapport"
+                return TurnPlan(
+                    intent="opening", facts=facts, ask="how are you?", llm_allowed=False, decision="opening step 1: greet, who, AI disclosure, how are you",
+                    objective="Greet them by name, say who you are (an AI assistant from the company) and ask how they are; nothing about the offer yet",
+                    fallback=self._opening_text("greet", name, _tpl(
+                        f"Hi{name}! This is {{agent}}, an AI assistant from {{seller}}. How are you doing today?",
+                        f"नमस्ते{name}! मैं {{agent}}, {{seller}} की तरफ़ से एक AI असिस्टेंट। आप कैसे हैं?",
+                        f"Namaste{name}! Main {{agent}}, {{seller}} ki taraf se ek AI assistant. Aap kaise hain?")))
             return TurnPlan(
                 intent="opening", facts=facts, ask="do you have a minute?", llm_allowed=False,
                 objective="Say who you are (an AI assistant calling for the company), that the call is recorded, why you're calling, and ask permission to continue",
@@ -1156,6 +1245,41 @@ class ProductSalesDomain:
         # ---------------- policy: compliance (word for word)
         if (side := self._compliance(text, intent, d, ctx)) is not None:
             return side
+        self._order_fill(text, d, ctx, session.turn_index)
+        handback = d.pop("handback_open", None) == "1"  # last turn we owned a rush and offered "what's included first?"
+        if pending == "rapport" and (rap := self._rapport_step(text, intent, d, ctx, lang)) is not None:
+            return rap
+        if pending == "rapport":
+            pending = d["pending"] = "intro"
+        if d.get("last_intent") == "purpose" and not _OPT_OUT.search(text) and ctx is not None and "what_the_product_is" not in ctx.told \
+                and self.p.pitch_en and self.p.pitch_hi and not re.match(r"^\W*(no|nope|nah|nahi|nahin|नहीं|ना)\b", text, re.I) \
+                and not re.search(r"not interested|interest nahi|nahi lena|नहीं लेना|don.?t want (it|this|that|the offer)|no thanks|abhi nahi|अभी नहीं|busy", text, re.I) \
+                and (_LEAD_YES.match(text) or re.search(r"\b(fine|go ahead|tell me|pitch|go on|sure|interested|why not|let.?s hear|what.?s the offer|what offer)\b|"
+                                                        r"batao|bataiye|boliye|बताइए|बताओ|बोलिए|ज़रूर|zaroor|kya offer|क्या ऑफ़र|क्या ऑफर", text, re.I)) \
+                and not _PRICE_CORE.search(text):
+            return self._pitch_plan(d, True)  # step 4 of the opening: they want to hear it
+
+        # ---------------- the caller never heard why we called (barge-in on the opening) and only grunted ("Ugh.", "What?", "No?"):
+        # say who we are and why, briefly, and ask again; never a "what's holding you back?" for a purpose they never heard
+        if d.get("_purpose_due") == "1" and d.get("purpose_restated") != "1" and _GRUNT.match(text) and d.get("last_intent") not in ("identify", "opening_purpose") \
+                and not (ctx is not None and "who_is_calling" in ctx.told and "what_the_product_is" in ctx.told) \
+                and not (_FIRM_NO.search(text) or _OPT_OUT.search(text) or _GOODBYE_NOW.search(text) or _CUT_CALL.search(text)):
+            d["purpose_restated"] = "1"
+            d["pending"] = "intro"
+            pp = self.p
+            facts = {**self._base(), "agent": Fact(value=pp.agent_name, description="your name", must_mention=False),
+                     "seller": Fact(value=pp.seller_name, description="your company", must_mention=False)}
+            return TurnPlan(intent="purpose", llm_allowed=False, facts=facts, decision="opening not heard + a grunt: restate the purpose briefly, ask again",
+                            objective="They did not hear why you called: who you are, why you called, that it is recorded, and ask if now is okay",
+                            ask="is now okay?",
+                            fallback=_tpl("Just so you know, I'm {agent}, an AI assistant from {seller}, calling about an offer on {product}. This call is recorded. Is now an okay time for two minutes?",
+                                          "बता दूँ, मैं {seller} से {agent}, एक AI असिस्टेंट, {product} के एक ऑफ़र के बारे में कॉल कर रहा हूँ। ये कॉल रिकॉर्ड हो रही है। क्या अभी दो मिनट बात हो सकती है?",
+                                          "Bata doon, main {seller} se {agent}, ek AI assistant, {product} ke ek offer ke baare mein call kar raha hoon. Ye call record ho rahi hai. Kya abhi do minute baat ho sakti hai?"))
+
+        # ---------------- "sell me a pen", "pitch yourself", "give me a demo", "say one line in Hindi" (a product whose playbook has a
+        # pitch_anything node): do it on the spot, before the unclear / abuse / negotiation gates ("bitch me a pen" is STT for "pitch")
+        if (pa := self._pitch_anything_step(text, d, ctx, lang)) is not None:
+            return pa
 
         # ---------------- abuse / swearing / anger: a short apology and a way forward, in every tone (never a fact, never a pitch)
         rude_ask = _PRICE_CORE.search(text) or _TERMS_Q.search(text) or re.search(
@@ -1218,6 +1342,20 @@ class ProductSalesDomain:
         if (rep_ := self._repeat_request_step(text, d, ctx, lang)) is not None:
             return rep_
 
+        # ---------------- the booking: slots the caller gave (zone, count, city) are remembered, never asked again; the next missing one is
+        # asked, one per turn; with all of them, one read-back with the chosen option's price and the total (acie/decision/order.py)
+        if (od := self._order_step(text, intent, d, ctx, lang, pending)) is not None:
+            return od
+        if (pl := self._pilot_step(text, d, ctx, lang)) is not None:
+            return pl
+        if (tm := self._time_after_confirm_step(text, d, lang)) is not None:
+            return tm
+
+        # ---------------- a clear buying signal ("take my money", "sign me up") or paying in person ("I'll pay at the gym", "offline"):
+        # the close path decides, the LLM never improvises a close (and a no + "pay offline" is never consent to a link)
+        if (cl := self._buy_signal_step(text, intent, d, ctx, lang, pending)) is not None:
+            return cl
+
         # ---------------- the deal's memory first: "where were we?", a number while the price is on the table (a counter, never consent),
         # an absurd number, a vague "more or less", a push after agreement (acie/decision/deal.py)
         if (dstep := self._deal_step(text, intent, d, ctx, lang)) is not None:
@@ -1234,6 +1372,7 @@ class ProductSalesDomain:
             ns0 = negotiation.NegState.load(d)
             on_table = {int(x) for x in (ns0.price, ns0.agreed) if x}
             if nn is not None and nn >= 100 and nn not in on_table and not negotiation._NOT_A_PRICE.search(text) and on_table \
+                    and not self._names_order_price(text, d) \
                     and (neg2 := self._negotiate_step(text, d, ctx, lang, force_kind="counter_offer")) is not None:
                 return neg2  # a number the caller names that is not our price is a counter, even after the terms were confirmed
 
@@ -1302,6 +1441,8 @@ class ProductSalesDomain:
                 and (not _BUY.search(text) or re.search(r"go ahead|tell|bata|bol", text, re.I)) and not re.search(r"send|bhej|भेज|\bbuy\b|kharid|खरीद|subscribe|sign me up|i.?ll take|le (lunga|lenge|leti|leta)|"
                                   r"ले (लूँगा|लूंगा|लेंगे|लेती|लेता)", text, re.I):
             yes = None  # "yes, go ahead" to "shall I tell you the price?" means tell me, not buy
+        if yes and d.get("last_intent") == "purpose" and not re.search(r"\bsend\b|bhej|भेज|\bbuy\b|kharid|खरीद|sign me up|i.?ll take|le (lunga|lenge)|ले (लूँगा|लूंगा|लेंगे)", text, re.I):
+            yes = None  # "yes, interested" to "would you be interested in hearing about it?" = tell me (step 4 of the opening)
         if yes and ctx is not None and (ctx.has("payment_link") or d.get("sad_hold") == "1"):
             yes = None  # the link already went out (never confirm or offer it again), or they are in a hard time: nothing to close
         if yes and ctx is not None and not _NOT_NOW_LINK.search(text):
@@ -1354,6 +1495,12 @@ class ProductSalesDomain:
             when = d["callback_note"].strip(" .!?।") if timed and len(d["callback_note"].split()) <= 6 else ""  # the time they said, repeated back
             if timed and not when:
                 when = " ".join(dict.fromkeys(m.group(0).strip() for m in _CB_TIME.finditer(text)))  # a long sentence: just the day / time words
+            if d.get("pilot") == "1" and when:
+                return TurnPlan(intent="callback", end_call=True, decision="pilot setup call scheduled", llm_allowed=False,
+                                objective="Confirm the team will call at that time to set up the free pilot; goodbye",
+                                fallback=_tpl(f"Perfect, our team will call you {when} to set up your free pilot. Have a great day!",
+                                              f"बढ़िया, हमारी टीम {when} आपको कॉल करके फ़्री पायलट सेट कर देगी। आपका दिन शुभ हो!",
+                                              f"Badhiya, hamari team {when} aapko call karke free pilot set kar degi. Aapka din accha ho!"))
             return TurnPlan(intent="callback", end_call=True, decision="schedule callback",
                             context=f"Customer said: {text}\nWhen they asked to be called: {d['callback_note']}",
                             objective="Say of course; if they mentioned a time or day, repeat it to confirm you'll call then "
@@ -1496,19 +1643,16 @@ class ProductSalesDomain:
         pitched = ctx is not None and "what_the_product_is" in ctx.told
         # a short "yes, go on" - not "I'm a college student, assignments and coding" (that deserves an answer)
         plain_go_on = ((intent in ("tell_more", "affirm") and len(text.split()) <= 4) or _weak_yes(text) or _clean_yes(text)) and not asks
+        after_purpose = d.get("last_intent") == "purpose"
+        if after_purpose and not asks and not self._no(text, intent, d) and (
+                _LEAD_YES.match(text) or re.search(r"interested|tell me|go ahead|go on|sure|why not|okay|batao|bataiye|boliye|bolo|बताइए|बताओ|बोलिए|ज़रूर|zaroor", text, re.I)):
+            plain_go_on = True
         quoted = ctx is not None and "offer_price" in ctx.quoted
         short_what = asks and len(text.split()) <= 6 and (u is None or u.question_topic in ("product", "none"))
         if not pitched and not quoted and pending in ("intro", None) and self._faq_match(text) is None \
                 and (plain_go_on or (intent in ("tell_more", "benefits") and (not asks or short_what))) \
                 and not (u is not None and u.heard("personal", "small_talk")) and p.pitch_hi and p.pitch_en:
-            d["pending"] = "pitch"
-            return TurnPlan(intent="pitch", llm_allowed=False, facts={"discount": self._offer()["discount"]},
-                            objective="Operator-written pitch, then the discount and a short question", ask="shall I tell you the price?",
-                            fallback=(_tpl(p.pitch_en + " Right now it's {discount}. Shall I tell you the price?",
-                                           p.pitch_hi + " अभी इस पर {discount} चल रहा है। कीमत बताऊँ?",
-                                           (p.pitch_hinglish or p.pitch_hi) + " Abhi is pe {discount} chal raha hai. Price bataun?") if p.discount.strip() else
-                                      _tpl(p.pitch_en + " Would you like to hear about the options?", p.pitch_hi + " क्या आप विकल्पों के बारे में जानना चाहेंगे?",
-                                           (p.pitch_hinglish or p.pitch_hi) + " Kya aap options ke baare mein jaanna chahenge?")))
+            return self._pitch_plan(d, after_purpose)
         decided = ctx is not None and (ctx.has("payment_link") or ctx.decision != "undecided")
         price_core = bool(_PRICE_CORE.search(text)) and asks
         pure_price = ((intent == "price" or price_core) and len(text.split()) <= 6 and bool(_PRICE_ASK.search(text)) and self._faq_match(text) is None
@@ -1516,6 +1660,8 @@ class ProductSalesDomain:
                       and not decided and not _PRICE_DETAIL.search(text) and not (_RUPEE_ASK.search(text) and p.rupee_terms.get("en"))
                       and not self._other_topic(text, u, intent)  # "personal trainer session कितने का?" is about the trainer
                       and (u is None or u.question_topic in ("offer_terms", "none")))
+        if handback and plain_go_on and not quoted and p.benefits:
+            return self._included_plan(d)
         if pure_price or (pending == "pitch" and plain_go_on):
             d["pending"] = "discovery"
             return self._price_plan(lang, known=bool(d.get("need_known")))
@@ -1597,11 +1743,13 @@ class ProductSalesDomain:
             ref = await self.world.lookup(text)
         if general and _WEATHER_Q.search(text) and "weather now" not in ref.lower() and "no city" not in ref.lower():
             # nothing was looked up (no world service, a timeout, no result): never invent the weather ("दिल्ली में मौसम साफ़")
-            return TurnPlan(intent="small_talk", llm_allowed=False, decision="cannot check the weather: say so",
+            multi = bool(_SMALL_HOW.search(text) or _SMALL_TIME.search(text) or _SMALL_WHAT.search(text))
+            return TurnPlan(intent="small_talk", llm_allowed=False, decision="small talk: cannot check the weather, say so (and answer the rest)",
                             objective="Say honestly you can't check the weather right now",
-                            fallback=_tpl("I can't check the weather right now, sorry; your phone will show it faster.",
-                                          "मैं अभी मौसम चेक नहीं कर पा रहा, माफ़ कीजिए; आपके फ़ोन पर जल्दी दिख जाएगा।",
-                                          "Main abhi mausam check nahi kar paa raha, sorry; aapke phone par jaldi dikh jaayega."))
+                            fallback=self._small_talk_line(text) if multi else
+                            _tpl("I can't check the weather right now, sorry; your phone will show it faster.",
+                                 "मैं अभी मौसम चेक नहीं कर पा रहा, माफ़ कीजिए; आपके फ़ोन पर जल्दी दिख जाएगा।",
+                                 "Main abhi mausam check nahi kar paa raha, sorry; aapke phone par jaldi dikh jaayega."))
 
         if d.get("pending") == "discovery" and not _NOT_NOW_LINK.search(text):  # they just told us what they use: tie the product to that
             d["pending"] = "close" if ctx is not None and "offer_price" in ctx.quoted else "pitch"
@@ -1632,8 +1780,13 @@ class ProductSalesDomain:
             logging.getLogger("acie.decision").exception("kb_knowledge failed")
         if u is not None and u.gist:
             knowledge.append(f"What the customer most likely means: {u.gist}")
+        if self._has_price(lang) and self._names_confirmed_price(text):
+            # "2999 was it?": they said our own confirmed price; confirming it back is correct, not an invented number
+            knowledge.append(f"Confirmed offer (the customer just named this price; you may confirm it): {self._terms('en')}")
         if d.get("callback_note"):
             knowledge.append(f"Callback the customer asked for: {d['callback_note']}")
+        if (oline := self._order_knowledge(d)):
+            knowledge.append(oline)
 
         facts = {**self._base(),
                  "offer": Fact(value=self._terms(lang), description="the monthly offer as one phrase; it already says for how long and the "
@@ -1664,13 +1817,18 @@ class ProductSalesDomain:
         complaint = re.search(r"(just|already) (said|told|gave|mentioned)|told me the price|(said|told).{0,15}price|"
                               r"bata (diya|chuke)|बता (दिया|चुके)|फिर से price|again", text, re.I)
         explicit_terms = _RUPEE_ASK.search(text) or _RENEWAL_ASK.search(text)
-        haggle = _HAGGLE.search(text) or re.search(r"student|स्टूडेंट|(mein|me|में|for) (do|de do|दो|दे दो)\b|do na\b|दो ना|"
+        haggle = (not ordermod.premium_ask(text)) and _HAGGLE.search(text) or (not ordermod.premium_ask(text)) and re.search(r"student|स्टूडेंट|(mein|me|में|for) (do|de do|दो|दे दो)\b|do na\b|दो ना|"
                                                    r"zyada hai|jyada hai|ज़्यादा है|ज्यादा है|mehenga|mehnga|महंगा|expensive|too much", text, re.I)
         if _PRICE_ASK.search(text) and not other_plan and not complaint and not haggle and (explicit_terms or not quoted_last) \
                 and self._faq_match(text) is None \
                 and not self._other_topic(text, u, intent) \
                 and (u is None or u.question_topic in ("offer_terms", "none", "product") or intent == "price"):
             lead = self._price_lead(text, lang)
+            for k in ("offer", "validity", "rupees"):
+                facts.pop(k, None)
+        elif self._has_price(lang) and self._names_confirmed_price(text) and _is_question(text) and not haggle and not other_plan:
+            # "2999 was it?": they check our own price - confirm it from the locked phrase (the LLM never writes the number)
+            lead = {"hi": "जी हाँ, ", "hinglish": "Ji haan, "}.get(lang, "Yes, ") + self._price_lead(text, lang)[0].lower() + self._price_lead(text, lang)[1:]
             for k in ("offer", "validity", "rupees"):
                 facts.pop(k, None)
         elif re.search(_ANNUAL, text, re.I) and self.p.annual_note.get(lang) and not (u is not None and u.heard("personal")):
@@ -1708,7 +1866,11 @@ class ProductSalesDomain:
             generic = _tpl("Sorry, I didn't quite get that. Could you say it once more?",
                            "माफ़ कीजिए, मैं ठीक से समझ नहीं पाया। एक बार फिर से बताएँगे?",
                            "Sorry, main theek se samajh nahi paya. Ek baar phir se bataenge?")
-        if faq is None and node_note and node_note[2]:
+        small = not node_note and ((u is not None and u.heard("small_talk") and not _SALE_WORDS.search(text)) or bool(
+            (_SMALL_HOW.search(text) or _SMALL_TIME.search(text) or _SMALL_WHAT.search(text)) and not _SALE_WORDS.search(text) and faq is None))
+        if small and faq is None:
+            fb = self._small_talk_line(text)  # the validator dropped the LLM's answer: acknowledge the question, never a random gym fact
+        elif faq is None and node_note and node_note[2]:
             fb = _tpl(node_note[2], node_note[2], node_note[2])  # the playbook's own line beats "say that again?"
         elif faq is not None:
             texts = {"en": faq.answer + ".", "hi": faq.answer_hi + "।" if faq.answer_hi else "",
@@ -1756,7 +1918,19 @@ class ProductSalesDomain:
             fb = ({"en": faq.answer + ".", "hi": faq.answer_hi + "।" if faq.answer_hi else ANYTHING_ELSE[1],
                    "hinglish": faq.answer_hinglish + "." if faq.answer_hinglish else ANYTHING_ELSE[2]} if faq is not None
                   else _tpl(ANYTHING_ELSE[0], ANYTHING_ELSE[1], ANYTHING_ELSE[2]))
-        return TurnPlan(intent="small_talk" if general else ("personal" if sad else "answer"),
+        if small:
+            why = "small talk: answer it briefly and kindly, no pitch"
+        elif sad:
+            why = "personal: warmth first, no selling"
+        elif node_note:
+            why = f"playbook situation: {d.get('pb_title_turn') or d.get('pb_node_turn')}"
+        elif faq is not None:
+            why = "approved answer (FAQ), word for word"
+        elif lead:
+            why = "price asked: the exact price line, then the rest"
+        else:
+            why = "answer from the product facts (no playbook situation matched)"
+        return TurnPlan(intent="small_talk" if (small or general) else ("personal" if sad else "answer"), decision=why,
                         facts=facts, context="\n\n".join(knowledge) or None, reference=ref or None,
                         general_knowledge=general, objective=objective,
                         lead={lang: lead} if lead else None,
@@ -1764,6 +1938,29 @@ class ProductSalesDomain:
                                       "claims not in the background", "'limited time' (no end date is known)", "promises about health or safety",
                                       "facilities, policies, refunds or cancellation terms that are not in the background"],
                         fallback=fb)
+
+    def _names_confirmed_price(self, text: str) -> bool:
+        from ...context import amounts
+        said = {round(x) for x in amounts(text or "")}
+        mine = {round(x) for x in amounts(" ".join([self.p.offer_price or "", self.p.original_price or "", self._terms("en")]))}
+        return bool(said & mine)
+
+    def _small_talk_line(self, text: str) -> dict[str, str]:
+        """A short, human answer to chit-chat ("how are you? what's the time? is the weather good?") when the LLM's answer was dropped."""
+        en, hi, hl = [], [], []
+        if _SMALL_HOW.search(text) or _SMALL_WHAT.search(text):
+            en.append("I'm doing well, thanks for asking!")
+            hi.append("मैं ठीक हूँ, पूछने के लिए शुक्रिया!")
+            hl.append("Main theek hoon, poochne ke liye shukriya!")
+        things = [w for w, rx in (("the weather", _WEATHER_Q), ("the time", _SMALL_TIME)) if rx.search(text)]
+        if things:
+            en.append(f"I can't check {' or '.join(things)} from here, honestly.")
+            hi.append("सच कहूँ तो मैं यहाँ से " + " या ".join({"the weather": "मौसम", "the time": "समय"}[t] for t in things) + " नहीं देख सकता।")
+            hl.append("Sach kahoon to main yahan se " + " ya ".join({"the weather": "mausam", "the time": "time"}[t] for t in things) + " check nahi kar sakta.")
+        if not en:
+            en, hi, hl = (["Ha, fair question! I honestly can't answer that one from here."], ["अच्छा सवाल है! सच कहूँ तो इसका जवाब मेरे पास नहीं है।"],
+                          ["Accha sawal hai! Sach kahoon to iska jawab mere paas nahi hai."])
+        return _tpl(" ".join(en), " ".join(hi), " ".join(hl))
 
     def _stage(self, text: str, d: dict, ctx, frustration: float, u) -> str:
         base = self._stage_base(text, d, ctx, frustration, u)
@@ -2088,12 +2285,492 @@ class ProductSalesDomain:
                                       f"ज़रूर, आप फ्रंट डेस्क पर {price} दे सकते हैं; मैंने आपके लिए {price} नोट कर लिया है। और कुछ मदद चाहिए?",
                                       f"Zaroor, aap front desk par {price} de sakte hain; maine aapke liye {price} note kar liya hai. Aur kuch madad chahiye?"))
 
+    # ------------------------------------------------------------------ the close branch of the tree: buying signals, paying in person
+
+    # ------------------------------------------------------------------ the opening, step 2/3 (owner, 15 Nov: connect before the offer)
+
+    def _pitch_plan(self, d: dict, after_purpose: bool = False) -> TurnPlan:
+        """The operator pitch + discount + "shall I tell you the price?" (a yes after the opening's purpose question gets a warm lead)."""
+        p = self.p
+        d["pending"] = "pitch"
+        warm = _tpl("Perfect, here's the short version.", "बढ़िया, तो संक्षेप में सुनिए।", "Badhiya, to short mein suniye.") if after_purpose else _tpl("", "", "")
+        return TurnPlan(intent="pitch", llm_allowed=False, facts={"discount": self._offer()["discount"]}, lead=warm if after_purpose else None,
+                        decision=("opening step 3: yes to the purpose, warm ack + pitch" if after_purpose else "pitch: operator line, then ask before the price"),
+                        objective="Operator-written pitch, then the discount and a short question", ask="shall I tell you the price?",
+                        fallback=(_tpl(p.pitch_en + " Right now it's {discount}. Shall I tell you the price?",
+                                       p.pitch_hi + " अभी इस पर {discount} चल रहा है। कीमत बताऊँ?",
+                                       (p.pitch_hinglish or p.pitch_hi) + " Abhi is pe {discount} chal raha hai. Price bataun?") if p.discount.strip() else
+                                  _tpl(p.pitch_en + " Would you like to hear about the options?", p.pitch_hi + " क्या आप विकल्पों के बारे में जानना चाहेंगे?",
+                                       (p.pitch_hinglish or p.pitch_hi) + " Kya aap options ke baare mein jaanna chahenge?")))
+
+    def _opening_text(self, step: str, name: str, default: dict[str, str]) -> dict[str, str]:
+        """The operator's wording for an opening step (Product.opening[step]) when set, else the generic line."""
+        own = (self.p.opening or {}).get(step) or {}
+        out = {}
+        for l, v in default.items():
+            t = own.get(l) or ""
+            nm = (name or "").strip()  # "Hi  yash!" on call 1d5573e7dc: the generic lines pass " name" with its leading space
+            out[l] = re.sub(r"  +", " ", t.replace(" {name}", f" {nm}" if nm else "").replace("{name}", nm)) if t else v
+        return out
+
+    def _rapport_step(self, text: str, intent: str, d: dict, ctx, lang: str) -> TurnPlan | None:
+        """Their answer to "how are you?": reply like a person, then the purpose + the recording notice + "would you be interested?"
+        (one step, no price). Busy / annoyed -> acknowledge and offer a callback. A no, a goodbye, a time to call back, a price or
+        product question go to the normal flow (the pending step becomes "intro"). None = not handled here."""
+        p = self.p
+        d["pending"] = "intro"
+        if _FIRM_NO.search(text) or _GOODBYE_NOW.search(text) or _CUT_CALL.search(text) or _HANGUP_ASK.search(text) or _ledger_bye(text):
+            return None
+        if _BUSY_NOW.search(text) or _ABUSE.search(text) or float(d.get("_frustration", "0") or 0) >= 0.5:
+            if _CB_TIME.search(text):
+                return None  # "call me tomorrow at 5": the callback flow records the time
+            d["pending"] = "callback_time"
+            d["callback_asked"] = "1"
+            d["callback_note"] = text[:120]
+            return TurnPlan(intent="callback_time", llm_allowed=False, decision="opening: busy or annoyed, offer a callback",
+                            objective="Acknowledge they are busy / not in the mood; offer to call back; ask when; no pitch",
+                            fallback=_tpl("No problem, I've caught you at a bad time. When would be a better time for me to call back?",
+                                          "कोई बात नहीं, शायद मैंने गलत समय पर कॉल किया। मैं किस समय वापस कॉल करूँ?",
+                                          "Koi baat nahi, shayad maine galat time par call kiya. Main kis time wapas call karoon?"))
+        u = self._nlu(d)
+        product_q = (_PRICE_CORE.search(text) or _TERMS_Q.search(text) or self._faq_match(text) is not None
+                     or (self._asks(text, d) and not _ASK_BACK.search(text) and not _PURPOSE.search(text) and self._on_topic(text)))
+        if product_q:
+            d["_recording_due"] = "1"  # they jumped straight to a question: answered in the normal flow, with the recording notice first
+            return None
+        from ...state import social
+        sarcastic = social.turn_value(d, "sarcasm") >= 0.5 or social.load(d).get("sarcasm", 0) >= 0.6
+        if d.get("last_intent") != "opening" or sarcastic:
+            ack = _tpl("", "", "")  # not their answer to "how are you?" (or said sarcastically): no literal "glad to hear that"
+        elif _FEEL_BAD.search(text):
+            ack = _tpl("Sorry to hear that, I hope it gets better soon.", "ये सुनकर अफ़सोस हुआ, उम्मीद है जल्दी ठीक हो जाएगा।",
+                       "Ye sunkar afsos hua, umeed hai jaldi theek ho jaayega.")
+        elif _ASK_BACK.search(text):
+            ack = _tpl("I'm doing well, thanks for asking!", "मैं ठीक हूँ, पूछने के लिए शुक्रिया!", "Main theek hoon, poochne ke liye shukriya!")
+        elif _FEEL_OK.search(text) or (u is not None and u.heard("affirm", "small_talk")):
+            ack = _tpl("Glad to hear that!", "ये सुनकर अच्छा लगा!", "Ye sunkar accha laga!")
+        else:
+            ack = _tpl("", "", "")
+        heard_who = ctx is None or "who_is_calling" in ctx.told
+        who = _tpl("", "", "") if heard_who else _tpl(f"This is {p.agent_name}, an AI assistant from {p.seller_name}. ",
+                                                       f"मैं {p.agent_name}, {p.seller_name} की तरफ़ से एक AI असिस्टेंट। ",
+                                                       f"Main {p.agent_name}, {p.seller_name} ki taraf se ek AI assistant. ")
+        purpose = self._opening_text("purpose", "", _tpl(
+            "I'm calling about a special offer on {product}. This call is recorded. Would you be interested in hearing about it?",
+            "मैं {product} के एक खास ऑफ़र के बारे में कॉल कर रहा हूँ। इस कॉल की रिकॉर्डिंग होती है। क्या आप इसके बारे में सुनना चाहेंगे?",
+            "Main {product} ke ek khaas offer ke baare mein call kar raha hoon. Is call ki recording hoti hai. Kya aap iske baare mein sunna chahenge?"))
+        d["purpose_restated"] = "1"
+        facts = {**self._base(), "agent": Fact(value=p.agent_name, description="your name", must_mention=False),
+                 "seller": Fact(value=p.seller_name, description="your company", must_mention=False)}
+        return TurnPlan(intent="purpose", llm_allowed=False, facts=facts, ask="would you be interested?",
+                        decision="opening step 2: reply to how-are-you, then purpose + recording notice + permission (no price)",
+                        objective="Reply to what they said like a person, then say why you called, that the call is recorded, and ask if they'd like to hear it",
+                        fallback={l: " ".join(x for x in (ack[l].strip(), who[l].strip(), purpose[l]) if x) for l in ("en", "hi", "hinglish")})
+
+    def _buy_signal_step(self, text: str, intent: str, d: dict, ctx, lang: str, pending) -> TurnPlan | None:
+        """A clear buying signal or "I'll pay at the gym / offline" routes deterministically:
+          * pay in person (with a buying signal, at the confirmation, or once the price is known) -> the front-desk close, outcome recorded
+            (never "our team will send the link" - call c9960ed17d: "No, I would prefer paying it offline" got link_sent);
+          * a buying signal without a payment method -> the confirmation with the full terms (it also answers "2999 was it?");
+            terms already confirmed -> the link.
+        Price talk inside a haggle stays with the negotiation flow; a product with no confirmed price never gets here."""
+        if ctx is None or ctx.has("payment_link") or not self._has_price(lang) or d.get("existing_user") == "1" or d.get("sad_hold") == "1":
+            return None
+        if _OPT_OUT.search(text) or _FIRM_NO.search(text) or _CANCEL.search(text) and not _PAY_OFFLINE.search(text):
+            return None
+        if negotiation.detect(text) in ("counter_offer", "haggle") and not self._names_offered_price(text, d):
+            return None  # "I'll pay 2,500" is a counter, not a yes to our price
+        deal = self._deal_get(d, ctx)
+        if deal.status in ("open", "countering") and negotiation.NegState.load(d).rounds > 0:
+            return None  # mid-haggle: the negotiation flow owns the price
+        offline = bool(_PAY_OFFLINE.search(text)) and not _OFFLINE_NEG.search(text)
+        signal = bool(_BUY_SIGNAL.search(text)) and not _BUY_NEG.search(text)
+        after_confirm = pending == "confirm" or d.get("last_intent") in ("confirm_close", "confirm_buy")
+        quoted = "offer_price" in ctx.quoted
+        if offline and (signal or after_confirm or quoted or d.get("terms_confirmed") == "1"):
+            if d.get("pay_at_desk") == "1" and not signal:
+                return None  # already settled at the desk: the conversation answers what else they say
+            return self._offer_desk_close(d, ctx, lang)
+        if signal:  # (a question riding along - "2999 was it?", "how do I pay?" - is answered by the terms read-back)
+            if d.get("terms_confirmed") == "1" and (after_confirm or d.get("requested_link") == "1"):
+                return self._link_plan(d, lang)
+            d["pending"] = "confirm"
+            d["requested_link"] = "0"
+            plan = self._confirm_plan(lang, d)
+            plan.decision = "buying signal: confirm the full terms once before any link"
+            return plan
+        return None
+
+    # ------------------------------------------------------------------ "pitch me anything" / live demo (data-enabled)
+
+    def _pitch_node(self):
+        """The playbook node that turns this on (data, not code: products/<tenant>/<id>.json node id "pitch_anything")."""
+        if self.playbook is None:
+            return None
+        return next((n for n in self.playbook.nodes if n.id == "pitch_anything"), None)
+
+    @staticmethod
+    def _pitch_item(text: str) -> str | None:
+        """The thing to pitch ("a pen", "this bottle", "yourself"); "" = asked for a pitch without naming one; None = not a pitch request."""
+        m = _PITCH_REQ.search(text)
+        if not m:
+            return None
+        raw = next((g for g in (m.group("a"), m.group("b"), m.group("c"), m.group("d")) if g is not None), "")
+        raw = _ITEM_FILLER.sub(" ", raw)
+        raw = re.split(r"\b(?:and|but|so|because|aur|or)\b|,", raw)[0]
+        raw = re.sub(r"^\W*(?:something|anything|kuch bhi|kuch)\b", "", raw.strip(), flags=re.I)
+        raw = re.sub(r"\b(?:mujhe|muje|मुझे|to|ko|ki|ka|ke|yeh|ye|ये|यह)\b", " ", raw, flags=re.I)
+        words = [w for w in re.findall(r"[\w'ऀ-ॿ-]+", raw)][:5]
+        item = " ".join(words).strip()
+        return item
+
+    def _pitch_anything_step(self, text: str, d: dict, ctx, lang: str) -> TurnPlan | None:
+        node = self._pitch_node()
+        if node is None or _OPT_OUT.search(text) or _FIRM_NO.search(text) or _GOODBYE_NOW.search(text) or _CUT_CALL.search(text):
+            return None
+        if _HINDI_LINE.search(text):
+            return self._hindi_line_plan(d, lang)
+        item = self._pitch_item(text)
+        demo = item is None and (_PITCH_HOW.search(text) or (_DEMO_REQ.search(text) and not _DEMO_BOOKING.search(text)))
+        if item is None and not demo:
+            return None
+        if item is None or item == "":
+            item = "pen" if not d.get("pitched_items") else ""
+        art = re.match(r"^(?:a|an|the|this|that|my|your)\s+", item, re.I)
+        noun = item[art.end():] if art else item
+        prev = [x for x in d.get("pitched_items", "").split("|") if x]
+        if prev and re.fullmatch(r"\s*(?:it|that|this|that one|this one|the same|same)\s*", item, re.I):
+            noun = prev[-1]  # "pitch it again": the item from before only when they point back at it
+        if _SELF_ITEM.match(noun.strip()) or not noun:
+            return self._self_pitch_plan(d, lang, demo=bool(demo))
+        n = int(d.get("pitch_n", "0")) + 1
+        d["pitch_n"] = str(n)
+        d["pitched_items"] = (d.get("pitched_items", "") + "|" + noun)[-200:]
+        d["pending"] = "demo"  # "ok thank you" after a demo is not a yes to "shall I tell you the price?"
+        # a different tie-back each time (the second pitch in a call was rejected as a repeated sentence and fell back to the template)
+        ties = [("That's exactly how I'd sell your product, on every call.", "आपके प्रोडक्ट को भी मैं हर कॉल पर ऐसे ही बेचूँगा।",
+                 "Aapke product ko bhi main har call par aise hi bechunga."),
+                ("Now picture that energy on every one of your leads.", "अब सोचिए, आपकी हर लीड को यही जोश मिले।",
+                 "Ab sochiye, aapki har lead ko yahi josh mile."),
+                ("Same playbook I'd run for your product, call after call.", "आपके प्रोडक्ट के लिए भी हर कॉल पर यही तरीका।",
+                 "Aapke product ke liye bhi har call par yahi tareeka."),
+                ("That's the demo: your product gets that treatment on every call.", "यही डेमो है: आपके प्रोडक्ट को हर कॉल पर यही मिलेगा।",
+                 "Yahi demo hai: aapke product ko har call par yahi milega.")]
+        t3 = ties[(n - 1) % len(ties)]
+        tie = {"en": t3[0], "hi": t3[1], "hinglish": t3[2]}
+        lead = _tpl("Sure, live demo." if demo else "", "ज़रूर, लाइव डेमो।" if demo else "", "Zaroor, live demo." if demo else "") if demo else None
+        goal = node.goal or "pitch the named item on the spot"
+        points = "; ".join(node.points[:4])
+        return TurnPlan(
+            intent="pitch_demo", llm_allowed=True, max_words=80, persona=self.p.tone or None, lead=lead,
+            decision=f"pitch anything: live pitch of '{noun}' (playbook pitch_anything)", ask=None,
+            objective=(f"The caller asked you to pitch \"{noun}\" right now, as a live demo of your selling skill. Do it with energy: 2 to 4 short, "
+                       f"confident, fun sentences about the {noun} itself (NOT about {self.p.product_name}): one vivid benefit, one hook question to "
+                       f"the caller, one close. No prices, no numbers, no brands or made-up specs. Then one short line tying it back: that's how "
+                       f"you'd sell their product, in these words or close: \"{tie['en']}\" (never reuse a sentence you said earlier in the call). "
+                       f"Operator guidance: {goal}. {points}"),
+            fallback={
+                "en": f"Here's your {noun}, sold in twenty seconds: it does one job, and it does it every single time you reach for it. Quick question: "
+                      f"when did your old {noun} last let you down? Take this one today and that problem is gone. " + tie["en"],
+                "hi": f"ये लीजिए, बीस सेकंड में {noun}: ये एक काम करता है, और हर बार भरोसे से करता है। एक सवाल: आपके पुराने {noun} ने आख़िरी बार कब धोखा "
+                      f"दिया था? आज ये ले लीजिए, वो परेशानी ख़त्म। " + tie["hi"],
+                "hinglish": f"Ye lijiye, bees second mein {noun}: ye ek kaam karta hai, aur har baar bharose se karta hai. Ek sawaal: aapke purane {noun} "
+                            f"ne aakhri baar kab dhokha diya tha? Aaj ye le lijiye, wo pareshani khatam. " + tie["hinglish"]})
+
+    def _self_pitch_plan(self, d: dict, lang: str, demo: bool = False) -> TurnPlan:
+        p = self.p
+        d["pending"] = d.get("pending") or "pitch"
+        en = (p.pitch_en or p.one_liner).strip()
+        return TurnPlan(intent="pitch_demo", llm_allowed=True, max_words=80, persona=p.tone or None, decision="pitch anything: pitch yourself",
+                        facts={f"benefit_{i + 1}": Fact(value=b, description="a benefit", verbatim=False, must_mention=False) for i, b in enumerate(p.benefits[:3])},
+                        objective=(f"The caller asked you to pitch yourself ({p.product_name}) as a live demo: 2 to 4 short, confident, fun sentences: one "
+                                   "vivid benefit, one hook question, one close. No prices or numbers."),
+                        ask="want me to do that for your product?",
+                        fallback=_tpl(en + " Want me to do that for your product?",
+                                      (p.pitch_hi or en) + " क्या मैं आपके प्रोडक्ट के लिए भी यही करूँ?",
+                                      (p.pitch_hinglish or en) + " Kya main aapke product ke liye bhi yahi karoon?"))
+
+    def _hindi_line_plan(self, d: dict, lang: str) -> TurnPlan:
+        """"Just one line in Hindi": one Hindi line, then carry on in the caller's language (no language switch)."""
+        p = self.p
+        line_hi = next((b for b in (p.benefits_hi or [])), "") or "मैं आपकी हर लीड को मिनटों में कॉल करता हूँ"
+        line_hi = line_hi.rstrip("।. ") + "।"
+        return TurnPlan(intent="pitch_demo", llm_allowed=False, decision="demo: one line in Hindi, then back to the caller's language",
+                        objective="Say one line in Hindi, then continue in the caller's language",
+                        fallback={"en": f"Sure, here it is: {line_hi} And I'm back in English, just like that. Want me to pitch something in Hindi next?",
+                                  "hinglish": f"Zaroor, ye rahi: {line_hi} Aur main wapas Hinglish mein, bas aise hi. Agla kuch Hindi mein pitch karoon?",
+                                  "hi": f"ज़रूर: {line_hi} बस ऐसे ही, जब चाहें भाषा बदल सकता हूँ। अगला कुछ हिंदी में पिच करूँ?"})
+
+    def _pilot_step(self, text: str, d: dict, ctx, lang: str) -> TurnPlan | None:
+        """"Sign me up for the pilot": the free pilot (from the product's trial lever), no payment link, a setup call."""
+        if ctx is None or ctx.has("payment_link") or d.get("pilot") == "1" or not _PILOT_SIGNUP.search(text) or _BUY_NEG.search(text) \
+                or _OPT_OUT.search(text) or _FIRM_NO.search(text):
+            return None
+        neg = self.p.negotiation
+        levers = (neg.get("levers") if isinstance(neg, dict) else getattr(neg, "levers", None)) or {}
+        lever = levers.get("trial_pass") or levers.get("free_trial")
+        lever = lever if isinstance(lever, dict) else (getattr(lever, "model_dump", lambda: None)() if lever is not None else None)
+        if not lever or "free" not in str(lever.get("en", "")).lower() or "pilot" not in str(lever.get("en", "")).lower() + " " + text.lower():
+            return None
+        def clean(t):
+            t = re.sub(r"^\s*(Even simpler|Or even simpler|Simpler still|और आसान|Aur aasaan)\s*[:,]\s*", "", t or "", flags=re.I).strip()
+            return re.split(r"(?<=[.!?।])\s+", t)[0].rstrip(".।")
+        d["pilot"] = "1"
+        d["outcome"] = "pilot"
+        d["pending"] = "callback_time"
+        d["callback_asked"] = "1"
+        return TurnPlan(intent="pilot_signup", llm_allowed=False, decision="pilot sign-up: the free pilot, no payment link, ask for a setup-call time",
+                        objective="Confirm the free pilot (nothing to pay now), no link; ask when the team should call to set it up",
+                        fallback=_tpl(f"Done! You're in for {clean(lever.get('en')).lower() if clean(lever.get('en'))[:2].lower() in ('a ', 'an') else clean(lever.get('en'))}, nothing to pay now. When should our team call you to set it up?",
+                                      f"हो गया! {clean(lever.get('hi', lever.get('en')))}, अभी कुछ नहीं देना। हमारी टीम इसे सेट करने के लिए आपको कब कॉल करे?",
+                                      f"Ho gaya! {clean(lever.get('hinglish', lever.get('en')))}, abhi kuch nahi dena. Hamari team ise set karne ke liye aapko kab call kare?"))
+
+    def _time_after_confirm_step(self, text: str, d: dict, lang: str) -> TurnPlan | None:
+        """"Tomorrow at 11 am" right after "shall I have the team send the link?" is a time, not a yes: ask whether that is a callback."""
+        if d.get("pending") != "confirm" or not _CB_TIME.search(text) or not _TIME_ONLY.match(text):
+            return None
+        d.pop("pending", None)
+        d["callback_time"] = "1"
+        d["callback_note"] = text[:120]
+        when = re.sub(r"^\W*(?:ok(?:ay)?|sure|haan|ha|yes|ji|so|um+)\W+", "", text.strip(" .!?।"), flags=re.I)
+        if d.get("pilot") == "1":
+            return TurnPlan(intent="callback", end_call=True, llm_allowed=False, decision="pilot setup call scheduled",
+                            objective="Confirm the team will call then to set up the pilot; goodbye",
+                            fallback=_tpl(f"Perfect, our team will call you {when} to set up your free pilot. Have a great day!",
+                                          f"बढ़िया, हमारी टीम {when} आपको कॉल करके फ़्री पायलट सेट कर देगी। आपका दिन शुभ हो!",
+                                          f"Badhiya, hamari team {when} aapko call karke free pilot set kar degi. Aapka din accha ho!"))
+        return TurnPlan(intent="callback", end_call=False, llm_allowed=False, decision="a time after the link question: a callback time, not consent (no link)",
+                        objective="Our team will call at that time; no link now; anything else?",
+                        fallback=_tpl(f"Sure, our team will call you {when} and take it from there; no link for now. Anything else I can help with?",
+                                      f"ज़रूर, हमारी टीम {when} आपको कॉल करेगी; अभी कोई लिंक नहीं। और कुछ मदद चाहिए?",
+                                      f"Zaroor, hamari team {when} aapko call karegi; abhi koi link nahi. Aur kuch madad chahiye?"))
+
+
+    # ------------------------------------------------------------------ the booking (order slots)
+
+    def _order_fill(self, text: str, d: dict, ctx, turn: int) -> list[str]:
+        """Every turn: fold what the caller said into the order slots (words first, then the NLU gist for what the words did not give)."""
+        cat = ordermod.catalog(self.p)
+        if not cat.tiers and not cat.slots:
+            return []
+        if _OPT_OUT.search(text) or re.search(r"\b(not|no|nahi|don.?t)\b.{0,12}\b(book|want|need)\b", text, re.I) and not re.search(r"\bnot\s+\w+,?\s+(but|actually)\b", text, re.I):
+            return []
+        o = ordermod.load(d)
+        u = self._nlu(d)
+        gist = (getattr(u, "gist", "") or "") if u is not None else ""
+        changed = ordermod.fill(o, text, cat, turn, extra=gist)
+        d["_order_changed"] = ",".join(changed)
+        if changed or d.get("_order"):
+            ordermod.save(o, d, ctx)
+        return changed
+
+    def _order_knowledge(self, d: dict) -> str:
+        cat = ordermod.catalog(self.p)
+        o = ordermod.load(d)
+        if not cat.slots or not (o.tier or o.quantity or o.location):
+            return ""
+        have = ordermod.describe(o, cat, self.p.product_name, with_price=bool(o.tier))
+        miss = o.missing(cat)
+        return (f"The caller's order so far: {have}. NEVER ask again for what is already in it"
+                + (f"; still needed: {', '.join(miss)}" if miss else "; nothing is missing, so never ask for the city, zone or count again") + ".")
+
+    def _order_confirm(self, d: dict, lang: str) -> TurnPlan | None:
+        """The read-back of a complete order: '5 VIP Lounge tickets for Delhi, Saturday 12 December, ₹14,999 each, ₹74,995 total.'"""
+        cat = ordermod.catalog(self.p)
+        o = ordermod.load(d)
+        if not cat.slots and o.quantity > 1 and o.tier_price:
+            # one plan, several people ("me and my wife"): the full terms each (renewal included) and the total for the offer period
+            total = o.tier_price * o.quantity
+            o.total, o.status = total, "summarised"
+            o.summary = f"{o.quantity} x {self.p.product_name}, {ordermod.fmt(total, cat.currency)} total"
+            ordermod.save(o, d, None)
+            d["terms_confirmed"] = "1"
+            d["pending"] = "confirm"
+            d["requested_link"] = "0"
+            ask = self._link_ask()
+            line = f"{o.quantity} memberships" if "member" in (self.p.product_name or "").lower() else f"{o.quantity} x {self.p.product_name}"
+            return TurnPlan(intent="confirm_close", llm_allowed=False, ask="confirm?", decision="booking for several people: read back the terms each and the total",
+                            facts={"offer": Fact(value=self._terms(lang), description="the full offer, per person")},
+                            objective="Confirm once: how many, the full terms each and the total, then ask whether to send the payment link",
+                            fallback=self._cx(_tpl(f"Just to confirm: {line}, each {{offer}}@@, so {ordermod.fmt(total, cat.currency)} in total now. " + ask["en"],
+                                                   f"बस कन्फ़र्म कर दूँ: {o.quantity} लोगों के लिए, हर एक का {{offer}}@@, यानी अभी कुल {ordermod.fmt(total, cat.currency)}। " + ask["hi"],
+                                                   f"Bas confirm kar doon: {o.quantity} logon ke liye, har ek ka {{offer}}@@, yaani abhi total {ordermod.fmt(total, cat.currency)}. " + ask["hinglish"])))
+        if not cat.slots or not o.complete(cat) or not o.tier_price:
+            return None
+        line = ordermod.describe(o, cat, self.p.product_name)
+        t = cat.tier(o.tier)
+        note = f" ({t.note})" if t is not None and t.note else ""
+        o.summary, o.status = line, "summarised"
+        ordermod.save(o, d, None)
+        d["terms_confirmed"] = "1"
+        d["pending"] = "confirm"
+        d["requested_link"] = "0"
+        ask = self._link_ask()
+        return TurnPlan(intent="confirm_close", llm_allowed=False, ask="confirm?", decision="booking complete: read back the order with its price and total",
+                        facts={"offer": Fact(value=line + note, description="the caller's order with the price and total")},
+                        objective="Read back their order once (what, where, when, price each and total), then ask whether to send the payment link",
+                        fallback=_tpl("Just to confirm: {offer}. " + ask["en"], "बस कन्फ़र्म कर दूँ: {offer}। " + ask["hi"],
+                                      "Bas confirm kar doon: {offer}. " + ask["hinglish"]))
+
+    def _order_link(self, d: dict, lang: str) -> TurnPlan | None:
+        """Yes to a read-back order: our team sends the link for that order; then what happens next, from the product's facts."""
+        cat = ordermod.catalog(self.p)
+        o = ordermod.load(d)
+        if not cat.slots and o.quantity > 1 and o.tier_price and o.status == "summarised":
+            o.status = "link"
+            ordermod.save(o, d, None)
+            tot = ordermod.fmt(o.total or o.tier_price * o.quantity, cat.currency)
+            return TurnPlan(intent="link_sent", decision="booking for several people confirmed: our team sends the payment link", end_call=False, llm_allowed=False,
+                            objective="Say our team will send the payment link for all of them and the total; thank them", facts={},
+                            fallback=_tpl(f"Great! Our team will send you the payment link for {o.quantity}, {tot} in total, shortly. Thank you! I'm here if you have a question.",
+                                          f"बढ़िया! हमारी टीम जल्द ही {o.quantity} लोगों का, कुल {tot} का पेमेंट लिंक भेज देगी। धन्यवाद! कोई सवाल हो तो मैं यहीं हूँ।",
+                                          f"Badhiya! Hamari team jaldi hi {o.quantity} logon ka, total {tot} ka payment link bhej degi. Thank you! Koi sawal ho to main yahin hoon."))
+        if not cat.slots or not o.complete(cat) or not o.tier_price:
+            return None
+        line = ordermod.describe(o, cat, self.p.product_name)
+        o.summary, o.status = line, "link"
+        ordermod.save(o, d, None)
+        total = ordermod.fmt(o.total or o.tier_price, cat.currency)
+        nxt = cat.next_steps
+        nxt_hi = "पेमेंट के बाद टिकट और इनवॉइस आपके ईमेल पर आ जाएँगे।" if nxt else ""
+        nxt_hl = "Payment ke baad ticket aur invoice aapke email par aa jayenge." if nxt else ""
+        return TurnPlan(intent="link_sent", decision="booking confirmed: our team sends the payment link for the order", end_call=False, llm_allowed=False,
+                        facts={"offer": Fact(value=line, description="the caller's order", must_mention=False)},
+                        objective="Say our team will send the payment link for their order and the total; what happens after payment; thank them",
+                        fallback=_tpl(f"Great! Our team will send you the payment link for {line} shortly. " + (nxt + " " if nxt else "") + "Thank you! I'm here if you have a question.",
+                                      f"बढ़िया! हमारी टीम जल्द ही {total} का पेमेंट लिंक भेज देगी। " + (nxt_hi + " " if nxt_hi else "") + "धन्यवाद! कोई सवाल हो तो मैं यहीं हूँ।",
+                                      f"Badhiya! Hamari team jaldi hi {total} ka payment link bhej degi. " + (nxt_hl + " " if nxt_hl else "") + "Thank you! Koi sawal ho to main yahin hoon."))
+
+    def _order_step(self, text: str, intent: str, d: dict, ctx, lang: str, pending) -> TurnPlan | None:
+        """The booking, driven by the slots: a booking word, a want with a slot ("I want five tickets for VIP"), the top option
+        ("the most expensive one") or an answer to our slot question -> remember it, ask the ONE next missing slot, and with all of
+        them read the order back (tier price x quantity = total). A question about something else goes to the normal flow."""
+        cat = ordermod.catalog(self.p)
+        if ctx is None or ctx.has("payment_link") or not self._has_price(lang) or d.get("existing_user") == "1" \
+                or d.get("sad_hold") == "1" or d.get("pay_at_desk") == "1":
+            return None
+        if _OPT_OUT.search(text) or _FIRM_NO.search(text) or _CANCEL.search(text) or _GOODBYE_NOW.search(text) or _CUT_CALL.search(text):
+            return None
+        o = ordermod.load(d)
+        changed = [c for c in (d.get("_order_changed") or "").split(",") if c]
+        if not cat.slots:
+            # one plan: only a head count matters ("what's the total for 5 of us?" - staging sim: read as ₹5 and joked about)
+            if "quantity" in changed and o.quantity > 1 and o.tier_price:
+                plan = self._order_confirm(d, lang)
+                if plan is not None:
+                    plan.decision = "several people on one plan: the total, then the link question"
+                return plan
+            return None
+        strong = bool(_BUY_SIGNAL.search(text) and not _BUY_NEG.search(text)) or bool(re.search(
+            r"\b(book|booking|reserve|note (it|that|down)|i.?ll take|go ahead and book)\b|बुक", text, re.I) and not _BUY_NEG.search(text))
+        booking = strong or bool(re.search(r"\b(i want|i need|we want|we need|give me|get me|make it|chahiye|kar do|karo)\b|चाहिए", text, re.I))
+        premium = ordermod.premium_ask(text) and len(cat.tiers) > 1
+        answer_to_ask = bool(o.asked) and bool(changed)
+        chose = "tier" in changed and (self._names_order_price(text, d) or re.search(
+            r"\bwala\b|wali|वाला|वाली|sahi rahega|theek rahega|chalega|चलेगा|i.?ll (take|go with)|let.?s (do|go with)|le (lunga|lenge|lungi)|ले (लूँगा|लेंगे)", text, re.I))
+        if not o.active and not (strong or (booking and changed) or premium or answer_to_ask or chose):
+            return None
+        if negotiation.detect(text) == "counter_offer" and not changed:
+            return None
+        asks_other = _is_question(text) and not changed and not booking and not premium
+        if asks_other or (_PRICE_CORE.search(text) and not changed and not booking):
+            return None  # "is there parking?" mid-booking: the conversation answers it (the order stays in its facts)
+        if o.status == "summarised" and not changed:
+            if (booking or honest.SEND_REQ.search(text) or _BUY.search(text)) and not _NOT_NOW_LINK.search(text) \
+                    and (not _is_question(text) or honest.SEND_REQ.search(text)):
+                return self._link_plan(d, lang)  # "yes, book it" after the read-back
+            return None  # the yes / no to the read-back: the consent flow decides
+        if not o.active and o.status == "" and not changed and not premium and not booking:
+            return None
+        o.active = True
+        miss = o.missing(cat)
+        lead_en, lead_hi, lead_hl = "", "", ""
+        if premium and o.tier:
+            t = cat.tier(o.tier)
+            if t is not None:
+                about = f": {t.about}" if t.about else ""
+                lead_en = f"The top one is {t.name}, {ordermod.fmt(t.price, cat.currency)} a {cat.unit or 'ticket'}{about}."
+                lead_hi = f"सबसे ऊपर {t.name} है, {ordermod.fmt(t.price, cat.currency)} एक {('टिकट' if 'ticket' in (cat.unit or 'ticket') else cat.unit)}।"
+                lead_hl = f"Sabse upar {t.name} hai, {ordermod.fmt(t.price, cat.currency)} ek {cat.unit or 'ticket'}."
+        elif changed or (booking and (o.tier or o.quantity or o.location)):
+            have = ordermod.describe(o, cat, self.p.product_name, with_price=False)
+            lead_en, lead_hi, lead_hl = f"Got it, {have}.", f"ठीक है, {have}।", f"Theek hai, {have}."
+        if not miss:
+            ordermod.save(o, d, ctx)
+            plan = self._order_confirm(d, lang)
+            if plan is not None:
+                plan.decision = "booking: all slots filled, read the order back"
+                if lead_en and premium:
+                    plan.fallback = {k: (dict(en=lead_en, hi=lead_hi, hinglish=lead_hl)[k] + " " + v) for k, v in plan.fallback.items()}
+                return plan
+            return None
+        slot = miss[0]
+        n = int(o.asked_n.get(slot, 0))
+        o.asked = slot
+        o.asked_n[slot] = n + 1
+        ordermod.save(o, d, ctx)
+        q = ordermod.slot_question(slot, cat, n)
+        d["pending"] = "order"
+        facts = {}
+        return TurnPlan(intent="order_slot", llm_allowed=False, ask=q["en"], decision=f"booking: ask the next missing slot ({slot}); have: {', '.join(s for s in cat.slots if o.has(s)) or 'nothing'}",
+                        objective="Acknowledge what they chose and ask only the one missing detail of the booking", facts=facts,
+                        fallback={"en": (lead_en + " " + q["en"]).strip(), "hi": (lead_hi + " " + q["hi"]).strip(), "hinglish": (lead_hl + " " + q["hinglish"]).strip()})
+
+    def _included_plan(self, d: dict) -> TurnPlan:
+        """After "sorry, I jumped ahead - want to hear what's included first?" a yes gets what's included, no price."""
+        p = self.p
+        d["pending"] = "pitch"
+
+        def items(lst, conj=" and "):
+            lst = [x.strip().rstrip(".।") for x in lst[:3] if x.strip()]
+            return lst[0] if len(lst) == 1 else ", ".join(lst[:-1]) + conj + lst[-1]
+        hi = list(p.benefits_hi or [])
+        en = items(p.benefits)
+        return TurnPlan(intent="answer", llm_allowed=False, decision="yes to 'what's included first?': what they get, no price",
+                        objective="Say what the membership includes (no price), then ask if they want to hear the offer",
+                        ask="shall I tell you the price?",
+                        fallback=_tpl(f"Sure. You get {en}. Shall I tell you the offer price?",
+                                      (f"ज़रूर। इसमें {items(hi, ' और ')} मिलता है। ऑफ़र की कीमत बताऊँ?" if hi else f"ज़रूर। इसमें {en} मिलता है। ऑफ़र की कीमत बताऊँ?"),
+                                      f"Zaroor. Isme {items(list(p.benefits_hinglish or p.benefits))} milta hai. Offer ki price bataun?"))
+
+    def _offer_desk_close(self, d: dict, ctx, lang: str) -> TurnPlan:
+        """Paying in person at the gym is a valid close: the front desk takes it at the offer (or the deal's standing price); outcome recorded."""
+        deal = self._deal_get(d, ctx)
+        d["no_link"] = "1"
+        if deal.agreed_price or (deal.status in ("open", "countering") and deal.last_agent_offer and deal.last_agent_offer != deal.offer_price):
+            return self._desk_close(d, ctx, lang, dealmod.fmt(deal.standing(), deal.currency))
+        d.pop("pending", None)
+        d["outcome"] = "sold"
+        d["pay_at_desk"] = "1"
+        d["terms_confirmed"] = "1"
+        o = ordermod.load(d)
+        cat = ordermod.catalog(self.p)
+        if cat.slots and o.complete(cat):
+            o.status = "desk"
+            line = ordermod.describe(o, cat, self.p.product_name)
+            o.summary = line
+            ordermod.save(o, d, ctx)
+            return TurnPlan(intent="pay_at_desk", llm_allowed=False, end_call=False, decision="booking read back, pays in person (no link)",
+                            facts={"offer": Fact(value=line, description="the caller's order")},
+                            objective="Yes, they can pay in person; say their order once; no link; ask if there's anything else",
+                            fallback=_tpl("Of course, you can pay in person. That's {offer}; just mention this call. Anything else I can help with?",
+                                          "बिल्कुल, आप खुद आकर पेमेंट कर सकते हैं। आपका ऑर्डर: {offer}; बस इस कॉल का ज़िक्र कर दीजिए। और कुछ मदद चाहिए?",
+                                          "Bilkul, aap khud aakar payment kar sakte hain. Aapka order: {offer}; bas is call ka zikr kar dijiye. Aur kuch madad chahiye?"))
+        return TurnPlan(intent="pay_at_desk", llm_allowed=False, end_call=False, decision="buying signal, pays in person: front desk at the offer price (no link)",
+                        facts={"offer": Fact(value=self._terms(lang), description="the full offer")},
+                        objective="Yes, they can pay at the front desk; say the offer terms once; no link; ask if there's anything else",
+                        fallback=self._cx(_tpl("Of course, you can pay at the front desk. It's {offer}@@; just mention this call when you come in. Anything else I can help with?",
+                                               "बिल्कुल, आप फ्रंट डेस्क पर पेमेंट कर सकते हैं। ये {offer} है@@; आते समय बस इस कॉल का ज़िक्र कर दीजिए। और कुछ मदद चाहिए?",
+                                               "Bilkul, aap front desk par payment kar sakte hain. Ye {offer} hai@@; aate waqt bas is call ka zikr kar dijiye. Aur kuch madad chahiye?")))
+
     def _negotiate_step(self, text: str, d: dict, ctx, lang: str, force_kind: str | None = None) -> TurnPlan | None:
         """Price talk (haggling, a counter-offer, a competitor, budget, value doubt, a group discount, a free trial) goes through the
         deterministic negotiation state machine (acie/decision/negotiation.py) with its numbers held by the deal (acie/decision/deal.py):
         the phrase ledger lives in dialog["_neg"], the price record in session.context.deal."""
         if d.get("existing_user") == "1" or d.get("sad_hold") == "1" or _FIRM_NO.search(text) or _OPT_OUT.search(text):
             return None
+        if _TRUST_Q.search(text) and negotiation.counter_number(text) is None:
+            return None  # "will it make up prices?" mid-haggle is a question about the product, answered by the conversation
         if force_kind is None and self._names_offered_price(text, d) and not (_is_question(text) is False and negotiation.explicit_push(text) and not honest.SEND_REQ.search(text)):
             return None  # "₹2,999 monthly ya yearly?" names the price on the table: a question about it, never a counter-offer
         ladder = negotiation.ladder_enabled(self.p)
@@ -2393,12 +3070,30 @@ class ProductSalesDomain:
         n = negotiation.counter_number(text)
         if n is None:
             return False
+        if self._names_order_price(text, d):
+            return True  # "General Standing ₹1,999 wala" / "₹11,997 total, right?": a listed option's price or the order's total
         on_table = {int(x) for x in re.findall(r"\d+", (self.p.offer_price + " " + self._terms("en")).replace(",", ""))}
         st = negotiation.NegState.load(d)
         if st.price:
             on_table.add(int(st.price))
         return n in on_table and bool(honest.SEND_REQ.search(text) or _BUY.search(text) or _is_question(text)
                                       or re.search(r"kar\s?do|karo|de\s?do|chalega|theek|ठीक|le lunga|le leta|done|ok\b", text, re.I))
+
+    def _names_order_price(self, text: str, d: dict) -> bool:
+        """The number is one of the product's listed option prices (with that option named, or a choice word) or the read-back order
+        total: never a counter-offer (c1d9da4eca-style staging sim: "General Standing ₹1,999 wala sahi rahega" got a haggle)."""
+        n = negotiation.counter_number(text)
+        if n is None:
+            return False
+        cat = ordermod.catalog(self.p)
+        o = ordermod.load(d)
+        if o.total and abs(n - o.total) < 1:
+            return True
+        for t in cat.tiers:
+            if abs(n - t.price) < 1 and (ordermod.parse_tier(text, cat) == t.name or len(cat.tiers) == 1 or re.search(
+                    r"\bwala\b|wali|वाला|वाली|sahi|theek|thik|ठीक|chalega|चलेगा|that one|this one|i.?ll (take|go with)|le (lunga|lenge)", text, re.I)):
+                return True
+        return False
 
     def _has_free_plan(self) -> bool:
         """Only a product whose own facts mention a free plan may say "the free plan will do" (a gym has a free trial pass, not a free plan)."""
@@ -2486,6 +3181,20 @@ class ProductSalesDomain:
                             fallback=_tpl("The link is on its way to this number. Thank you, have a great day!",
                                           "लिंक इसी नंबर पर भेजा जा रहा है। धन्यवाद, आपका दिन शुभ हो!",
                                           "Link isi number pe bheja ja raha hai. Thank you, aapka din accha ho!"))
+        if d.get("pay_at_desk") == "1" and not ctx.has("payment_link"):
+            # settled: they pay at the front desk. Questions are answered; anything else gets a warm close, never a new pitch or a link
+            if self._asks(text, d) or self._faq_match(text) or intent == "price" or honest.SEND_REQ.search(text):
+                return None
+            n = int(d.get("desk_bye_n", "0"))
+            d["desk_bye_n"] = str(n + 1)
+            bye = bool(_GOODBYE_NOW.search(text) or _ledger_bye(text) or n >= 1)
+            lines = (_tpl("Great, see you at the front desk then. Thanks for your time, have a good day!",
+                          "बढ़िया, तो फ्रंट डेस्क पर मिलते हैं। आपके समय के लिए धन्यवाद, आपका दिन शुभ हो!",
+                          "Badhiya, to front desk par milte hain. Aapke time ke liye thank you, aapka din accha ho!"),
+                     _tpl(f"Perfect. Take care, and see you at {self.p.seller_name}!" if self.p.seller_name else "Perfect. Take care, goodbye!",
+                          "ठीक है जी, अपना ध्यान रखिए। नमस्ते!", "Theek hai ji, apna dhyaan rakhiye. Namaste!"))
+            return TurnPlan(intent="goodbye_after", llm_allowed=False, end_call=bye, decision="settled at the front desk: warm close, no pitch, no link",
+                            objective="They will pay at the front desk: thank them warmly, no pitch", fallback=lines[min(n, 1)])
         if ctx.decision == "later" or ctx.has("callback_later"):
             if not (_BUY.search(text) and intent != "deny"):
                 note = d.get("callback_note", "")
@@ -2520,6 +3229,8 @@ class ProductSalesDomain:
         """Before any link: one confirmation that states the complete terms (persona reviews: it never said
         that $8 lasts only 3 months). Once confirmed, a later clear yes sends the link (no confirm loop).
         `lead`: a line said first (an agreed negotiation: "Done, ₹2,800 it is."); the terms then read back that agreed price."""
+        if d is not None and lead is None and (oplan := self._order_confirm(d, lang)) is not None:
+            return oplan
         short = lead is None and d is not None and d.get("last_intent") in ("price", "reoffer") and d.get("terms_confirmed") != "1"
         if d is not None:
             d["terms_confirmed"] = "1"
@@ -2544,6 +3255,8 @@ class ProductSalesDomain:
         at = f" at {cur}{int(round(agreed)):,}" if agreed else ""
         at_hi = f" {cur}{int(round(agreed)):,} पर" if agreed else ""
         at_hl = f" {cur}{int(round(agreed)):,} par" if agreed else ""
+        if not sms and not question and (oplan := self._order_link(d, lang)) is not None:
+            return oplan
         if sms:
             sent = _tpl("Great, I'm sending the payment link by SMS to this number now" + at + ".",
                         "बढ़िया," + at_hi + " मैं अभी इसी नंबर पर SMS से पेमेंट लिंक भेज रहा हूँ।",

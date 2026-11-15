@@ -166,18 +166,18 @@ ACCEPT = _b(
 ASK = _b(
     professional=[
         ("Shall I send the payment link at {p}, Sir?", "सर, क्या मैं {p} पर पेमेंट लिंक भेज दूँ?", "Sir, kya main {p} par payment link bhej doon?"),
-        ("Sir, would you join today at {p}?", "सर, क्या आप {p} पर आज जॉइन करेंगे?", "Sir, kya aap {p} par aaj join karenge?"),
+        ("Sir, shall we go ahead today at {p}?", "सर, क्या आज {p} पर बात पक्की करें?", "Sir, kya aaj {p} par baat pakki karein?"),
         ("May I confirm {p} for you, Sir?", "सर, क्या मैं आपके लिए {p} पक्का कर दूँ?", "Sir, kya main aapke liye {p} pakka kar doon?"),
         ("Sir, shall I SMS the link for {p}?", "सर, क्या मैं {p} का लिंक SMS कर दूँ?", "Sir, kya main {p} ka link SMS kar doon?"),
     ],
     mid=[
-        ("If I make it {p}, will you join today?", "{p} कर दूँ तो आज जॉइन कर लेंगे?", "{p} kar doon to aaj join kar lenge?"),
+        ("If I make it {p}, shall we go ahead today?", "{p} कर दूँ तो आज ही पक्का कर लें?", "{p} kar doon to aaj hi pakka kar lein?"),
         ("Shall I lock {p} and send the link?", "क्या मैं {p} पक्का कर दूँ और लिंक भेज दूँ?", "Kya main {p} pakka kar doon aur link bhej doon?"),
         ("Is {p} a deal, then?", "तो {p} में बात पक्की?", "To {p} mein baat pakki?"),
         ("Want me to SMS the link for {p} now?", "{p} का लिंक अभी SMS कर दूँ?", "{p} ka link abhi SMS kar doon?"),
     ],
     casual=[
-        ("{p}, then you join today?", "{p} में आज ही ले लो?", "{p} mein aaj hi le lo?"),
+        ("{p}, then we go ahead today?", "{p} में आज ही ले लो?", "{p} mein aaj hi le lo?"),
         ("Bhai, {p} locked? I send the link?", "भाई, {p} पक्का? लिंक भेज दूँ?", "Bhai, {p} pakka? Link bhej doon?"),
         ("Boss, {p} deal?", "बॉस, {p} में डील?", "Boss, {p} mein deal?"),
         ("Shall I SMS the {p} link, bhai?", "भाई, {p} का लिंक SMS कर दूँ?", "Bhai, {p} ka link SMS kar doon?"),

@@ -15,7 +15,8 @@ from .psyche import style as _style
 from .schemas import CompiledPrompt, ExpressionParams, SessionState, TurnPlan
 
 LANGUAGE_RULES = {
-    "en": "Speak in simple Indian English.",
+    "en": "Speak only in simple English (the caller is Indian, but the reply is English): never Hindi or Hinglish words such as main, "
+          "hoon, aap, hai, theek, even if the caller or earlier turns used Hindi.",
     "hi": "Speak in natural spoken Hindi written in Devanagari. Common English banking words "
           "(balance, transfer, limit, card, account) may stay in English as people say them.",
     "hinglish": "Speak in natural Hinglish written in Roman script, mixing Hindi and English the way "
@@ -210,7 +211,7 @@ class PromptCompiler:
         for u in session.history[-self.history_turns:]:
             messages.append({"role": "user" if u.role == "customer" else "assistant", "content": u.text})
         plan_json = json.dumps(_plan_for_llm(plan), ensure_ascii=False, indent=1)
-        reminder = {"en": "Reply only in English.", "hi": "Reply only in Hindi (Devanagari script).",
+        reminder = {"en": "Reply only in English (no Hindi or Hinglish words), even if the customer mixed languages.", "hi": "Reply only in Hindi (Devanagari script).",
                     "hinglish": "Reply only in Hinglish (Roman script)."}[expr.language]
         ctx = session.context.summary() if getattr(session, "context", None) else ""
         ctx_block = f"CALL SO FAR (true for the whole call, never contradict it):\n{ctx}\n\n" if ctx else ""

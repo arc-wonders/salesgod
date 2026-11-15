@@ -26,7 +26,7 @@ CONCERT = {"id": "karan-aujla-concert-tickets", "seller_name": "karan aujla conc
                                   "hi": "आप किस कैटेगरी के टिकट खरीदना चाहते हैं और आपको कितने पास की आवश्यकता है?",
                                   "hinglish": "Aap kis category ke ticket lena chahte hain aur kitne pass chahiye?"},
            "topic_words": ["karan aujla", "concert", "tickets"], "sms_text": "", "payment_link": ""}
-P = Product.model_validate(RAW.get("karan-aujla-concert-tickets") or CONCERT)
+P = Product.model_validate(CONCERT)  # the in-file no-price example (the live concert entry now has prices)
 EMPTY = re.compile(r"\s[.,]|\bis\s*,|it's\s*\.|it's\s*,|for you it's\s+,|,\s*then\s*\.|that's\s*\.|:\s*\.|\{\w+\}")
 
 

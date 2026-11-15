@@ -51,3 +51,23 @@ def test_true_crisis_lines_still_caught_when_on(monkeypatch):
     monkeypatch.setenv("ACIE_SAFETY", "1")
     for line in ("मेरे मरने का मन कर रहा है", "छत से कूदना है मुझे", "chhat se kood jaunga", "mujhe nahi jeena", "I want to end it all"):
         assert safety.is_distress(line), line
+
+
+def test_safety_single_borderline_flag_released_when_caller_says_it_was_a_normal_question(monkeypatch):
+    """One borderline match (< 0.9) followed by "I was just asking about the show timing / I'm fine": back to normal, no helpline loop.
+    Clear ideation stays sticky."""
+    import asyncio
+    from acie.decision.domains.product_sales import Product, ProductSalesDomain
+    from acie.decision.engine import DecisionEngine
+    from acie.pipeline import ACIEPipeline
+    from acie.schemas import TurnInput
+    monkeypatch.setenv("ACIE_SAFETY", "1")
+    pipe = ACIEPipeline(DecisionEngine(ProductSalesDomain(Product())))
+    T = lambda t: TurnInput(session_id="sfx", customer_id="+910000000000", text=t)  # noqa: E731
+    sess = pipe.session(T(""))
+    sess.dialog.update({"safety_flag": "1", "_safety_trigger": "0.85", "_safety_turns": "1"})
+    r = asyncio.run(pipe.run_turn(T("अरे अर्जुन जी, आप ये क्या कह रहे हैं? मैं तो बस शो के टाइम के बारे में पूछ रहा था।")))
+    assert not r.plan.intent.startswith("safety") and "safety_flag" not in sess.dialog
+    sess.dialog.update({"safety_flag": "1", "_safety_trigger": "0.92", "_safety_turns": "1"})
+    r = asyncio.run(pipe.run_turn(T("I'm fine, I was just asking.")))
+    assert r.plan.intent.startswith("safety")
