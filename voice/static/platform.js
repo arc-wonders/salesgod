@@ -15,6 +15,7 @@ const PACKS = [['steps', 'Follows my steps'], ['lead_qualification', 'Lead quali
 const BUILTIN_CT = [['sales_pitch', 'Sales pitch'], ['lead_qualification', 'Lead qualification'], ['follow_up', 'Follow-up'], ['payment_reminder', 'Payment reminder'], ['feedback_survey', 'Feedback survey'], ['appointment_booking', 'Appointment booking']];
 
 Object.assign(ICONS, {
+  mic: 'M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3zM19 10v2a7 7 0 0 1-14 0v-2M12 19v3',
   home: 'M3 11l9-8 9 8M5 10v10h5v-6h4v6h5V10',
   box: 'M21 8l-9-5-9 5v8l9 5 9-5zM3 8l9 5 9-5M12 13v9',
   list: 'M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01',
@@ -144,9 +145,12 @@ function aiBox(o) {
 }
 
 /* ------------------------------------------------------------ router + shell */
-const NAV = [['dashboard', 'Dashboard', 'home'], ['products', 'Products', 'box'], ['calltypes', 'Call types', 'list'], ['customers', 'Customers & Leads', 'users'], ['campaigns', 'Campaigns', 'mega'], ['followups', 'Follow-ups', 'clock'], ['calls', 'Calls', 'phone'], ['settings', 'Settings', 'cog']];
+const NAV = [['dashboard', 'Dashboard', 'home'], ['products', 'Products', 'box'], ['studio', 'Product studio', 'spark'], ['calltypes', 'Call types', 'list'], ['customers', 'Customers & Leads', 'users'], ['campaigns', 'Campaigns', 'mega'], ['agents', 'Agents', 'mic'], ['followups', 'Follow-ups', 'clock'], ['calls', 'Calls', 'phone'], ['settings', 'Settings', 'cog']];
+/* Build / Deploy / Monitor grouping (as in Sarvam and Bolna). A page added to NAV but not listed here lands in the last group. */
+const NAV_GROUPS = [['Monitor', ['dashboard', 'calls']], ['Deploy', ['campaigns', 'customers', 'followups']], ['Build', ['studio', 'products', 'calltypes', 'agents']], ['Workspace', ['settings']]];
+const navGroups = () => { const listed = new Set(NAV_GROUPS.flatMap((g) => g[1])); const extra = NAV.map((n) => n[0]).filter((id) => !listed.has(id)); return extra.length ? NAV_GROUPS.map((g, i) => (i === NAV_GROUPS.length - 1 ? [g[0], [...g[1], ...extra]] : g)) : NAV_GROUPS; };
 const SECTION_OF = { tree: 'products', sim: 'calls', progress: 'dashboard', onboarding: 'dashboard' };
-const TITLE = { dashboard: 'Dashboard', products: 'Products', calltypes: 'Call types', customers: 'Customers & Leads', campaigns: 'Campaigns', followups: 'Follow-ups', calls: 'Calls', settings: 'Settings', tree: 'Decision tree', sim: 'Simulator', progress: 'Progress', onboarding: 'Set up a project' };
+const TITLE = { studio: 'Product studio', dashboard: 'Dashboard', products: 'Products', calltypes: 'Call types', customers: 'Customers & Leads', campaigns: 'Campaigns', agents: 'Agents', followups: 'Follow-ups', calls: 'Calls', settings: 'Settings', tree: 'Decision tree', sim: 'Simulator', progress: 'Progress', onboarding: 'Set up a project' };
 const PS = { route: null, tok: 0, navOpen: false, menu: false, crumb: '', ob: null };
 const INTERNAL = { calls: 'live' };
 function parseHash() {
@@ -161,11 +165,11 @@ function go(p, a) {
 }
 function readRoute() {
   const r = PS.route = parseHash(); S.page = INTERNAL[r.name] || r.name; PS.crumb = '';
-  if (r.name === 'calls' && r.id) { S.sel = r.id; S.rtab = 'map'; }
+  if (r.name === 'calls' && r.id) { S.sel = r.id; }
   store.set('sg_page', r.name);
 }
 function refresh() { if (S.authed) render($('#app')); }
-window.addEventListener('hashchange', () => { if (S.authed) { PS.navOpen = false; refresh(); } });
+window.addEventListener('hashchange', () => { if (!location.hash.startsWith('#/onboarding')) PS.obNew = false; if (S.authed) { PS.navOpen = false; refresh(); } });
 const $ = (q) => document.querySelector(q);
 document.addEventListener('keydown', (e) => { if (e.key === '/' && !/INPUT|TEXTAREA|SELECT/.test((document.activeElement || {}).tagName || '')) { const s = $('#gsearch'); if (s) { e.preventDefault(); s.focus(); } } });
 document.addEventListener('click', (e) => { if (PS.menu && !e.target.closest('.switcher')) { PS.menu = false; const m = $('#pmenu'); if (m) m.remove(); } if (!e.target.closest('.searchbox')) { const r = $('#sres'); if (r) r.hidden = true; } });
@@ -180,16 +184,16 @@ function render(app) {
       h('div', { class: 'switcher' },
         h('button', { class: 'org', 'aria-haspopup': 'listbox', 'aria-expanded': String(PS.menu), onclick: () => { PS.menu = !PS.menu; const m = $('#pmenu'); if (m) { m.remove(); return; } $('.switcher').append(projectMenu()); } },
           h('span', { class: 'dot', style: `background:${t.color || '#888'}` }), h('span', { style: 'min-width:0;flex:1' }, h('small', {}, 'Project'), h('b', {}, t.name)), ic('chev', 'sm'))),
-      h('nav', { class: 'nav' }, NAV.map(([id, label, icon]) => h('a', { class: 'nav-item' + (cur === id ? ' on' : ''), href: '#/' + id, 'aria-current': cur === id ? 'page' : null }, ic(icon), h('span', {}, label), id === 'calls' ? h('span', { class: 'cnt', id: 'livecnt' }) : null))),
-      h('div', { class: 'side-foot' }, h('a', { class: 'nav-item', href: '#/onboarding' }, ic('spark'), h('span', {}, 'Guided setup')))),
+      h('nav', { class: 'nav' }, navGroups().map(([g, ids]) => [h('div', { class: 'group' }, g), ids.map((id) => { const [, label, icon] = NAV.find((n) => n[0] === id); return h('a', { class: 'nav-item' + (cur === id ? ' on' : ''), href: '#/' + id, 'aria-current': cur === id ? 'page' : null }, ic(icon), h('span', {}, label), id === 'calls' ? h('span', { class: 'cnt', id: 'livecnt' }) : null); })])),
+      h('div', { class: 'side-foot' }, h('a', { class: 'nav-item', href: '#/onboarding' }, ic('spark'), h('span', {}, 'Guided setup')), h('a', { class: 'nav-item', href: '/classic' }, ic('ext'), h('span', {}, 'Classic view')))),
     h('div', { class: 'scrim', onclick: () => { PS.navOpen = false; refresh(); } }),
     h('div', { class: 'main' },
       h('header', { class: 'topbar' },
         h('button', { class: 'icon-btn burger', title: 'Menu', 'aria-label': 'Open menu', onclick: () => { PS.navOpen = !PS.navOpen; $('.gs').classList.toggle('navopen', PS.navOpen); } }, ic('menu')),
         h('nav', { class: 'crumbs', 'aria-label': 'Breadcrumb' }, h('a', { href: '#/dashboard' }, t.name), h('i', {}, '/'), crumbs()),
         searchBox(),
-        h('span', { class: 'conn ' + S.conn, id: 'conn', title: 'Live event stream' }, h('i'), h('span', {}, S.conn === 'ok' ? 'LIVE' : S.conn === 'bad' ? 'RECONNECTING' : 'CONNECTING')),
-        h('a', { class: 'btn ghost sm hide-sm', href: '/classic' }, 'Classic view'),
+        h('span', { class: 'conn ' + S.conn, id: 'conn', title: 'Live event stream' }, h('i'), h('span', {}, S.conn === 'ok' ? 'Live' : S.conn === 'bad' ? 'Reconnecting' : 'Connecting')),
+        h('button', { class: 'btn pri sm', onclick: () => SG.newCall(), title: 'Place a call' }, ic('phone', 'sm'), h('span', { class: 'hide-xs' }, 'New call')),
         h('button', { class: 'icon-btn', title: dark ? 'Light theme' : 'Dark theme', 'aria-label': 'Toggle theme', onclick: () => { const l = document.documentElement.classList.toggle('light'); store.set('sg_theme', l ? 'light' : 'dark'); refresh(); } }, ic(dark ? 'sun' : 'moon'))),
       h('main', { class: 'content', id: 'page' }))));
   renderPage();
@@ -261,15 +265,18 @@ function callNow(c, o) {
   const label = o.callTypeName || o.callType || 'the default call type';
   confirmBox('Call ' + (c.name || c.phone) + ' now?', `This places a real call to ${c.phone} using ${label}. Calls are only made when you press this button or press Call next to a person in a campaign queue.`, 'Place the call', async () => {
     let r;
-    if (o.campaignId) r = await post(`/api/campaigns/${esc(o.campaignId)}/call/${esc(c.id)}`, { call_type: o.callType || undefined });
+    const ad = o.allowDnc ? { allow_dnc: true } : {};
+    if (o.campaignId) r = await post(`/api/campaigns/${esc(o.campaignId)}/call/${esc(c.id)}`, { call_type: o.callType || undefined, ...ad });
     else {
       const pid = o.productId || SG.tenantProducts()[0]?.id;
       if (!pid) { notice('Add a product to this project first: the call needs something to talk about.'); return; }
-      r = await post(`/api/customers/${esc(c.id)}/call`, { product_id: pid, call_type: o.callType || undefined });
+      r = await post(`/api/customers/${esc(c.id)}/call`, { product_id: pid, call_type: o.callType || undefined, ...ad });
     }
     if (!r.ok) { notice(r.na ? 'Calling is not available on this server yet.' : r.err); return; }
     const d = r.data, first = (d.calls || [])[0] || d;
-    if (first.error) { notice(first.error); return; }
+    if (first.error) { notice(first.error, 'The call was not placed'); return; }
+    const warn = [].concat(first.warning || [], first.warnings || []).filter(Boolean).map((w) => (typeof w === 'string' ? w : w.message || w.msg || '')).filter(Boolean).join(' ');
+    if (warn) toast('Placed, with a warning: ' + warn);
     await SG.loadCalls().catch(() => {}); go('calls', { id: first.call_id });
   });
 }
@@ -300,26 +307,27 @@ async function pageDashboard(el, ctx) {
   const steps = [['Add a product', prods.length > 0, '#/products'], ['Pick a call type', ct.ok && ct.list.length > 0, '#/calltypes'], ['Add customers', (customers || 0) > 0, '#/customers'], ['Create a campaign', ca.length > 0, '#/campaigns'], ['Run a test call', obLoad(S.tenant).tested, '#/onboarding']];
   const doneN = steps.filter((s) => s[1]).length;
   el.replaceChildren(h('div', { class: 'pad' },
-    head('Dashboard', 'Where ' + proj().name + ' stands today.', h('a', { class: 'btn sm', href: '#/progress' }, ic('activity', 'sm'), 'Build progress'), h('a', { class: 'btn pri sm', href: '#/onboarding' }, ic('spark', 'sm'), 'Guided setup')),
+    head('Dashboard', 'Where ' + proj().name + ' stands today.', h('a', { class: 'btn ghost', href: '#/progress' }, ic('activity', 'sm'), 'Build progress'), h('a', { class: 'btn', href: '#/onboarding' }, ic('spark', 'sm'), 'Guided setup'), h('button', { class: 'btn pri', onclick: () => SG.newCall() }, ic('phone', 'sm'), 'New call')),
     h('div', { class: 'tiles' }, tile(customers, 'Customers & leads', '#/customers', cu.na), tile(running, 'Campaigns running', '#/campaigns', _camps && _camps.na), tile(due, 'Follow-ups due today', '#/followups', fu.na), tile(calls.length, 'Calls', '#/calls'), tile(prods.length, 'Products', '#/products')),
     h('div', { class: 'cols2' },
       h('div', { class: 'panel' }, h('div', { class: 'panel-head' }, h('b', {}, 'Setup'), h('span', { class: 'tag ' + (doneN === steps.length ? 'green' : 'amber') }, doneN + ' of ' + steps.length)),
         steps.map(([t, ok, href]) => h('a', { class: 'item2', href }, h('span', { class: 'chk' + (ok ? ' ok' : '') }, ok ? ic('check', 'sm') : null), h('span', {}, t), ic('arrow', 'sm')))),
       h('div', { class: 'panel' }, h('div', { class: 'panel-head' }, h('b', {}, 'Recent calls'), h('a', { class: 'btn ghost sm', style: 'margin-left:auto', href: '#/calls' }, 'All calls')),
-        calls.length ? calls.slice(0, 6).map((c) => h('a', { class: 'item2', href: '#/calls/' + esc(c.call_id) }, h('span', {}, c.customer_name || SG.mask(c.to), h('span', { class: 'hint' }, '  ' + SG.pname(c.campaign))), h('span', { class: 'st ' + c.status, style: 'margin-left:auto' }, c.status))) : h('div', { class: 'empty' }, 'No calls yet.')))));
+        calls.length ? calls.slice(0, 6).map((c) => h('a', { class: 'item2', href: '#/calls/' + esc(c.call_id) }, h('span', { class: 'i2t' }, h('b', {}, c.customer_name || SG.mask(c.to)), h('small', {}, [SG.pname(c.campaign), ago(c.created_at)].filter(Boolean).join(' \u00b7 '))), h('span', { class: 'st ' + c.status }, c.status))) : h('div', { class: 'empty' }, h('b', {}, 'No calls yet'), 'Your first call shows up here.', h('div', {}, h('button', { class: 'btn pri sm', onclick: () => SG.newCall() }, ic('phone', 'sm'), 'New call')))))));
 }
 
 /* ------------------------------------------------------------ Products */
 function pageProducts(el) {
   const ps = SG.tenantProducts(), pg = (extra) => '/productgen?' + qs({ project: S.tenant, return: '/#/products', ...extra });
   el.replaceChildren(h('div', { class: 'pad' },
-    head('Products', 'What the agent sells. Each product has its own offer, knowledge and decision tree.', h('a', { class: 'btn pri', href: pg() }, ic('spark', 'sm'), 'Add product with AI'), h('button', { class: 'btn', onclick: () => SG.editProduct(null) }, ic('plus', 'sm'), 'Add by hand')),
+    head('Products', 'What the agent sells. Each product has its own offer, knowledge and decision tree.', h('a', { class: 'btn pri', href: '#/studio' }, ic('spark', 'sm'), 'Add product with AI'), h('button', { class: 'btn', onclick: () => SG.editProduct(null) }, ic('plus', 'sm'), 'Add by hand')),
     ps.length ? h('div', { class: 'cards' }, ps.map((x) => h('div', { class: 'pcard' },
-      h('div', { class: 'k' }, x.seller_name || 'Product'), h('b', {}, x.product_name),
-      h('dl', {}, h('dt', {}, 'offer'), h('dd', {}, `${x.offer_price || '—'} ${x.discount || ''}`), h('dt', {}, 'normal'), h('dd', {}, x.original_price || '—'), h('dt', {}, 'agent'), h('dd', {}, x.agent_name || '—'),
-        h('dt', {}, 'can call'), h('dd', {}, (x.allowed_numbers || []).length ? x.allowed_numbers.length + ' test numbers only' : 'any number')),
-      h('div', { class: 'row', style: 'margin-top:12px;flex-wrap:wrap' }, h('button', { class: 'btn sm', onclick: () => SG.editProduct(x.id) }, 'Edit'), h('button', { class: 'btn sm', onclick: () => { S.tree.pid = x.id; S.tree.pb = null; go('tree'); } }, ic('tree', 'sm'), 'Decision tree'),
-        h('a', { class: 'btn sm', href: '/productgen?' + qs({ product: S.tenant + '/' + x.id, return: '/#/products' }) }, 'Knowledge'))))) : h('div', { class: 'empty' }, h('b', {}, 'No products in this project yet'), 'Type just a name under Add product with AI and the knowledge, offer and decision tree are drafted for you.')));
+      h('div', { class: 'row', style: 'align-items:flex-start' }, h('div', { style: 'min-width:0;flex:1' }, h('div', { class: 'k' }, x.seller_name || 'Product'), h('b', {}, x.product_name)), x.real_company ? h('span', { class: 'tag blue', title: 'A real company: the agent uses public facts only and never discounts' }, 'real brand') : null),
+      h('div', { class: 'price' }, h('span', { class: 'now' }, x.offer_price || x.original_price || 'No price'), x.offer_price && x.original_price && x.offer_price !== x.original_price ? h('s', {}, x.original_price) : null, x.discount ? h('span', { class: 'tag sig' }, x.discount) : null),
+      h('dl', {}, h('dt', {}, 'Agent'), h('dd', {}, x.agent_name || '—'), h('dt', {}, 'Offer valid'), h('dd', {}, x.offer_validity || '—'),
+        h('dt', {}, 'Can call'), h('dd', {}, (x.allowed_numbers || []).length ? x.allowed_numbers.length + ' test number' + (x.allowed_numbers.length > 1 ? 's' : '') + ' only' : 'Any number')),
+      h('div', { class: 'foot' }, h('button', { class: 'btn sm pri', onclick: () => SG.newCall({ product: x.id }) }, ic('phone', 'sm'), 'Call'), h('a', { class: 'btn sm', href: '#/studio/' + (x.tenant || 'default') + '.' + x.id }, ic('spark', 'sm'), 'Studio'), h('button', { class: 'btn sm', onclick: () => SG.editProduct(x.id) }, 'Edit'), h('button', { class: 'btn sm', onclick: () => { S.tree.pid = x.id; S.tree.pb = null; go('tree'); } }, ic('tree', 'sm'), 'Decision tree'),
+        h('a', { class: 'btn sm', href: '/productgen?' + qs({ product: S.tenant + '/' + x.id, return: '/#/products' }) }, 'Knowledge'))))) : h('div', { class: 'panel' }, h('div', { class: 'empty' }, h('b', {}, 'No products in this project yet'), 'Type just a product name and the knowledge, offer and decision tree are drafted for you to review.', h('div', {}, h('a', { class: 'btn pri', href: pg() }, ic('spark', 'sm'), 'Add product with AI'))))));
 }
 
 /* ------------------------------------------------------------ Call types */
@@ -542,7 +550,7 @@ async function pageCustomers(el, ctx) {
     const cols = STAGES.map((s) => [s, list.filter((c) => (c.stage || 'new') === s)]);
     const move = async (c, to) => {
       if ((c.stage || 'new') === to) return;
-      if (isDnc(c)) { notice('This person is on the Do-not-call list and stays there: only they can ask to be called again.'); draw(); return; }
+      if (isDnc(c)) { notice('This person is on the Do-not-call list: open them and press Lift Do-not-call first.'); draw(); return; }
       const go2 = async () => { const r = await post(`/api/customers/${esc(c.id)}`, to === 'do_not_call' ? { consent: { dnc: true, reason: 'moved to Do not call by the operator' } } : { stage: to }, 'PUT'); if (!r.ok) notice(r.err); draw(); };
       if (to === 'do_not_call') confirmBox('Mark ' + (c.name || c.phone) + ' as Do not call?', 'They will never be called by any campaign. This cannot be undone from here.', 'Mark Do not call', go2, { danger: true });
       else await go2();
@@ -596,7 +604,8 @@ async function pageCustomer(el, ctx) {
   const kv = (k, v) => [h('dt', {}, k), h('dd', {}, v == null || v === '' ? '—' : v)];
   el.replaceChildren(h('div', { class: 'pad' },
     head(c.name || c.phone, c.phone + (c.email ? ' · ' + c.email : ''), h('button', { class: 'btn', onclick: () => custForm(c, fields, () => pageCustomer(el, ctx)) }, 'Edit'),
-      isDnc(c) ? h('span', { class: 'tag red' }, 'Do not call') : [ctSel, camSel, SG.tenantProducts().length > 1 ? prodSel : null, h('button', { class: 'btn pri', onclick: () => { const ct = ctSel.value; callNow(c, { callType: ct, callTypeName: ct ? ctSel.selectedOptions[0].textContent : '', campaignId: camSel.value, productId: prodSel.value || undefined }); } }, ic('phone', 'sm'), 'Call now')]),
+      isDnc(c) ? h('span', { class: 'tag red' }, 'Do not call') : null, isDnc(c) ? h('button', { class: 'btn', onclick: () => upd({ consent: { dnc: false } }) }, 'Lift Do-not-call') : null,
+      [ctSel, camSel, SG.tenantProducts().length > 1 ? prodSel : null, h('button', { class: 'btn pri', onclick: () => { const ct = ctSel.value; callNow(c, { callType: ct, callTypeName: ct ? ctSel.selectedOptions[0].textContent : '', campaignId: camSel.value, productId: prodSel.value || undefined, allowDnc: isDnc(c) }); } }, ic('phone', 'sm'), isDnc(c) ? 'Call anyway' : 'Call now')]),
     h('div', { class: 'cols3' },
       h('div', {},
         h('div', { class: 'panel' }, h('div', { class: 'panel-head' }, h('b', {}, 'Pipeline'), h('span', { class: 'tag ' + (STAGE_TONE[c.stage || 'new'] || ''), style: 'margin-left:auto' }, stageName(c.stage || 'new'))),
@@ -783,9 +792,11 @@ function projectTab(body, p, save) {
 /* ------------------------------------------------------------ Onboarding wizard (resumable) */
 const OB_STEPS = ['Project basics', 'Product', 'Call type', 'Customers', 'Campaign', 'Test call'];
 async function pageOnboarding(el, ctx) {
-  const fresh = ctx.q.get('new');
-  if (fresh) { try { localStorage.removeItem(obKey('')); } catch {} PS.ob = null; location.replace('#/onboarding'); }
-  const st = PS.ob && PS.ob.projectId === S.tenant ? PS.ob : (PS.ob = fresh ? obLoad('') : (S.tenants.length ? obLoad(S.tenant) : obLoad('')));
+  /* ?new=1 starts a blank project; location.replace re-renders this page without ?new, so remember it (PS.obNew) or the
+     re-render would load the current project's wizard and "Next" would update that project instead of creating one */
+  if (ctx.q.get('new')) { try { localStorage.removeItem(obKey('')); } catch {} PS.ob = null; PS.obNew = true; location.replace('#/onboarding'); }
+  const fresh = !!PS.obNew && (!PS.ob || PS.ob.projectId === '');
+  const st = PS.ob && (PS.ob.projectId === S.tenant || fresh) ? PS.ob : (PS.ob = fresh ? obLoad('') : (S.tenants.length ? obLoad(S.tenant) : obLoad('')));
   if (!fresh && st.projectId === '' && S.tenant && !obLoad('').basics.name) { Object.assign(st, obLoad(S.tenant)); }
   const back = ctx.q.get('step'); if (back) st.step = Math.max(1, Math.min(7, +back));
   const draw = async () => {
@@ -819,7 +830,7 @@ function ob1(body, st, o) {
         if (!r.ok && r.na) r = await post('/api/tenants/' + esc(id), { name: basics.name, color: '#4f7cff' }, 'PUT');
         if (!r.ok) { err.textContent = r.err || 'Could not create the project.'; return; }
         try { localStorage.removeItem(obKey('')); } catch {}
-        st.projectId = id; await SG.loadTenants(); S.tenant = id; store.set('sg_tenant', id);
+        st.projectId = id; PS.obNew = false; await SG.loadTenants(); S.tenant = id; store.set('sg_tenant', id);
       } else { const r = await saveObj('/api/projects', st.projectId, basics); if (!r.ok && !r.na) { err.textContent = r.err; return; } }
       await SG.loadTenants(); o.next(2);
     }));
@@ -907,61 +918,128 @@ function ob7(body, st, o) {
 /* ------------------------------------------------------------ styles + page table */
 const css = `
 .gs{position:relative}
-.side .switcher{padding:10px 12px 0;position:relative}
+.side .switcher{padding:12px 12px 4px;position:relative}
 .side .switcher .org{border-color:hsl(var(--rule-strong));background:hsl(var(--panel))}
 .side .switcher .menu.pm{left:12px;right:12px;bottom:auto;top:calc(100% + 2px)}
-.nav-item{text-decoration:none}
 .side-foot .nav-item{margin:0}
 .crumbs a{color:hsl(var(--tertiary));text-decoration:none}.crumbs a:hover{color:hsl(var(--fg))}
-.topbar{gap:10px}.burger{display:none}
-.searchbox{position:relative;display:flex;align-items:center;gap:6px;width:min(340px,34vw);height:32px;padding:0 10px;border:1px solid hsl(var(--rule-strong));border-radius:999px;color:hsl(var(--tertiary))}
-.searchbox input{border:0;height:28px;padding:0;background:transparent;border-radius:0}.searchbox:focus-within{border-color:hsl(var(--signal))}.searchbox input:focus-visible{outline:0}
-.sres{position:absolute;top:36px;left:0;right:0;z-index:60;max-height:60vh;overflow:auto;padding:4px 0;border:1px solid hsl(var(--rule-strong));border-radius:10px;background:hsl(var(--panel));box-shadow:0 18px 50px hsl(220 20% 1%/.45)}
-.sres a{display:block;padding:7px 12px;color:hsl(var(--fg));text-decoration:none;font-size:12.5px}.sres a:hover,.sres a:focus{background:hsl(var(--hover))}
+.burger{display:none}
+.searchbox{position:relative;display:flex;align-items:center;gap:7px;width:min(340px,32vw);height:34px;padding:0 12px;border:1px solid hsl(var(--rule-strong));border-radius:999px;color:hsl(var(--tertiary));background:hsl(var(--field))}
+.searchbox input{border:0;height:30px;padding:0;background:transparent;border-radius:0;box-shadow:none!important;font-size:13px}.searchbox:focus-within{border-color:hsl(var(--signal)/.8);box-shadow:0 0 0 3px hsl(var(--signal)/.15)}.searchbox input:focus-visible{outline:0}
+.sres{position:absolute;top:40px;left:0;right:0;z-index:60;max-height:60vh;overflow:auto;padding:4px 0;border:1px solid hsl(var(--rule-strong));border-radius:var(--r-lg);background:hsl(var(--panel));box-shadow:var(--shadow)}
+.sres a{display:block;padding:8px 12px;color:hsl(var(--fg));text-decoration:none;font-size:13px}.sres a:hover,.sres a:focus{background:hsl(var(--hover))}
 .scrim{display:none}
-.pad.narrow{max-width:900px}
-.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:18px}
-.tile{display:block;padding:16px 18px;border:1px solid hsl(var(--rule));border-radius:10px;background:hsl(var(--panel));text-decoration:none;color:inherit}.tile:hover{border-color:hsl(var(--rule-heavy))}
-.tile .v{font-size:28px;font-weight:500;letter-spacing:-.03em;line-height:1.1}.tile .k{margin-top:4px;font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:hsl(var(--tertiary))}
+.pad.narrow{max-width:920px}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:20px}
+.tile{display:block;padding:16px 18px;border:1px solid hsl(var(--rule));border-radius:var(--r-lg);background:hsl(var(--panel));text-decoration:none;color:inherit;transition:border-color .15s}.tile:hover{border-color:hsl(var(--rule-heavy))}
+.tile .v{font-size:28px;font-weight:550;letter-spacing:-.03em;line-height:1.1}.tile .k{margin-top:6px;font-size:12.5px;color:hsl(var(--tertiary))}
 .cols2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;align-items:start}.cols2 .panel+.panel{margin-top:0}
 .cols3{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;align-items:start}.cols3>div>.panel+.panel{margin-top:16px}
-.item2{display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid hsl(var(--rule));color:hsl(var(--fg));text-decoration:none;font-size:12.5px}.item2:last-child{border-bottom:0}.item2:hover{background:hsl(var(--hover))}.item2 svg:last-child{margin-left:auto;color:hsl(var(--tertiary))}
-.chk{width:18px;height:18px;border:1.5px solid hsl(var(--rule-heavy));border-radius:50%;display:grid;place-items:center;flex:none}.chk.ok{background:hsl(var(--green));border-color:hsl(var(--green));color:hsl(var(--bg))}.chk svg{width:11px;height:11px}
-.ptabs{display:flex;gap:4px;margin:0 0 16px;border-bottom:1px solid hsl(var(--rule))}.ptabs button{height:34px;padding:0 14px;border:0;border-bottom:2px solid transparent;background:none;color:hsl(var(--muted));cursor:pointer;font-weight:500}.ptabs button.on{color:hsl(var(--fg));border-color:hsl(var(--signal))}
-.tablewrap{overflow-x:auto;border:1px solid hsl(var(--rule));border-radius:10px;background:hsl(var(--panel))}
-.tbl{width:100%;border-collapse:collapse;font-size:12.5px}.tbl th{padding:9px 12px;text-align:left;font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:hsl(var(--tertiary));font-weight:500;border-bottom:1px solid hsl(var(--rule));vertical-align:bottom}
-.tbl td{padding:9px 12px;border-bottom:1px solid hsl(var(--rule));vertical-align:middle}.tbl tr:last-child td{border-bottom:0}.tbl tbody tr:hover{background:hsl(var(--hover)/.5)}.tbl td.bad{color:hsl(var(--red))}.tbl td.late{color:hsl(var(--red))}
+.item2{display:flex;align-items:center;gap:12px;min-height:48px;padding:9px 18px;border-bottom:1px solid hsl(var(--rule));color:hsl(var(--fg));text-decoration:none;font-size:13.5px}.item2:last-child{border-bottom:0}.item2:hover{background:hsl(var(--hover)/.6)}.item2>svg:last-child{margin-left:auto;color:hsl(var(--tertiary))}
+.item2 .i2t{display:flex;flex-direction:column;min-width:0;flex:1}.item2 .i2t b{font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.item2 .i2t small{color:hsl(var(--tertiary));font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chk{width:20px;height:20px;border:1.5px solid hsl(var(--rule-heavy));border-radius:50%;display:grid;place-items:center;flex:none}.chk.ok{background:hsl(var(--green));border-color:hsl(var(--green));color:hsl(var(--bg))}.chk svg{width:12px;height:12px;stroke-width:2.4}
+.ptabs{display:flex;gap:4px;margin:0 0 20px;border-bottom:1px solid hsl(var(--rule));overflow-x:auto}.ptabs button{height:38px;padding:0 14px;border:0;border-bottom:2px solid transparent;margin-bottom:-1px;background:none;color:hsl(var(--muted));cursor:pointer;font-weight:500;font-size:13.5px;white-space:nowrap}.ptabs button:hover{color:hsl(var(--fg))}.ptabs button.on{color:hsl(var(--fg));border-color:hsl(var(--signal))}
+.tablewrap{overflow-x:auto;border:1px solid hsl(var(--rule));border-radius:var(--r-lg);background:hsl(var(--panel))}
+.tbl{width:100%;border-collapse:collapse;font-size:13px}.tbl th{padding:10px 14px;text-align:left;font-size:12px;color:hsl(var(--tertiary));font-weight:500;border-bottom:1px solid hsl(var(--rule));vertical-align:bottom;white-space:nowrap;background:hsl(var(--elevated)/.5)}
+.tbl th select{margin-top:4px}
+.tbl td{padding:11px 14px;border-bottom:1px solid hsl(var(--rule));vertical-align:middle}.tbl tr:last-child td{border-bottom:0}.tbl tbody tr:hover{background:hsl(var(--hover)/.5)}.tbl td.bad{color:hsl(var(--red))}.tbl td.late{color:hsl(var(--red))}
 .lnk{color:hsl(var(--fg));font-weight:500;text-decoration:none}.lnk:hover{color:hsl(var(--signal))}
-.filters{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:14px}.filters input,.filters select{width:auto}
-.seg{display:inline-flex;border:1px solid hsl(var(--rule-strong));border-radius:999px;overflow:hidden}.seg button{display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 12px;border:0;background:none;color:hsl(var(--muted));cursor:pointer}.seg button.on{background:hsl(var(--elevated));color:hsl(var(--fg))}
-.bulk{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 12px;margin-bottom:10px;border:1px solid hsl(var(--signal)/.5);border-radius:10px;background:hsl(var(--signal)/.07)}
-.board{display:flex;gap:12px;overflow-x:auto;padding-bottom:12px;align-items:flex-start}.col{flex:0 0 230px;min-height:120px;border:1px solid hsl(var(--rule));border-radius:10px;background:hsl(var(--panel));padding:8px}.col.over{border-color:hsl(var(--signal))}
+.filters{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:16px}.filters input,.filters select{width:auto}
+.bulk{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 12px;margin-bottom:12px;border:1px solid hsl(var(--signal)/.4);border-radius:var(--r-lg);background:hsl(var(--signal)/.06)}
+.board{display:flex;gap:12px;overflow-x:auto;padding-bottom:12px;align-items:flex-start}.col{flex:0 0 240px;min-height:120px;border:1px solid hsl(var(--rule));border-radius:var(--r-lg);background:hsl(var(--panel));padding:8px}.col.over{border-color:hsl(var(--signal))}
 .col-h{display:flex;align-items:center;justify-content:space-between;padding:4px 4px 8px}
-.kcard{padding:9px 10px;margin-bottom:8px;border:1px solid hsl(var(--rule-strong));border-radius:8px;background:hsl(var(--bg));cursor:grab}.kcard.locked{cursor:not-allowed;opacity:.75}.kcard .kn{font-weight:500;color:hsl(var(--fg));text-decoration:none}.kcard .mv{margin-top:6px;width:100%;height:26px;font-size:11.5px}
-.stagebar{display:flex;flex-wrap:wrap;gap:6px;padding:12px 16px}.stg{height:26px;padding:0 10px;border:1px solid hsl(var(--rule-strong));border-radius:999px;background:none;color:hsl(var(--muted));cursor:pointer;font-size:11.5px}.stg.on{background:hsl(var(--signal));border-color:hsl(var(--signal));color:hsl(220 10% 6%)}
-.tline{padding:6px 16px 14px}.tl-item{position:relative;padding:10px 0 10px 18px;border-left:2px solid hsl(var(--rule-strong));margin-left:6px}.tl-item::before{content:'';position:absolute;left:-6px;top:15px;width:10px;height:10px;border-radius:50%;background:hsl(var(--panel));border:2px solid hsl(var(--signal))}.tl-d{font-family:var(--mono);font-size:10px;color:hsl(var(--tertiary))}
-.ai{margin:0 0 16px;padding:12px 14px;border:1px solid hsl(var(--violet)/.5);border-radius:10px;background:hsl(var(--violet)/.06)}.ai-h{display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap}.ai-h svg{color:hsl(var(--violet))}
-.diff{margin-top:12px;border-top:1px solid hsl(var(--rule));padding-top:10px}.drow{display:grid;grid-template-columns:130px minmax(0,1fr);gap:10px;padding:6px 0;border-bottom:1px dashed hsl(var(--rule))}.dk{display:flex;align-items:flex-start;gap:6px;font-family:var(--mono);font-size:10.5px;color:hsl(var(--muted));text-transform:uppercase}
-.dv{white-space:pre-wrap;font-size:12px;overflow-wrap:anywhere}.dv .old{color:hsl(var(--tertiary));text-decoration:line-through;margin-bottom:3px}.dv .new{color:hsl(var(--green))}
-.langs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
-.chips{display:flex;flex-wrap:wrap;gap:6px}.chip{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 10px;border:1px solid hsl(var(--rule-strong));border-radius:999px;font-size:12px;cursor:pointer}
-.stepcard{padding:12px 14px;margin-bottom:10px;border:1px solid hsl(var(--rule-strong));border-radius:10px;background:hsl(var(--bg))}.stepcard.over{border-color:hsl(var(--signal));box-shadow:0 0 0 3px hsl(var(--signal)/.18)}
-.sc-h{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px}.sc-h input,.sc-h select{width:auto;min-width:0;max-width:150px}.sn{font-family:var(--mono);font-size:10.5px;color:hsl(var(--signal))}
-.grip{border:0;background:none;cursor:grab;color:hsl(var(--tertiary));padding:4px}.stepai{margin-top:8px}.stepai summary{cursor:pointer;color:hsl(var(--violet));font-size:12px}.stepai .ai{margin-top:8px}
-.frow{display:grid;grid-template-columns:1.2fr 90px 1.2fr 1.4fr 32px;gap:8px;align-items:center;margin-bottom:8px}
-.stepper{display:flex;gap:4px;list-style:none;margin:0 0 16px;padding:0;overflow-x:auto}.stepper li{flex:1;min-width:96px}.stepper button{display:flex;align-items:center;gap:8px;width:100%;height:36px;padding:0 10px;border:1px solid hsl(var(--rule-strong));border-radius:8px;background:none;color:hsl(var(--tertiary));cursor:pointer;font-size:12px}
-.stepper li.on button{border-color:hsl(var(--signal));color:hsl(var(--fg));background:hsl(var(--signal)/.08)}.stepper li.done button{color:hsl(var(--muted))}.stepper button:disabled{cursor:default;opacity:.6}.sn2{display:grid;place-items:center;width:18px;height:18px;border-radius:50%;border:1px solid currentColor;font-size:10px;flex:none}.sn2 svg{width:11px;height:11px}
-.obbody .db{padding:10px 20px 18px}.pcard.pick{cursor:pointer}.pcard.pick.on{box-shadow:inset 0 0 0 1px hsl(var(--signal)/.6)}
-.obsim{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);gap:16px}.obmap{border-left:1px solid hsl(var(--rule));padding-left:16px;min-width:0}
-.na{border:1px dashed hsl(var(--rule-strong));border-radius:10px}.tone-ex{margin-top:4px}.tone-all{margin-top:6px;font-size:11px}.tone-all div{margin-top:2px}
-.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:200;padding:9px 16px;border-radius:999px;background:hsl(var(--elevated));border:1px solid hsl(var(--rule-heavy));font-size:12.5px;box-shadow:0 10px 30px hsl(220 20% 1%/.4)}
-.dh p{color:hsl(var(--body))}.obbody .dh{padding:16px 20px 12px;border-bottom:1px solid hsl(var(--rule))}.obbody .df{border-top:1px solid hsl(var(--rule));padding:12px 20px;display:flex;gap:8px}
+.kcard{padding:10px 11px;margin-bottom:8px;border:1px solid hsl(var(--rule-strong));border-radius:var(--r);background:hsl(var(--bg));cursor:grab}.kcard.locked{cursor:not-allowed;opacity:.75}.kcard .kn{font-weight:500;color:hsl(var(--fg));text-decoration:none}.kcard .mv{margin-top:8px;width:100%;height:30px;font-size:12px}
+.stagebar{display:flex;flex-wrap:wrap;gap:6px;padding:14px 18px}.stg{height:28px;padding:0 11px;border:1px solid hsl(var(--rule-strong));border-radius:999px;background:none;color:hsl(var(--muted));cursor:pointer;font-size:12.5px}.stg:hover{color:hsl(var(--fg));border-color:hsl(var(--rule-heavy))}.stg.on{background:hsl(var(--signal));border-color:hsl(var(--signal));color:hsl(var(--on-signal))}
+.tline{padding:8px 18px 16px}.tl-item{position:relative;padding:10px 0 12px 20px;border-left:2px solid hsl(var(--rule-strong));margin-left:6px}.tl-item::before{content:'';position:absolute;left:-6px;top:15px;width:10px;height:10px;border-radius:50%;background:hsl(var(--panel));border:2px solid hsl(var(--signal))}.tl-d{font-size:12px;color:hsl(var(--tertiary))}
+.ai{margin:0 0 20px;padding:14px 16px;border:1px solid hsl(var(--violet)/.35);border-radius:var(--r-lg);background:hsl(var(--violet)/.05)}.ai-h{display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap}.ai-h b{font-weight:550}.ai-h svg{color:hsl(var(--violet))}
+.diff{margin-top:12px;border-top:1px solid hsl(var(--rule));padding-top:10px}.drow{display:grid;grid-template-columns:140px minmax(0,1fr);gap:10px;padding:7px 0;border-bottom:1px dashed hsl(var(--rule))}.dk{display:flex;align-items:flex-start;gap:7px;font-size:12.5px;color:hsl(var(--muted));text-transform:capitalize}
+.dv{white-space:pre-wrap;font-size:12.5px;overflow-wrap:anywhere}.dv .old{color:hsl(var(--tertiary));text-decoration:line-through;margin-bottom:3px}.dv .new{color:hsl(var(--green))}
+.langs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}.langs .hint{display:block;margin-bottom:4px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}.chip{display:inline-flex;align-items:center;gap:7px;min-height:30px;padding:0 11px;border:1px solid hsl(var(--rule-strong));border-radius:999px;font-size:12.5px;cursor:pointer;background:hsl(var(--field))}.chip:hover{border-color:hsl(var(--rule-heavy))}.chip:has(input:checked){border-color:hsl(var(--signal)/.55);background:hsl(var(--signal)/.07)}
+.stepcard{padding:14px 16px;margin-bottom:10px;border:1px solid hsl(var(--rule-strong));border-radius:var(--r-lg);background:hsl(var(--bg))}.stepcard.over{border-color:hsl(var(--signal));box-shadow:0 0 0 3px hsl(var(--signal)/.18)}.stepcard>input{margin-top:8px}
+.sc-h{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px}.sc-h input,.sc-h select{width:auto;min-width:0;max-width:160px;height:32px}.sn{font-size:12.5px;font-weight:550;color:hsl(var(--signal))}
+.grip{border:0;background:none;cursor:grab;color:hsl(var(--tertiary));padding:4px}.stepai{margin-top:10px}.stepai summary{cursor:pointer;color:hsl(var(--violet));font-size:12.5px}.stepai .ai{margin-top:8px}
+.frow{display:grid;grid-template-columns:1.2fr 100px 1.2fr 1.4fr 34px;gap:8px;align-items:center;margin-bottom:8px}
+.stepper{display:flex;gap:6px;list-style:none;margin:0 0 18px;padding:0;overflow-x:auto}.stepper li{flex:1;min-width:110px}.stepper button{display:flex;align-items:center;gap:8px;width:100%;height:38px;padding:0 12px;border:1px solid hsl(var(--rule-strong));border-radius:var(--r);background:hsl(var(--panel));color:hsl(var(--tertiary));cursor:pointer;font-size:12.5px;white-space:nowrap}
+.stepper li.on button{border-color:hsl(var(--signal)/.7);color:hsl(var(--fg));background:hsl(var(--signal)/.08)}.stepper li.done button{color:hsl(var(--muted))}.stepper button:disabled{cursor:default;opacity:.55}.sn2{display:grid;place-items:center;width:20px;height:20px;border-radius:50%;border:1px solid currentColor;font-size:11px;flex:none}.stepper li.done .sn2{background:hsl(var(--green));border-color:hsl(var(--green));color:hsl(var(--bg))}.sn2 svg{width:12px;height:12px;stroke-width:2.4}
+.obbody .db{padding:12px 22px 22px}.pcard.pick{cursor:pointer}.pcard.pick.on{border-color:hsl(var(--signal)/.6);box-shadow:0 0 0 3px hsl(var(--signal)/.12)}
+.obsim{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);gap:18px}.obmap{border-left:1px solid hsl(var(--rule));padding-left:18px;min-width:0}
+.na{border:1px dashed hsl(var(--rule-strong));border-radius:var(--r-lg)}.tone-ex{margin-top:6px}.tone-all{margin-top:6px;font-size:12px}.tone-all div{margin-top:2px}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:200;max-width:min(560px,calc(100vw - 32px));padding:10px 16px;border-radius:var(--r-lg);background:hsl(var(--elevated));border:1px solid hsl(var(--rule-heavy));font-size:13px;box-shadow:var(--shadow);animation:enter .2s both}
+.dh p{color:hsl(var(--muted))}.obbody .dh{padding:18px 22px 14px;border-bottom:1px solid hsl(var(--rule))}.obbody .dh h3{margin:0;font-size:16px;font-weight:550}.obbody .dh p{margin:4px 0 0;font-size:13px}.obbody .df{border-top:1px solid hsl(var(--rule));padding:12px 22px;display:flex;gap:8px}
 @media (max-width:1100px){.cols3,.cols2,.obsim{grid-template-columns:1fr}.obmap{border-left:0;padding-left:0}.frow{grid-template-columns:1fr 1fr}}
-@media (max-width:760px){.side{display:flex!important;position:fixed;left:0;top:0;z-index:90;width:260px;transform:translateX(-100%);transition:transform .2s}.navopen .side{transform:none}
-.navopen .scrim{display:block;position:fixed;inset:0;z-index:80;background:hsl(220 20% 2%/.55)}.burger{display:grid}.searchbox{width:auto;flex:1}.hide-sm,.conn{display:none}.crumbs{display:none}.langs{grid-template-columns:1fr}.drow{grid-template-columns:1fr}.grid2{grid-template-columns:1fr}.head .acts{width:100%}}
+@media (max-width:900px){.searchbox{width:auto;flex:1;min-width:0}.crumbs{display:none}}
+@media (max-width:760px){.side{display:flex!important;position:fixed;left:0;top:0;z-index:90;width:272px;transform:translateX(-100%);transition:transform .2s}.navopen .side{transform:none}
+.navopen .scrim{display:block;position:fixed;inset:0;z-index:80;background:hsl(220 20% 2%/.55)}.burger{display:grid}.hide-sm,.conn{display:none}.langs{grid-template-columns:1fr}.drow{grid-template-columns:1fr}.grid2{grid-template-columns:1fr}.head .acts{width:100%}.tiles{grid-template-columns:repeat(2,1fr)}.frow{grid-template-columns:1fr}}
+@media (max-width:420px){.hide-xs{display:none}}
 `;
 const st = document.createElement('style'); st.textContent = css; document.head.append(st);
 
-const PAGES = { dashboard: pageDashboard, products: pageProducts, calltypes: pageCallTypes, customers: pageCustomers, campaigns: pageCampaigns, followups: pageFollowups, settings: pageSettings, onboarding: pageOnboarding };
+/* ------------------------------------------------------------ Agents (personas: name + gender + voice per language)
+   Added by agent "voices" 15 Nov (functional only; look owned by "ui", spec in team/voices/UI_NOTES.md).
+   API: GET/POST/PUT/DELETE /api/agents, POST /api/agents/preview (audio/wav), PUT /api/agents-default/{tenant}. */
+const AG_LANG = { hi: 'Hindi', hinglish: 'Hinglish', en: 'English' };
+async function pageAgents(el, ctx) {
+  el.replaceChildren(h('div', { class: 'pad' }, head('Agents', 'Who the caller hears: the name the agent says, its gender and its voice per language.'), h('div', { class: 'empty' }, 'Loading…')));
+  const r = await tryApi('/api/agents?' + qs({ tenant: S.tenant })); if (!ctx.alive()) return;
+  if (!r.ok) return el.replaceChildren(h('div', { class: 'pad' }, head('Agents'), naBox('Agents', r, () => pageAgents(el, ctx))));
+  const d = r.data, def = (d.tenant_defaults || {})[S.tenant] || 'arjun';
+  const vname = (id) => (d.voices.find((v) => v.id === id) || {}).name || id;
+  const rows = d.agents.map((a) => h('tr', {},
+    h('td', {}, h('b', {}, a.display_name), h('div', { class: 'hint mono' }, a.id + (a.tenant ? '' : ' · stock'))),
+    h('td', {}, h('span', { class: 'tag' + (a.gender === 'female' ? ' sig' : a.gender === 'male' ? ' green' : '') }, a.gender)),
+    h('td', {}, a.languages.map((l) => h('div', { class: 'hint' }, (AG_LANG[l] || l) + ': ' + vname((a.voices[l] || {}).voice_id)))),
+    h('td', {}, a.id === def ? h('span', { class: 'tag green' }, 'default') : h('button', { class: 'btn ghost sm', onclick: async () => { const x = await post('/api/agents-default/' + esc(S.tenant), { agent_id: a.id }, 'PUT'); x.ok ? (toast(a.display_name + ' is now the default.'), pageAgents(el, ctx)) : notice(x.err); } }, 'Make default'),
+      a.used_by && a.used_by.length ? h('div', { class: 'hint' }, 'used by ' + a.used_by.join(', ')) : null,
+      a.problems && a.problems.length ? h('div', { class: 'err' }, a.problems.join('; ')) : null),
+    h('td', {}, h('div', { class: 'row' },
+      h('button', { class: 'btn sm', onclick: () => agentPreview(a, a.languages[0]) }, ic('play', 'sm'), 'Preview'),
+      h('button', { class: 'btn sm', onclick: () => editAgent(d, a, () => pageAgents(el, ctx)) }, 'Edit'),
+      h('button', { class: 'btn ghost sm danger', 'aria-label': 'Delete ' + a.display_name, onclick: () => confirmBox('Delete ' + a.display_name + '?', 'Products using it must point at another agent first.', 'Delete', async () => { const x = await tryApi('/api/agents/' + esc(a.id), { method: 'DELETE' }); x.ok ? pageAgents(el, ctx) : notice(x.err); }) }, ic('trash', 'sm'))))));
+  el.replaceChildren(h('div', { class: 'pad' },
+    head('Agents', 'Who the caller hears. A product uses its own agent, or this project’s default.', h('button', { class: 'btn pri', onclick: () => editAgent(d, null, () => pageAgents(el, ctx)) }, ic('plus', 'sm'), 'New agent')),
+    h('div', { class: 'panel' }, h('table', { class: 'tbl' }, h('thead', {}, h('tr', {}, ['Agent', 'Gender', 'Voices', 'Use', ''].map((t) => h('th', {}, t)))), h('tbody', {}, rows)))));
+}
+async function agentPreview(agent, lang, text) {
+  const body = agent.id && !agent._draft ? { agent_id: agent.id, language: lang, text } : { agent, language: lang, text };
+  try {
+    const res = await fetch('/api/agents/preview', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    if (!res.ok) { let m = res.statusText; try { m = (await res.json()).detail || m; } catch {} return notice('Preview failed: ' + m); }
+    const url = URL.createObjectURL(await res.blob()); const au = new Audio(url); au.onended = () => URL.revokeObjectURL(url); au.play();
+  } catch (e) { notice('Preview failed: ' + e.message); }
+}
+function editAgent(d, a, done) {
+  const isNew = !a, cur = clone(a) || { id: '', tenant: S.tenant, display_name: '', gender: 'male', languages: ['hi', 'hinglish', 'en'], voices: {}, backup_voice: null, speaking_rate: 1, tone_level: 'mid', greeting_style: 'standard', description: '' };
+  modal(isNew ? 'New agent' : 'Edit ' + cur.display_name, 'The voice must match the agent’s gender. Hindi verbs follow the gender too ("bol raha hoon" / "bol rahi hoon").', (b, f, close) => {
+    const I = (v, a2) => h('input', { value: v ?? '', ...(a2 || {}) });
+    const F = { id: I(cur.id, { placeholder: 'e.g. kabir', disabled: !isNew }), name: I(cur.display_name, { placeholder: 'What it says, e.g. Arjun' }),
+      gender: h('select', {}, d.genders.map((g) => h('option', { value: g, selected: g === cur.gender }, g))),
+      rate: I(cur.speaking_rate, { type: 'number', min: 0.8, max: 1.25, step: 0.05 }),
+      tone: h('select', {}, d.tone_levels.map((t) => h('option', { value: t, selected: t === cur.tone_level }, t))),
+      greet: h('select', {}, d.greeting_styles.map((t) => h('option', { value: t, selected: t === cur.greeting_style }, t))),
+      desc: I(cur.description, { placeholder: 'optional note' }), shared: h('input', { type: 'checkbox', style: 'width:auto;height:auto', checked: !cur.tenant }) };
+    const langs = new Set(cur.languages), sel = {}, vbox = h('div');
+    const opts = (lang, val) => { const g = F.gender.value; const vs = d.voices.filter((v) => (g === 'neutral' || v.gender === g) && (!lang || v.languages.includes(lang))); return [h('option', { value: '' }, lang ? '— choose a voice —' : '— none —'), ...vs.map((v) => h('option', { value: v.id, selected: v.id === val }, v.name + ' · ' + v.gender))]; };
+    const drawV = () => vbox.replaceChildren(...['hi', 'hinglish', 'en'].map((l) => h('div', { class: 'frow' },
+      h('label', { class: 'chip' }, h('input', { type: 'checkbox', style: 'width:auto;height:auto', checked: langs.has(l), onchange: (e) => { e.target.checked ? langs.add(l) : langs.delete(l); drawV(); } }), AG_LANG[l]),
+      langs.has(l) ? (sel[l] = h('select', { 'aria-label': AG_LANG[l] + ' voice' }, opts(l, (cur.voices[l] || {}).voice_id))) : h('span', { class: 'hint' }, 'not spoken'),
+      langs.has(l) ? h('button', { class: 'btn ghost sm', onclick: () => agentPreview({ ...collect(), _draft: true }, l) }, ic('play', 'sm'), 'Hear') : null)),
+      h('div', { class: 'frow' }, h('span', { class: 'hint' }, 'Backup voice'), sel.backup = h('select', { 'aria-label': 'Backup voice' }, opts(null, (cur.backup_voice || {}).voice_id))));
+    F.gender.onchange = () => { cur.voices = {}; ['hi', 'hinglish', 'en'].forEach((l) => { if (sel[l]) cur.voices[l] = { voice_id: sel[l].value }; }); drawV(); };
+    const collect = () => { const voices = {}; [...langs].forEach((l) => { if (sel[l] && sel[l].value) voices[l] = { voice_id: sel[l].value }; });
+      return { id: F.id.value.trim() || 'draft', tenant: F.shared.checked ? '' : (cur.tenant || S.tenant), display_name: F.name.value.trim(), gender: F.gender.value, languages: ['hi', 'hinglish', 'en'].filter((l) => langs.has(l)), voices, backup_voice: sel.backup.value ? { voice_id: sel.backup.value } : null, speaking_rate: num(F.rate.value) || 1, tone_level: F.tone.value, greeting_style: F.greet.value, description: F.desc.value.trim() }; };
+    drawV();
+    const err = h('p', { class: 'err' });
+    b.append(h('div', { class: 'grid2' }, fld('Id', F.id), fld('Name it says', F.name)), h('div', { class: 'grid2' }, fld('Gender', F.gender), fld('Speaking rate', F.rate, '0.8 – 1.25, 1 = normal')),
+      fld('Languages and voices', vbox), h('div', { class: 'grid2' }, fld('Tone', F.tone), fld('Greeting style', F.greet)), fld('Note', F.desc),
+      h('label', { class: 'chip' }, F.shared, 'Stock agent (every project may use it)'), err);
+    f.append(h('button', { class: 'btn', onclick: close }, 'Cancel'), h('button', { class: 'btn pri', onclick: async () => {
+      const o = collect(); if (isNew && !/^[a-z0-9][a-z0-9_-]*$/.test(F.id.value.trim())) { err.textContent = 'Id: lower-case letters, digits, - and _'; return; }
+      const x = isNew ? await post('/api/agents', o) : await post('/api/agents/' + esc(cur.id), o, 'PUT');
+      if (!x.ok) { err.textContent = x.err; return; } toast('Agent saved.'); close(); done(); } }, ic('save', 'sm'), 'Save'));
+  });
+}
+
+const PAGES = { studio: (el, ctx) => (window.SGStudio ? window.SGStudio(SG, el, ctx) : el.replaceChildren(naBox('Product studio', { err: '/ui/studio.js did not load' }))), agents: pageAgents, dashboard: pageDashboard, products: pageProducts, calltypes: pageCallTypes, customers: pageCustomers, campaigns: pageCampaigns, followups: pageFollowups, settings: pageSettings, onboarding: pageOnboarding };
 return { go, render, renderPage, aiBox, toneField, parseCSV, e164 };
 };

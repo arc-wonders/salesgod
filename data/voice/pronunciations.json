@@ -1,0 +1,208 @@
+{
+ "global": {},
+ "tenants": {},
+ "agents": {},
+ "suggestions": {
+  "karan-aujla-concert-tickets": [
+   {
+    "word": "General",
+    "kind": "name",
+    "example": "Karan Aujla is a top-charting Punjabi singer, lyricist, and rapper known for popular global Punjabi music hits. The live concert tour features a massive stage s",
+    "candidates": {
+     "hi": [
+      "जनरल",
+      "जेनरल"
+     ],
+     "hinglish": [
+      "General",
+      "Jenral"
+     ],
+     "en": [
+      "General",
+      "Jen-er-uhl"
+     ]
+    },
+    "values": {
+     "hi": "जनरल",
+     "hinglish": "General",
+     "en": "General"
+    },
+    "status": "suggested",
+    "at": 1794706226.117859
+   },
+   {
+    "word": "Access",
+    "kind": "name",
+    "example": "Karan Aujla is a top-charting Punjabi singer, lyricist, and rapper known for popular global Punjabi music hits. The live concert tour features a massive stage s",
+    "candidates": {
+     "hi": [
+      "एक्सेस",
+      "एक्सैस"
+     ],
+     "hinglish": [
+      "Access",
+      "Ekcess"
+     ],
+     "en": [
+      "Access",
+      "Ak-sess"
+     ]
+    },
+    "values": {
+     "hi": "एक्सेस",
+     "hinglish": "Access",
+     "en": "Access"
+    },
+    "status": "suggested",
+    "at": 1794706226.1178606
+   },
+   {
+    "word": "Punjabi",
+    "kind": "name",
+    "example": "Karan Aujla is a top-charting Punjabi singer, lyricist, and rapper known for popular global Punjabi music hits. The live concert tour features a massive stage s",
+    "candidates": {
+     "hi": [
+      "पंजाबी",
+      "पन्जाबी"
+     ],
+     "hinglish": [
+      "Punjabi",
+      "Panjabi"
+     ],
+     "en": [
+      "Poon-jaa-bee",
+      "Poon-jah-bee",
+      "Punjabi"
+     ]
+    },
+    "values": {
+     "hi": "पंजाबी",
+     "hinglish": "Punjabi",
+     "en": "Poon-jaa-bee"
+    },
+    "status": "suggested",
+    "at": 1794706226.117862
+   },
+   {
+    "word": "Phase",
+    "kind": "name",
+    "example": "We offer General Access, Phase Zone, VIP standing, and front-row Fan Pit passes. VIP and Fan Pit passes include separate fast-track entry lanes.",
+    "candidates": {
+     "hi": [
+      "फेज",
+      "फेज़"
+     ],
+     "hinglish": [
+      "Phase",
+      "Faze"
+     ],
+     "en": [
+      "Phase",
+      "fayz"
+     ]
+    },
+    "values": {
+     "hi": "फेज",
+     "hinglish": "Phase",
+     "en": "Phase"
+    },
+    "status": "suggested",
+    "at": 1794706226.1178634
+   },
+   {
+    "word": "Zone",
+    "kind": "name",
+    "example": "We offer General Access, Phase Zone, VIP standing, and front-row Fan Pit passes. VIP and Fan Pit passes include separate fast-track entry lanes.",
+    "candidates": {
+     "hi": [
+      "जोन",
+      "ज़ोन"
+     ],
+     "hinglish": [
+      "Zone",
+      "Jone"
+     ],
+     "en": [
+      "Zone",
+      "zohn"
+     ]
+    },
+    "values": {
+     "hi": "जोन",
+     "hinglish": "Zone",
+     "en": "Zone"
+    },
+    "status": "suggested",
+    "at": 1794706226.1178648
+   },
+   {
+    "word": "India",
+    "kind": "name",
+    "example": "Official tickets and entry passes for Karan Aujla's live music concert tour across India.",
+    "candidates": {
+     "hi": [
+      "इंडिया",
+      "इण्डिया"
+     ],
+     "hinglish": [
+      "India",
+      "Indiya"
+     ],
+     "en": [
+      "India",
+      "In-dee-uh"
+     ]
+    },
+    "values": {
+     "hi": "इंडिया",
+     "hinglish": "India",
+     "en": "India"
+    },
+    "status": "suggested",
+    "at": 1794706226.1178663
+   }
+  ]
+ },
+ "products": {
+  "karan-aujla-concert-tickets": {
+   "Aujla": {
+    "hi": "औजला",
+    "en": "Ouj-laa"
+   },
+   "Karan": {
+    "hi": "करण",
+    "en": "Karun"
+   },
+   "Fan Pit": {
+    "hi": "फ़ैन पिट"
+   },
+   "Passes": {
+    "hi": "पासेज़"
+   },
+   "VIP": {
+    "hi": "वी-आई-पी"
+   }
+  },
+  "fitzone-gym": {
+   "FitZone": {
+    "hi": "फ़िट-ज़ोन",
+    "hinglish": "Fit Zone"
+   },
+   "zumba": {
+    "hi": "ज़ुम्बा"
+   }
+  },
+  "claude-pro": {
+   "Claude": {
+    "hi": "क्लॉड",
+    "hinglish": "क्लॉड"
+   },
+   "Anthropic": {
+    "hi": "एंथ्रोपिक"
+   },
+   "Pro": {
+    "hi": "प्रो"
+   }
+  }
+ }
+}

@@ -227,19 +227,22 @@ def build_catalog(p) -> list[Item]:
     words = item_words(p)
     ben_hi, ben_hl = list(getattr(p, "benefits_hi", []) or []), list(getattr(p, "benefits_hinglish", []) or [])
     for i, b in enumerate(p.benefits):
-        be = _esc(b)
-        text = {"en": f"It also comes with {be}."}
+        be = _esc(b).strip().rstrip(".।!").strip()
+        if len(be) > 1 and be[0].isupper() and not be[1].isupper():
+            be = be[0].lower() + be[1:]  # "It also comes with guaranteed ...", never "with Guaranteed ....."
+        # "open from 5 am to 11 pm" is not a thing it "comes with" (live replay: "It also comes with open from 5 am to 11 pm.")
+        text = {"en": f"It's also {be}." if re.match(r"(open|available|close|near|located|valid|good for)\b", be, re.I) else f"It also comes with {be}."}
         core = {"en": be}
         if i < len(ben_hi) and ben_hi[i].strip():
-            core["hi"] = _esc(ben_hi[i])
+            core["hi"] = _esc(ben_hi[i]).strip().rstrip("।.").strip()
             text["hi"] = f"इसके साथ {core['hi']} भी मिलता है।"
         if i < len(ben_hl) and ben_hl[i].strip():
-            core["hinglish"] = _esc(ben_hl[i])
+            core["hinglish"] = _esc(ben_hl[i]).strip().rstrip(".").strip()
             text["hinglish"] = f"Saath mein {core['hinglish']} bhi milta hai."
         kws = sorted({w for w, bb in words.items() if bb == b} | _derived_words(b, p))
         items.append(Item(f"benefit_{i + 1}", "benefit", text, kws, core=core))
     d, o, ov, op = _esc(p.discount), _esc(p.offer_price), _esc(p.offer_validity), _esc(p.original_price)
-    items.append(Item("offer", "fact", T(f"The offer is {d}: {o} {ov}, normally {op}.",
+    (items.append if o.strip() else (lambda _x: None))(Item("offer", "fact", T(f"The offer is {d}: {o} {ov}, normally {op}.",
                                          f"ऑफर है {d}: {_esc(honest.terms_text(p, 'hi'))}।",
                                          f"Offer hai {d}: {_esc(honest.terms_text(p, 'hinglish'))}."),
                       ["price", "cost", "how much", "kitn", "कितन", "कीमत", "दाम", "रुपए", "रुपये", "रुपया", "rupee", "rupaye", "dollar", "डॉलर", "discount",
@@ -247,9 +250,9 @@ def build_catalog(p) -> list[Item]:
     if honest.can_cancel(p):
         items.append(Item("cancel", "fact", T("You can cancel any time.", "आप कभी भी cancel कर सकते हैं।", "Aap kabhi bhi cancel kar sakte hain."),
                           ["cancel", "कैंसल", "stop paying"]))
-    items.append(Item("how", "fact", T(f"Nothing is charged on this call; if you want it, a secure link comes by SMS to this number.",
-                                       "इस कॉल पर कुछ नहीं कटता; आप चाहें तो इसी नंबर पर SMS से एक सुरक्षित लिंक आ जाएगा।",
-                                       "Is call par kuch nahi katta; aap chahein to isi number par SMS se ek surakshit link aa jaayega."),
+    items.append(Item("how", "fact", T(f"Nothing is charged on this call; if you want it, our team will send you a secure payment link.",
+                                       "इस कॉल पर कुछ नहीं कटता; आप चाहें तो हमारी टीम आपको एक सुरक्षित पेमेंट लिंक भेज देगी।",
+                                       "Is call par kuch nahi katta; aap chahein to hamari team aapko ek surakshit payment link bhej degi."),
                       ["pay", "link", "लिंक", "payment", "पेमेंट", "join", "buy", "खरीद", "kaise"]))
     for k, f in enumerate(p.faqs):
         if f.answer and not f.not_eligible:

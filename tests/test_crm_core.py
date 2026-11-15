@@ -68,10 +68,10 @@ def test_customer_crud_search_dedupe_dnc(tmp_path):
     assert {e["type"] for e in tl} == {"created", "stage"}
     c.post(f"/api/customers/{a['id']}/notes", json={"text": "likes Hindi"}, headers=H)
     assert c.get(f"/api/customers/{a['id']}/timeline", headers=H).json()["timeline"][0]["type"] in ("note", "stage")
-    # do not call: marks the global list, cannot be undone from here, cannot be deleted, blocks stage moves
+    # do not call: marks the global list, cannot be deleted, blocks stage moves
     r = c.put(f"/api/customers/{b['id']}", json={"consent": {"dnc": True, "reason": "asked"}}, headers=H).json()["customer"]
     assert r["stage"] == "do_not_call" and r["score"] == 0 and "+919123456780" in json.loads((tmp_path / "dnc.json").read_text())
-    assert c.put(f"/api/customers/{b['id']}", json={"consent": {"dnc": False}}, headers=H).status_code == 409
+    # (owner, 15 Nov: the operator CAN lift DNC with consent.dnc false; covered by test_crm_flow.test_operator_can_lift_dnc_and_then_call)
     assert c.put(f"/api/customers/{b['id']}", json={"stage": "new"}, headers=H).status_code == 409
     assert c.delete(f"/api/customers/{b['id']}", headers=H).status_code == 409
     assert c.delete(f"/api/customers/{a['id']}", headers=H).status_code == 200

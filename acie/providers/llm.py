@@ -24,6 +24,11 @@ class LLMProvider(ProviderBase):
             session.dialog["_nlu_crisis"] = (getattr(u, "crisis_reason", "") or "1")[:120]
         if u is None:
             return None
+        soc = {k: float(v) for k in ("sarcasm", "humour", "hostility", "interest", "impatience", "scepticism")
+               if (v := getattr(u, k, None)) is not None}
+        if soc:  # social signals (acie/state/social.py): fused with the lexicon in the pipeline, read by the style policy
+            import json as _json
+            session.dialog["_nlu_social"] = _json.dumps(soc, sort_keys=True)
         gist = getattr(u, "gist", "") or ""
         state = {d: float(getattr(u, d)) for d in STATE_DIMS[:4]}
         for d in STATE_DIMS[4:]:

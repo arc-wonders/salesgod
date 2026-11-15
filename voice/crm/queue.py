@@ -6,7 +6,7 @@ import time
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
-from .models import Campaign, Customer, Project, TERMINAL
+from .models import Campaign, Customer, Project, TERMINAL, is_demo
 from .scoring import UNREACHED
 from .store import JsonStore
 
@@ -79,14 +79,15 @@ def compute(store: JsonStore, campaign: Campaign, now: float | None = None, acti
             skip("already reached; waits for a follow-up"); continue
         ct = (na.call_type if due_fu and na and na.call_type else campaign.call_type_id)
         eligible.append({"customer_id": c.id, "name": c.name, "phone": c.phone, "stage": c.stage, "score": c.score,
-                         "call_type": ct, "reason": reason, "_k": (0 if due_fu else 1, -c.score, c.created_at, c.id)})
+                         "call_type": ct, "reason": reason, **({"demo": True, "note": "demo record - no real number"} if is_demo(c) else {}), "_k": (0 if due_fu else 1, -c.score, c.created_at, c.id)})
     eligible.sort(key=lambda r: r["_k"])
     for r in eligible:
         r.pop("_k", None)
+    dialable = [r for r in eligible if not r.get("demo")]  # demo records (fake numbers) are listed but never dialled
     last = campaign.stats.get("last_dial_at", 0)
     pacing_wait = max(0, int(last + sch.pacing_seconds - now)) if last else 0
     slots = max(0, sch.max_parallel - active_calls)
     can_now = win["open"] and campaign.status == "running" and slots > 0 and pacing_wait == 0
     return {"campaign_id": campaign.id, "status": campaign.status, "dial_mode": campaign.dial_mode, "window": win,
             "slots": slots, "pacing_wait_seconds": pacing_wait, "dialable_now": can_now,
-            "next": eligible[:slots] if can_now else [], "eligible": eligible, "skipped": skipped[:200]}
+            "next": dialable[:slots] if can_now else [], "eligible": eligible, "skipped": skipped[:200]}

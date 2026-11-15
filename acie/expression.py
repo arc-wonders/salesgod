@@ -259,6 +259,38 @@ class ABBackend:
                 await b.aclose()
 
 
+GEMINI_HOST = "generativelanguage.googleapis.com"
+
+
+def gemini_settings() -> dict | None:
+    """Gemini through its OpenAI-compatible endpoint, independent of where ACIE_EXPR_* (the default reply model) points.
+    GEMINI_BASE_URL / GEMINI_API_KEY / GEMINI_MODEL win; otherwise any of ACIE_EXPR_* / ACIE_PLANNER_* that points at Google
+    supplies the URL and key. None when no Gemini URL + key is configured. The key is returned, never logged."""
+    base, key = os.getenv("GEMINI_BASE_URL", ""), os.getenv("GEMINI_API_KEY", "")
+    model = os.getenv("GEMINI_MODEL", "")
+    for pre in ("ACIE_EXPR", "ACIE_PLANNER"):
+        b = os.getenv(f"{pre}_BASE_URL", "")
+        if GEMINI_HOST in b and os.getenv(f"{pre}_API_KEY"):
+            base = base or b
+            key = key or os.getenv(f"{pre}_API_KEY", "")
+            if pre == "ACIE_EXPR":  # the planner's model is a slow "pro" one: never borrow it for replies
+                model = model or os.getenv("ACIE_EXPR_MODEL", "")
+    if not (base and key):
+        return None
+    return {"base_url": base.rstrip("/"), "api_key": key, "model": model or "gemini-3.5-flash"}
+
+
+def make_gemini_backend() -> "OpenAICompatibleBackend | None":
+    """The console's "gemini" reply backend (None when Gemini is not configured)."""
+    g = gemini_settings()
+    if not g:
+        return None
+    return OpenAICompatibleBackend(base_url=g["base_url"], model=g["model"], api_key=g["api_key"],
+                                   max_tokens=int(os.getenv("GEMINI_MAX_TOKENS", "400")),
+                                   extra_body=json.loads(os.getenv("GEMINI_EXTRA_BODY") or '{"reasoning_effort": "minimal"}'),
+                                   label="gemini:" + g["model"])
+
+
 def make_backend_from_env() -> ExpressionBackend:
     """Plain OpenAICompatibleBackend unless ACIE_EXPR_AB and/or ACIE_EXPR_FALLBACK_BASE_URL are set."""
     ab = os.getenv("ACIE_EXPR_AB")

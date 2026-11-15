@@ -16,6 +16,7 @@ from __future__ import annotations
 import re
 
 from .expression import render_fallback
+from .agents import gender_from_packs, gendered
 from .rules import load_packs
 from .text import detect_language
 from .schemas import ExpressionParams, TurnPlan, ValidationReport
@@ -63,6 +64,9 @@ class StreamingValidator:
         self.known = known
         # rule packs: explicit list (names or objects) or the plan's own; none = unchanged behaviour
         self.rule_packs = load_packs(rule_packs if rule_packs is not None else getattr(plan, "rule_packs", []))
+        # the agent's gender (agent_male / agent_female pack): Hindi first-person verbs follow it in every sentence,
+        # LLM or template ("बोल रहा हूँ" -> "बोल रही हूँ" for a female agent; acie/agents.py)
+        self.agent_gender = gender_from_packs(rule_packs if rule_packs is not None else getattr(plan, "rule_packs", []))
         self.issue_codes: list[str] = []
         # trusted: operator-written template text (llm_allowed=False) - "first 3 months" in a reviewed
         # FAQ answer is not an LLM inventing a number (live call 194d15aef7 spoke only "Fair question.")
@@ -105,7 +109,7 @@ class StreamingValidator:
             self.add_issue(f"missing facts: {missing}", "missing_fact")
         if missing or self.failed or not (self.emitted or out):
             self.used_fallback = True
-            out.append(self.fill(render_fallback(self.plan, self.expr)))
+            out.append(self.fill(gendered(render_fallback(self.plan, self.expr), self.agent_gender)))
         return out
 
     def report(self) -> ValidationReport:
@@ -135,8 +139,12 @@ class StreamingValidator:
             s = _CURRENCY_BEFORE_SLOT.sub("", _EMOJI.sub("", _MARKDOWN.sub("", s))).replace("\ufffd", "").strip()
             s = _OFFER_PAD.sub("", s)  # "पहले 3 महीने में {offer}" -> "{offer}" (the phrase already says it)
             s = _THIS_WEEK_PAD.sub("", s)
+            s = gendered(s, self.agent_gender)
             if not s:
                 continue
+            if any(n in self.plan.facts and not str(self.plan.facts[n].value or "").strip() for n in _SLOT.findall(s)):
+                self.add_issue(f"empty slot dropped: {s!r}", "empty_slot")
+                continue  # never speak a sentence with an empty slot ("Right now it's ." on a product with no price)
             problem = self._check(s)
             if problem:
                 self.add_issue(f"{problem}: {s!r}", self._code_for(problem))

@@ -18,9 +18,9 @@ def test_owner_call_sequence(tone):
     pd = out[5]                                                           # (a) the plain per-day answer, never confirm_close
     assert pd[0] == "negotiation" and re.search(r"one payment of ₹2,649 for 3 months", pd[1]) and "just the maths" in pd[1] or "arithmetic" in pd[1]
     ct = out[6]                                                           # (b) 2,600 >= floor and >= the next step 2,549: accepted at 2,600, link not sent
-    assert ct[0] == "negotiation" and "₹2,600" in ct[1] and "₹2,649" not in ct[1] and "?" in ct[1]
+    assert ct[0] == "confirm_close" and "₹2,600" in ct[1] and "₹2,649" not in ct[1] and "?" in ct[1]   # agreed at their number, confirmed
     assert not any(i == "link_sent" for i, _ in out[:7])
-    assert "agreed" not in out[7][1].lower() and "tay hui" not in out[7][1]  # nothing was agreed yet
+    assert "₹2,600" in out[7][1] and not re.search(r"₹2,[0-5]\d\d", out[7][1])   # a push after agreement: the agreed price stays
     assert out[8][0] == "apology" and re.search(r"sorry", out[8][1], re.I) and "detail" not in out[8][1]
 
 
@@ -28,8 +28,8 @@ def test_owner_call_sequence(tone):
 def test_counter_after_terms_confirmed_is_still_a_counter_never_a_link_at_our_price(tone):
     out, sess = talk(["go ahead", "how much", "too costly", "can you do better", "can you do better", "ok fine, 2649 is okay", "okay 2,600 then, send the link"], tone, lang="en")
     assert out[5][0] == "confirm_close"
-    last = out[6]
-    assert last[0] == "negotiation" and "₹2,600" in last[1] and last[0] != "link_sent"
+    last = out[6]   # 2,649 was already accepted: a lower number never reopens it
+    assert last[0] == "negotiation" and "₹2,649" in last[1] and "₹2,600" not in last[1]
 
 
 @pytest.mark.parametrize("tone", TONES)

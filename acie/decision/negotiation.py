@@ -33,6 +33,7 @@ import re
 from dataclasses import asdict, dataclass, field
 
 from ..signals import NEGOTIATE_MORE
+from . import deal as dl
 from . import honest
 from . import negotiation_banks as nb
 
@@ -48,7 +49,9 @@ _COUNTER = re.compile(r"(?:₹|rs\.?|rupees?)\s*\d[\d,]{2,}|\b\d[\d,]{2,}\s*(?:p
                       r"(give|do|de|दो|दे)\s*(it|me)?\s*(for|at|in)?\s*(₹|rs\.?|\$)?\s*\d[\d,]*", _I)
 _COUNTER_MORE = re.compile(r"\b\d[\d,]{2,}\s*(?:rupe\w*|rs)?\s*(?:kar\s?do|kardo|karo|de\s?do|dedo|कर\s?दो|करो|दे\s?दो)(?![\wऀ-ॿ])|"
                           r"\b(?:for|at|around|about|to|in)\s*(?:₹|rs\.?|rupees?|\$)?\s*\d[\d,]{2,}\b|\b(?:want|need|make|give|take|do)\b.{0,18}\b\d[\d,]{2,}\b|"
-                          r"\b\d[\d,]{2,}\s*(?:max|only|hi|bas|tak|se zyada nahi)\b", _I)
+                          r"\b\d[\d,]{2,}\s*(?:max|only|hi|bas|tak|se zyada nahi)\b|"
+                          r"\b\d[\d,]{2,}\s*(?:rupe\w*|rs)?\s*(?:chalega|चलेगा|chalegi|theek|ठीक|ok|okay|done|final|deal|ho jayega|हो जाएगा)|"
+                          r"\b(?:how|what) about\s*(?:₹|rs\.?|rupees?)?\s*\d[\d,]{2,}", _I)
 _COMP_NAME = re.compile(r"cult|gold.?s|anytime fitness|competitor|chatgpt|gpt|gemini|copilot|other (gym|app|plan)|dusr[ae] (gym|app|jagah)|doosre|दूसरे|कहीं और|kahin aur|elsewhere|वहाँ|wahan", _I)
 _COMP_PRICE = re.compile(r"cheap|sasta|सस्ता|सस्ती|price|dollar|\$|₹|rupe|रुपये|\b\d{3,5}\b|kitna|कितना|cost|monthly|मंथली|महंगा|mehenga|expensive|same|20|free hai|फ्री है", _I)
 _BUDGET = re.compile(r"budget|afford|bajet|बजट|tight|tangi|तंगी|paise (kam|nahi|nhi)|पैसे (कम|नहीं)|expensive for me|mere liye (mehenga|महंगा)|मेरे लिए (महंगा|ज़्यादा|ज्यादा)", _I)
@@ -71,6 +74,8 @@ _NOT_A_PRICE = re.compile(r"\b(?:days?|din|months?|mahine|weeks?|hafte|sessions?
 def detect(text: str) -> str | None:
     """The negotiation type for this line, or None when it is not price talk."""
     t = text.lower()
+    if not _PER_DAY_Q.search(t):
+        t = dl._UNIT_AFTER.sub(" ", t)  # "5 sets of 10 reps", "21 km", "5 baje": not amounts
     if _PER_DAY_Q.search(t) and _PER_DAY_PAY.search(t) and re.search(r"\d", t) and not _NOT_A_PRICE_DAYS.search(t):
         return "per_day"
     for name, rx in (("discount_group", _GROUP), ("free_trial", _TRIAL), ("counter_offer", _COUNTER)):
@@ -78,6 +83,8 @@ def detect(text: str) -> str | None:
             return name
     if _COUNTER_MORE.search(t) and not _NOT_A_PRICE.search(t):
         return "counter_offer"
+    if not re.search(r"\d", t) and _SPOKEN_CUE.search(t) and not _NOT_A_PRICE.search(t) and any(x >= 100 for x in dl.amounts(t)):
+        return "counter_offer"  # "do hazaar aath sau mein de do", "अट्ठाईस सौ चलेगा?", "how about twenty eight hundred"
     if _COMP_NAME.search(t) and _COMP_PRICE.search(t):
         return "competitor"
     for name, rx in (("budget", _BUDGET), ("value_doubt", _VALUE), ("haggle", _HAGGLE), ("haggle", _PUSH_MORE)):
@@ -86,11 +93,21 @@ def detect(text: str) -> str | None:
     return None
 
 
+_SPOKEN_CUE = re.compile(r"(mein|me|में|pe|par|पे|पर|for|at|tak|तक)\s*(do|de|dedo|दो|दे|chalega|चलेगा|done|kar|कर|final|ho)|chalega|चलेगा|"
+                         r"how about|what about|make it|around|about|kar do|कर दो|de do|दे दो|\bdo it\b|deal\b", _I)
+
+
 def counter_number(text: str) -> int | None:
-    """The amount the caller names: the last number of 3+ digits ("not sold at 2,999, I want 2,500" -> 2500), else the last number."""
-    nums = [int(x) for x in re.findall(r"\d+", text.replace(",", ""))]
+    """The amount the caller names: the last price-like amount ("not sold at 2,999, I want 2,500" -> 2500), in digits or words
+    (English / Hindi / Hinglish: "2.8k", "do hazaar aath sau", "अट्ठाईस सौ"); durations and phone numbers are not amounts.
+    Falls back to the last plain number (e.g. "$5 do" -> 5)."""
+    n = dl.amount(text)
+    if n is not None and (n >= 100 or not re.search(r"\d", text)):
+        return n
+    bare = dl._UNIT_AFTER.sub(" ", text)  # "5 sets of 10 reps", "100 kg": counts, not money
+    nums = [int(x) for x in re.findall(r"\d+", bare.replace(",", ""))]
     big = [x for x in nums if x >= 100]
-    return (big or nums or [None])[-1]
+    return (big or nums or [n])[-1]
 
 
 @dataclass
@@ -112,6 +129,11 @@ class NegState:
     sweet: bool = False                               # the last perk-only sweetener at the floor was given
     notlast: bool = False                             # "going lower is difficult" was said once (never twice on a call)
     agreed: float = 0.0                               # the price the caller said yes to (never retracted, never re-offered higher)
+    concessions: int = 0                              # price cuts made (capped by negotiation.max_concessions)
+    last_cut: float = 0.0                             # the size of the last cut (the next one must be smaller)
+    best_counter: float = 0.0                         # the highest number the caller offered below our price (never go under it)
+    last_counter: float = 0.0                         # the caller's last number
+    no_sms: bool = False                              # SMS sending is off for this product: no "shall I SMS the link" asks
 
     @classmethod
     def load(cls, dialog: dict) -> "NegState":
@@ -133,6 +155,14 @@ class NegReply:
     note: str = ""
     offer: dict | None = None   # {"price": n, "perk": id}: a closing ask is pending on this
     toned: bool = False         # the text already carries the call's tone (else the domain restyles it)
+    agreed: bool = False        # the agent accepted the caller's number (or held them to our offer they matched): both sides agree on offer["price"]
+    kind: str = ""              # restate | hold | joke | vague (no price movement) | "" (a normal ladder reply)
+    lead: dict | None = None    # on an agreement: just the "done, {p} it is" line (the domain adds the confirmation with the terms)
+
+
+def accept_line(r: NegReply, lang: str) -> str:
+    """The "done, {p} it is" part of an agreement reply (the whole text when there is no separate lead)."""
+    return (r.lead or r.text).get(lang, "")
 
 
 def _t(en: str, hi: str, hl: str) -> dict[str, str]:
@@ -200,6 +230,17 @@ BUDGET_NOTE = _t("Please don't stretch your budget for this.", "इसके ल
 _PUSH = re.compile(r"kam kar|कम कर|\bsasta\b|सस्त[ाी]|\bcheap|discount|छूट|डिस्काउंट|reduce|lower|cheaper|sasta kar|सस्ता कर|best price|final price|last price|aur kam|और कम|"
                    r"thoda (aur )?(kam|sasta)|bargain|negotiat|match|beat (that|their|it)|give (me )?(it )?(for|at)|(mein|में|me) (do|de|dedo|दो|दे)\b|"
                    r"too (much|expensive|costly)|bahut (mehenga|mehnga|महंगा)|बहुत (महंगा|महँगा)|can.?t afford|afford nahi|budget", _I)
+
+
+# a question about charges, fees, terms or credibility is not a request for a lower price
+_TRUST_Q = re.compile(r"hidden|chhupa|chupa|छुपा|छिपा|extra (charge|fee|cost)|(any|koi) (other |extra )?(charges?|fees?)|charges?\b|चार्ज|\bfees?\b|फ़ीस|फीस|"
+                      r"certif|सर्टिफ|qualified|qualification|genuine|fake|nakli|नकली|scam|fraud|legit|trust|bharosa|भरोसा|terms|conditions|catch\b|"
+                      r"real (offer|trainers?)|asli|असली", _I)
+_NOT_BUDGET = re.compile(r"budget (ki|ka) (baat|problem|issue|dikkat) nahi|budget (is )?not (the|an?) (issue|problem)|not about (the )?(budget|money|price)|"
+                         r"(it'?s|its) not (the|about the) (budget|money|price)|बजट की (बात|दिक्कत) नहीं|paise ki baat nahi|पैसे की बात नहीं|"
+                         r"budget pe kyu|budget pe kyon|why .{0,20}budget", _I)
+_LOWER_ASK = re.compile(r"kam kar|कम कर|\bsasta|सस्त|discount|छूट|डिस्काउंट|reduce|lower|cheaper|better price|best price|aur kam|और कम|"
+                        r"(mein|में|me|for|at)\s*(₹\s*)?\d|\d[\d,]{2,}\s*(mein|में|me|pe|par|chalega|kar do)", _I)
 
 
 def explicit_push(text: str) -> bool:
@@ -286,37 +327,22 @@ def ladder_enabled(p) -> bool:
     return eco is not None and eco.list_price > 0 and 0 < eco.profit_floor < eco.list_price
 
 
-def _grid(L: float) -> int:
-    return 50 if L >= 1000 else 10 if L >= 200 else 5 if L >= 50 else 1
+_grid, _near, _up = dl.grid, dl.near, dl.up
 
 
-def _near(x: float, g: int) -> int:
-    """The friendly price (...49 / ...99 on a 50 grid) nearest to x."""
-    return int(round((x + 1) / g)) * g - 1 if g > 1 else int(round(x))
+def ladder_prices(list_price: float, floor: float, schedule=None, max_steps: int | None = None) -> list[int]:
+    """The concession prices, highest first (acie/decision/deal.py `ladder`): every cut strictly smaller than the one before, every price
+    a friendly ...49/...99 number at or above the floor, at most `max_steps` of them. The last one is the final price.
+    Empty when there is nothing to give."""
+    return dl.ladder(list_price, floor, schedule or _STEP_FRACTIONS, max_steps)
 
 
-def _up(x: float, g: int) -> int:
-    """The smallest friendly price at or above x (so the rounded floor never drops under the real floor)."""
-    return int(math.ceil((x + 1) / g - 1e-9)) * g - 1 if g > 1 else int(math.ceil(x - 1e-9))
-
-
-def ladder_prices(list_price: float, floor: float) -> list[int]:
-    """The concession prices, highest first, last = the final price (the floor rounded UP to a friendly number, never below it).
-    Steps shrink: each cut is a fraction of (list - floor). Empty when there is nothing to give (final == list)."""
-    g = _grid(list_price)
-    final = min(_up(floor, g), int(math.ceil(list_price)))
-    if list_price - final < g:
-        return []
-    room, prev, out = list_price - floor, float(list_price), []
-    for fr in _STEP_FRACTIONS:
-        x = _near(prev - fr * room, g)
-        if x >= prev:
-            x = _near(prev - g, g)
-        if x - final < max(g, 0.1 * room):  # too close to the final price to be a step of its own
-            break
-        out.append(x)
-        prev = x
-    return out + [final]
+def _neg_cfg(p) -> tuple[float, int | None, tuple]:
+    """(extra floor from the negotiation config, max concessions, step schedule) for a product."""
+    cfg = dl.config_for(p)
+    if cfg is None:
+        return 0.0, None, _STEP_FRACTIONS
+    return cfg.floor, cfg.max_concessions, tuple(cfg.schedule)
 
 
 def effective_floor(eco, st: NegState) -> float:
@@ -369,12 +395,29 @@ def _p(p, price: float) -> dict[str, str]:
 
 
 def _ask(p, st: NegState, tone: str, price: float) -> dict[str, str]:
+    if st.no_sms:  # SMS sending is off: never "shall I SMS the link"
+        bank = {t: [r for r in rows if "SMS" not in r[0]] for t, rows in nb.ASK.items()}
+        return _say(bank, tone, st, "ask", p=_fmt(p, price))
     return _say(nb.ASK, tone, st, "ask", p=_fmt(p, price))
+
+
+_NEED_GOAL = re.compile(r"muscle|bulk|मसल|बॉडी|body ?build|weight|वज़न|वजन|fat|stay fit|fitness|fit (rehna|rehne|rahna)|फिट|lift|deadlift|squat|bench|"
+                        r"strength|stamina|cardio|run|marathon|yoga|zumba|dance|health|sehat|सेहत|tone|abs|flexib|sport|coding|code|कोडिंग|writing|"
+                        r"study|padhai|पढ़ाई|resume|assignment|report|work|business|kaam ke liye", _I)
+_NEED_JUNK = re.compile(r"didn.?t (get|hear|understand)|samajh nahi|समझ नहीं|sunai nahi|what\?|repeat|pardon|sorry\?|hello|^\W*(uh|um|hmm|ok|okay|haan|yes|no)\W*$", _I)
+
+
+def real_need(text: str) -> bool:
+    """Is this a stated goal or use (fit to quote back), not a filler, a mishearing or a question?"""
+    t = (text or "").strip()
+    return bool(t) and bool(_NEED_GOAL.search(t)) and not _NEED_JUNK.search(t) and not honest.is_question(t)
 
 
 def _value_lines(p, st: NegState, tone: str, need_known: str, n_benefits: int = 2) -> dict[str, str]:
     if need_known and (_VALUE.search(need_known) or _BUDGET.search(need_known) or _HAGGLE.search(need_known) or _PUSH.search(need_known)):
         need_known = ""  # the "need" the call recorded is the price complaint itself: not a goal to tie the value to
+    if need_known and not real_need(need_known):
+        need_known = ""  # only a real stated goal / use is ever quoted back ("Uh, I didn't get you." was quoted as a need on a live call)
     joiner = {"en": " and ", "hi": " और ", "hinglish": " aur "}
     b = {l: joiner[l].join(x for x in (_benefit(p, l, i) for i in range(n_benefits)) if x) for l in LANGS}
     out = {l: "" for l in LANGS}
@@ -391,24 +434,46 @@ def _lowest_offer(st: NegState, cur: float) -> float:
     return min(x for x in (st.price, cur) if x) if st.price else cur
 
 
+def _restate_reply(p, st: NegState, tone: str, lead: dict | None = None, kind: str = "restate") -> NegReply:
+    """"Where were we?" / a vague "maybe more or less": say where the deal stands (numbers from the state only), never concede."""
+    tone = clean_tone(tone)
+    say = lambda *banks: {l: _join(*(b[l] for b in banks)) for l in LANGS}
+    lead = lead or {l: "" for l in LANGS}
+    cur = st.agreed or st.price or float(p.economics.list_price)
+    if st.agreed:
+        body = _say(nb.RESTATE_AGREED, tone, st, "rs_ag", p=_fmt(p, st.agreed))
+        ask = _say(nb.AGREED_ASK, tone, st, "agask", p=_fmt(p, st.agreed))
+        return NegReply("negotiation", say(lead, body, ask), st, offer={"price": st.agreed}, toned=True, kind=kind,
+                        note="Restate the agreed price; no new concession.")
+    if st.last_counter and st.last_counter < cur:
+        body = _say(nb.RESTATE_BOTH, tone, st, "rs_both", p=_fmt(p, cur), n=_fmt(p, st.last_counter))
+    else:
+        body = _say(nb.RESTATE_OFFER, tone, st, "rs_off", p=_fmt(p, cur))
+    tail = _say(nb.VAGUE_ASK, tone, st, "vask") if kind == "vague" else _ask(p, st, tone, cur)
+    return NegReply("negotiation", say(lead, body, tail), st, offer={"price": cur} if st.price else None, toned=True, kind=kind,
+                    note="Say where the deal stands (our last offer, their last number); no concession unless they ask for one.")
+
+
 def _ladder_reply(p, kind: str, text: str, st: NegState, need_known: str, committed: bool = False, tone: str = "mid", force_kind: str | None = None) -> NegReply | None:
-    """The Indian way, per product economics (list, floor = max(cost x (1+margin), floor_price), perk costs against the margin):
+    """The Indian way, per product economics (list, floor = max(cost x (1+margin), floor_price, negotiation floor), perk costs against the margin):
       1. first push: a warm, firm no plus concrete value, no cut (no number given -> ask the budget; a number -> say no to it, ask them to come up);
-      2. every later push: ONE step down the shrinking ladder (fractions of list - floor, friendly ...49/...99 prices), framed personally,
-         tied to a closing ask; "last/final" only on the true last step above the floor, otherwise "going lower is difficult";
-      3. a counter at/above our current offer, or at/above the next step, or at/after the last step and >= floor: accepted at once;
-         a counter between the floor and the next step: meet in the middle (friendly rounding, never below the floor);
-         a counter below the floor: a no to that number, then the next step;
-      4. at the floor: one honest sweetener (a perk the margin allows, then a configured lever), then a warm walk-away. Never below the
-         floor, never back up (st.price only goes down), never retracts the agreed price, no urgency or invented approvals."""
+      2. every later push: ONE step down the shrinking ladder (each cut strictly smaller than the last, friendly ...49/...99 prices), framed
+         personally, tied to a closing ask; at most negotiation.max_concessions cuts; "final" only on the true last step;
+      3. a counter at/above our current offer, or at/above the next step, or after the last step and >= floor: AGREED at once (both sides
+         said the same price) - the reply confirms it, never "if I make it X";
+         a counter between the floor and the next step: meet in the middle (never below the floor, never a bigger cut than the last);
+         a counter below the floor: a no to that number, then the next step; an absurd counter (far below the floor): humour, no movement;
+      4. never below the caller's own best counter (if our next step would be at/below it, we agree at their number);
+      5. once agreed, the price is fixed: a push or a lower counter hears the agreed price again, never a concession;
+      6. at the floor: one honest sweetener (a perk the margin allows, then a configured lever), then a warm walk-away.
+    Never back up (st.price only goes down), no urgency or invented approvals."""
     tone = clean_tone(tone)
     eco = p.economics
     st = NegState(**asdict(st))
     L = float(eco.list_price)
-    floor = effective_floor(eco, st)
+    cfg_floor, max_cuts, schedule = _neg_cfg(p)
+    floor = max(effective_floor(eco, st), cfg_floor)
     cur = st.price or L
-    st.pushes += 1
-    first = st.pushes == 1
     n, target = None, None
     if kind == "counter_offer" or (re.search(r"\d[\d,]{2,}", text) and not _NOT_A_PRICE.search(text)):  # "mera budget 2000 hai" names a rate too
         n = counter_number(text)
@@ -416,6 +481,32 @@ def _ladder_reply(p, kind: str, text: str, st: NegState, need_known: str, commit
             target = float(max(0, cur - n)) if re.search(r"\d\s*(?:rupe\w*|rs\.?|₹)?\s*(?:kam|कम|off|less)\b", text, _I) and n < cur else float(n)
     say = lambda *banks: {l: _join(*(b[l] for b in banks)) for l in LANGS}
     g = _grid(L)
+    joke = target is not None and 0 <= target < floor * _joke_pct(p) / 100.0
+
+    if st.agreed:  # rule 5: the agreed price never moves (down or up)
+        st.price = min(st.price or st.agreed, st.agreed)
+        if target is not None:
+            st.last_counter = target
+        if joke:
+            return NegReply("negotiation", say(_say(nb.JOKE, tone, st, "joke", n=_fmt(p, target), p=_fmt(p, st.agreed)),
+                                               _say(nb.AGREED_ASK, tone, st, "agask", p=_fmt(p, st.agreed))), st,
+                            offer={"price": st.agreed}, toned=True, kind="joke", note="An absurd number after the deal: humour, the agreed price stays.")
+        if target is not None and target >= st.agreed:
+            return _restate_reply(p, st, tone)
+        return NegReply("negotiation", say(_say(nb.HOLD_AGREED, tone, st, "hold", p=_fmt(p, st.agreed)),
+                                           _say(nb.AGREED_ASK, tone, st, "agask", p=_fmt(p, st.agreed))), st,
+                        offer={"price": st.agreed}, toned=True, kind="hold", note="Price already agreed: it stays; no concession.")
+    if joke:  # far below the floor: humour, no movement, not counted as a push
+        st.last_counter = target
+        return NegReply("negotiation", say(_say(nb.JOKE, tone, st, "joke", n=_fmt(p, target), p=_fmt(p, cur)), _ask(p, st, tone, cur)), st,
+                        offer={"price": cur} if st.price else None, toned=True, kind="joke",
+                        note="An absurd counter: light humour, our price stays; no concession.")
+    st.pushes += 1
+    first = st.pushes == 1
+    if target is not None:
+        st.last_counter = target
+        if target < cur:
+            st.best_counter = max(st.best_counter, target)
 
     def notlast(cond: bool = True) -> dict[str, str]:
         if not cond or st.notlast:
@@ -424,22 +515,34 @@ def _ladder_reply(p, kind: str, text: str, st: NegState, need_known: str, commit
         return _say(nb.NOT_LAST, tone, st, "notlast")
 
     def accept(price: float, note: str) -> NegReply:
-        seq_ = ladder_prices(L, floor)
-        st.price, st.final_said = min(price, cur), st.final_said or bool(seq_ and price <= seq_[-1])
-        return NegReply("negotiation", say(_say(nb.ACCEPT, tone, st, "accept", p=_fmt(p, st.price)), _ask(p, st, tone, st.price)), st,
-                        offer={"price": st.price}, note=note, toned=True)
+        seq_ = ladder_prices(L, floor, schedule, max_cuts)
+        price = max(min(price, cur), floor)  # agreeing at their number is not one of our cuts (max_concessions counts our own steps)
+        st.price, st.final_said = price, st.final_said or bool(seq_ and price <= seq_[-1])
+        st.agreed = price
+        done = _say(nb.ACCEPT, tone, st, "accept", p=_fmt(p, price))
+        return NegReply("negotiation", say(done, _say(nb.AGREED_ASK, tone, st, "agask", p=_fmt(p, price))), st,
+                        offer={"price": price}, note=note, toned=True, agreed=True, lead=done)
 
-    if st.agreed:
-        if target is None:  # the agreed price stands: never retracted, never raised
-            return NegReply("negotiation", _say(nb.CLOSED_AGAIN, tone, st, "closed"), st, note="Price already agreed: it stays.", toned=True)
-        cur, st.price, st.agreed = min(cur, st.agreed), min(cur, st.agreed), 0.0   # they name a different number: a counter against the agreed price, not above it
-        st.closed = False
+    def concede(price: float) -> float | None:
+        """The price a cut may go to: strictly below `cur`, a smaller cut than the last one, >= floor and >= their best counter.
+        None = no cut allowed (max cuts reached or nothing left)."""
+        if max_cuts is not None and st.concessions >= max_cuts:
+            return None
+        if st.last_cut and cur - price >= st.last_cut - 1e-9 and cur - price > g + 1e-9:
+            price = cur - max(st.last_cut - g, g)  # a smaller cut than the last one (the smallest friendly step may repeat)
+        price = max(price, floor)
+        if price >= cur - 1e-9:
+            return None
+        return float(price)
+
     if target is not None and target >= cur:
-        return accept(cur, "Their number is at or above our offer: accepted at once, at our offer.")
+        return accept(cur, "Their number is at or above our offer: agreed at once, at our offer.")
     if st.closed and not (target is not None and target >= floor):
         return NegReply("negotiation", _say(nb.CLOSED_WALK, tone, st, "walk", p=_fmt(p, cur)), st, toned=True)
-    seq = ladder_prices(L, floor)
+    seq = ladder_prices(L, floor, schedule, max_cuts)
     nxt = next((x for x in seq if x < cur), None)
+    if max_cuts is not None and st.concessions >= max_cuts:
+        nxt = None
     if first:  # one warm firm no, with value: no cut yet
         if target is not None:
             lead = _say(nb.NO_NUM, tone, st, "nonum", n=_fmt(p, target))
@@ -452,35 +555,48 @@ def _ladder_reply(p, kind: str, text: str, st: NegState, need_known: str, commit
             tail = _say(nb.ASK_BUDGET, tone, st, "budget")
         return NegReply("negotiation", say(lead, _value_lines(p, st, tone, need_known), tail), st,
                         note="Warm firm no with value; no concession yet; ask their budget/number.", toned=True)
-    if target is not None and target >= floor:
-        if nxt is None or target >= nxt:  # at/after the last step, or at/above the step we would give anyway: yes
-            return accept(target, "Their number clears the floor and is at/above our next step: accepted.")
+    if target is not None and target >= floor and not (st.final_said and nxt is None):  # "final" stays final
+        if nxt is None or target >= nxt:  # at/after the last step, or at/above the step we would give anyway: agreed
+            return accept(target, "Their number clears the floor and is at/above our next step: agreed.")
         mid = max(_near((cur + target) / 2.0, g), seq[-1] if seq else int(math.ceil(floor)))
-        if mid < cur:
-            st.price = float(mid)
-            final = bool(seq) and mid == seq[-1]
+        mid_ok = concede(mid)
+        if mid_ok is not None and mid_ok <= st.best_counter + 1e-9:
+            return accept(st.best_counter, "Our next step would reach their own number: agreed at their number.")
+        if mid_ok is not None:
+            mid = mid_ok
+            st.last_cut, st.concessions, st.price = cur - mid, st.concessions + 1, float(mid)
+            final = bool(seq) and mid <= seq[-1]
             st.final_said = st.final_said or final
-            return NegReply("price_floor" if final else "negotiation",
+            return NegReply("negotiation",
                             say(_say(nb.MID, tone, st, "mid", p=_fmt(p, mid)), notlast(not final),
                                 _ask(p, st, tone, mid)), st, offer={"price": float(mid)}, note="Met in the middle, never below the floor; one closing ask.", toned=True)
     if nxt is not None:
-        st.price = float(nxt)
-        final = nxt == seq[-1]
-        st.final_said = st.final_said or final
-        lead = _say(nb.NO_NUM_THEN, tone, st, "nothen", n=_fmt(p, target)) if target is not None else {l: "" for l in LANGS}
-        body = _say(nb.FINAL, tone, st, "final", p=_fmt(p, nxt)) if final else say(
-            _say(nb.STEP, tone, st, "step", p=_fmt(p, nxt)), notlast(cur < L))
-        return NegReply("price_floor" if final else "negotiation", say(lead, body, _ask(p, st, tone, nxt)), st, offer={"price": float(nxt)},
-                        note="Final price, said once, warmly." if final else "One concession tied to a closing ask.", toned=True)
+        price = concede(nxt)
+        if price is not None and st.best_counter and price <= st.best_counter + 1e-9:
+            return accept(st.best_counter, "Our next step would reach their own number: agreed at their number.")
+        if price is not None:
+            st.last_cut, st.concessions, st.price = cur - price, st.concessions + 1, float(price)
+            final = (bool(seq) and price <= seq[-1]) or (max_cuts is not None and st.concessions >= max_cuts)
+            st.final_said = st.final_said or final
+            lead = _say(nb.NO_NUM_THEN, tone, st, "nothen", n=_fmt(p, target)) if target is not None else {l: "" for l in LANGS}
+            body = _say(nb.FINAL, tone, st, "final", p=_fmt(p, price)) if final else say(
+                _say(nb.STEP, tone, st, "step", p=_fmt(p, price)), notlast(cur < L))
+            return NegReply("negotiation", say(lead, body, _ask(p, st, tone, price)), st, offer={"price": float(price)},
+                            note="Final price, said once, warmly." if final else "One concession tied to a closing ask.", toned=True)
+    if target is not None and target >= floor and not st.final_said and (not st.last_cut or cur - target < st.last_cut - 1e-9 or cur - target <= g + 1e-9):
+        return accept(target, "No cut left, but their number is a smaller step than our last one and clears the floor: agreed.")
     # at the floor: no more cash. State it once, then one honest sweetener, then a warm goodbye
     if not st.final_said:
         st.final_said = True
-        return NegReply("price_floor", say(_say(nb.LOWEST, tone, st, "lowest", p=_fmt(p, cur)), _ask(p, st, tone, cur)), st, offer={"price": cur},
+        return NegReply("negotiation", say(_say(nb.LOWEST, tone, st, "lowest", p=_fmt(p, cur)), _ask(p, st, tone, cur)), st, offer={"price": cur},
                         note="Floor stated once, warmly.", toned=True)
     if not st.sweet:
         st.sweet = True
+        allowed = _sweeteners(p)
         perks = [x for x in eco.ladder if x.kind == "perk" and len(st.perks) < eco.max_perks and x.id not in st.perks and all(x.text.get(l) for l in LANGS)
-                 and cur >= eco.profit_floor + x.cost]
+                 and cur >= eco.profit_floor + x.cost and (allowed is None or x.id in allowed)]
+        if allowed:
+            perks.sort(key=lambda x: allowed.index(x.id))
         if perks:  # a perk instead of cash, only if the margin still clears with its cost
             stp = perks[0]
             st.perks.append(stp.id)
@@ -496,6 +612,18 @@ def _ladder_reply(p, kind: str, text: str, st: NegState, need_known: str, commit
     return NegReply("negotiation", _say(nb.CLOSE_WARM, tone, st, "close"), st, note="Final no: warm goodbye, callback offered.", toned=True)
 
 
+def _joke_pct(p) -> float:
+    cfg = getattr(p, "negotiation", None)
+    return float(getattr(cfg, "joke_below_pct", 40.0) or 40.0) if cfg is not None else 40.0
+
+
+def _sweeteners(p) -> list[str] | None:
+    """The perk ids the operator allows as non-price sweeteners (None = any perk in economics.ladder)."""
+    cfg = getattr(p, "negotiation", None)
+    lst = list(getattr(cfg, "sweeteners", None) or []) if cfg is not None else []
+    return lst or None
+
+
 def lang_bank_value(b: dict, need_known: str) -> dict:
     if not all(b.values()):
         return {l: "" for l in LANGS}
@@ -507,7 +635,19 @@ def lang_bank_value(b: dict, need_known: str) -> dict:
 def step(p, text: str, st: NegState, need_known: str = "", faq_line=None, committed: bool = False, tone: str = "mid", force_kind: str | None = None) -> NegReply | None:
     """One negotiation turn. Returns the reply for all three languages and the new state, or None when this is not price talk.
     `faq_line(lang)` gives the operator's approved FAQ answer for the question, when there is one."""
+    ladder_on = ladder_enabled(p)
+    if force_kind is None and (_TRUST_Q.search(text) or _NOT_BUDGET.search(text)) and not _LOWER_ASK.search(text):
+        return None  # "hidden charges? are the trainers certified?" / "budget ki baat nahi": a terms or trust question, answered from the facts, never a concession
+    in_talk = bool(st.price or st.agreed or st.pushes or st.last_counter)
+    if ladder_on and in_talk and force_kind is None and dl.wants_restate(text):
+        st = NegState(**asdict(st))
+        st.last = "restate"
+        return _restate_reply(p, st, tone)  # "where were we on the price?": the deal as it stands, never a concession
     kind = force_kind or detect(text)
+    if ladder_on and in_talk and force_kind is None and dl.is_vague(text) and counter_number(text) is None:
+        st = NegState(**asdict(st))
+        st.last = "vague"
+        return _restate_reply(p, st, tone, kind="vague")  # "maybe make it more or less" is not a request: no concession
     if kind is None:
         return None
     st = NegState(**asdict(st))
@@ -520,7 +660,6 @@ def step(p, text: str, st: NegState, need_known: str = "", faq_line=None, commit
         return _compare_reply(p, st, tone)
     if kind == "counter_offer" and _COMP_NAME.search(text) and honest.is_question(text) and not _PUSH.search(text):
         return _compare_reply(p, st, tone)  # "Cult 2,500 mein deta hai, aapka kyun lu?": their rate is the competitor's, a question: answered, no concession
-    ladder_on = ladder_enabled(p)
     if ladder_on and kind in ("value_doubt", "budget") and honest.is_question(text) and not explicit_push(text):
         return None  # a question about how the price works is answered by the conversation first, not met with a concession
     if ladder_on and kind in ("haggle", "value_doubt", "budget", "counter_offer", "competitor"):

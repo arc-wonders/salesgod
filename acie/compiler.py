@@ -11,6 +11,7 @@ from __future__ import annotations
 import json
 
 from .psyche.ledger import CustomerFacts, SaidLedger
+from .psyche import style as _style
 from .schemas import CompiledPrompt, ExpressionParams, SessionState, TurnPlan
 
 LANGUAGE_RULES = {
@@ -157,7 +158,7 @@ HARD RULES
    language, directly in the sentence (no {{placeholders}} for these). Never prices or promises. Never say you can't help; if you truly don't know say so briefly, and if
    the question is unclear ask one short clarifying question. Never claim it relates to the product. Then come
    back to the plan's ask in a few words.
-10. Never repeat, quote or echo the customer's words back ("हाँ, बताइए" / "okay, let's try" are THEIR words, not yours).
+10. You may reuse up to 4 of the caller's own words once to show you heard them; never parrot a whole sentence; never re-ask what they told you.
     If "Reference wording" is given in the objective, say everything it says (same facts, same closing question).
 9. You are an AI assistant. If asked, say so honestly. Never ask for OTP, PIN, CVV, passwords or card or bank
    details. No pressure, no false urgency, no guilt, no claims you can't back. Answer what the customer just said first.
@@ -216,6 +217,8 @@ class PromptCompiler:
         ctx_block += _profile_block(profile) + _memory_block(memories)
         dialog = getattr(session, "dialog", None) or {}
         ctx_block += CustomerFacts.load(dialog).prompt_block(SaidLedger.load(dialog))  # already known / already said: do not restate
+        if _style.enabled():
+            ctx_block += _style.style_card(_style.Style.from_json(dialog.get(_style.STYLE_KEY)))  # this turn's conversational style
         messages.append({"role": "user", "content": f"{ctx_block}CUSTOMER SAID: {customer_text}\n\nPLAN:\n{plan_json}\n\n{reminder} "
                                                     "Use the {placeholders} for every fact, never the values."})
         return CompiledPrompt(system=system, messages=messages)

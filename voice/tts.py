@@ -13,11 +13,14 @@ No pitch or speed is ever derived from the caller's voice here.
 
 from __future__ import annotations
 
+import logging
 import os
 from collections.abc import AsyncIterator
 
 import httpx
 import numpy as np
+
+log = logging.getLogger("voice.tts")
 
 FISH_URL = "https://api.fish.audio/v1/tts"
 LINE_RATE = 8000
@@ -47,11 +50,34 @@ class StreamDownsampler:
         return out
 
 
+def _voice_gain(voice: str | None) -> float:
+    try:
+        from acie.agents import voice_gain
+        return voice_gain(voice)
+    except Exception:  # noqa: BLE001
+        return 1.0
+
+
+LIMIT = 0.6  # soft knee: samples above 60% of full scale are compressed smoothly towards 1.0 (never hard-clipped)
+
+
+def _limit(f: np.ndarray) -> np.ndarray:
+    a = np.abs(f)
+    over = a > LIMIT
+    if over.any():
+        f = f.copy()
+        f[over] = np.sign(f[over]) * (LIMIT + (1 - LIMIT) * np.tanh((a[over] - LIMIT) / (1 - LIMIT)))
+    return f
+
+
 def _pcm(f: np.ndarray) -> bytes:
     return np.clip(np.round(f * 32768.0), -32768, 32767).astype("<i2").tobytes()
 
 
 class FishTTS:
+    # stream(..., voices=[VoiceRef...], speed=...) is understood: the call's agent picks the voice (acie/agents.py)
+    accepts_voice = True
+
     def __init__(self) -> None:
         self.key = os.environ["FISH_API_KEY"]
         self.model = os.getenv("FISH_MODEL", "s2.1-pro-free")
@@ -62,18 +88,55 @@ class FishTTS:
         self.top_p = float(os.getenv("FISH_TOP_P", "0.5"))
         self.client = httpx.AsyncClient(timeout=httpx.Timeout(30.0, connect=5.0))
 
-    async def stream(self, text: str, language: str = "en") -> AsyncIterator[bytes]:
-        """Yields 16-bit mono PCM at 8 kHz (even-length chunks), faded in and out."""
+    async def stream(self, text: str, language: str = "en", voices: list | None = None,
+                     speed: float | None = None) -> AsyncIterator[bytes]:
+        """Yields 16-bit mono PCM at 8 kHz (even-length chunks), faded in and out.
+
+        voices: the agent's voices to try in order (objects with .voice_id / .model, acie.agents.voice_chain). A voice
+        Fish rejects (bad id, removed voice, model error) before any audio is sent falls through to the next one, then
+        to the server's FISH_VOICE_* default, then to Fish's own default voice. Once audio has started nothing retries."""
         hi = language in ("hi", "hinglish")
+        env_voice = self.voices.get("hi" if hi else "en")
+        chain: list[tuple[str | None, str]] = []
+        for v in voices or ():
+            vid, model = getattr(v, "voice_id", None) or None, getattr(v, "model", None) or self.model
+            if vid and (vid, model) not in chain:
+                chain.append((vid, model))
+        if not voices or not chain:
+            chain.append((env_voice, self.model))
+        elif (env_voice, self.model) not in chain and env_voice:
+            chain.append((env_voice, self.model))  # last resort: the server default (may be the other gender)
+        if (None, self.model) not in chain:
+            chain.append((None, self.model))
+        last: Exception | None = None
+        for i, (vid, model) in enumerate(chain):
+            started = False
+            try:
+                async for pcm in self._stream_one(text, hi, vid, model, speed):
+                    started = True
+                    yield pcm
+                return
+            except Exception as e:  # noqa: BLE001
+                if started or i == len(chain) - 1:
+                    raise
+                last = e
+                log.warning("Fish voice %s (%s) failed, trying the next voice: %s", vid, model, str(e)[:160])
+        if last:
+            raise last
+
+    async def _stream_one(self, text: str, hi: bool, voice: str | None, model: str,
+                          speed: float | None) -> AsyncIterator[bytes]:
         body = {"text": text, "format": "pcm", "sample_rate": self.rate, "latency": self.latency,
                 "normalize": True, "language": "hi" if hi else "en"}
         if self.rate != LINE_RATE:  # new path only; FISH_RATE=8000 keeps the old request exactly
             body["temperature"] = self.temperature
             body["top_p"] = self.top_p
-        voice = self.voices.get("hi" if hi else "en")
         if voice:
             body["reference_id"] = voice
-        headers = {"Authorization": f"Bearer {self.key}", "model": self.model}
+        if speed and abs(speed - 1.0) > 0.01:
+            body["prosody"] = {"speed": round(float(speed), 2), "volume": 0}
+        headers = {"Authorization": f"Bearer {self.key}", "model": model}
+        gain = _voice_gain(voice)
         carry = b""
         down = StreamDownsampler(self.rate) if self.rate != LINE_RATE else None
         fade_n = int(LINE_RATE * FADE_MS / 1000)
@@ -89,7 +152,10 @@ class FishTTS:
                 if not cut:
                     continue
                 x = np.frombuffer(data[:cut], dtype="<i2").astype(np.float32) / 32768.0
-                f = np.concatenate([held, down.push(x) if down is not None else x])
+                y = down.push(x) if down is not None else x
+                if gain != 1.0:  # a loud reference voice is brought to the old voices' level, then peak-limited
+                    y = _limit(y * gain)
+                f = np.concatenate([held, y])
                 if len(f) <= fade_n:
                     held = f
                     continue

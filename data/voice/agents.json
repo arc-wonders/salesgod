@@ -1,0 +1,80 @@
+{
+ "version": 1,
+ "tenant_defaults": {
+  "anthropic": "arjun",
+  "fitzone": "arjun"
+ },
+ "voices": [],
+ "agents": [
+  {
+   "id": "arjun",
+   "tenant": "",
+   "display_name": "Arjun",
+   "gender": "male",
+   "languages": [
+    "hi",
+    "hinglish",
+    "en"
+   ],
+   "voices": {
+    "hi": {
+     "voice_id": "6209a5682085409fa935f901f0bce950",
+     "model": "s2.1-pro-free"
+    },
+    "hinglish": {
+     "voice_id": "6209a5682085409fa935f901f0bce950",
+     "model": "s2.1-pro-free"
+    },
+    "en": {
+     "voice_id": "ea47f73b0b9c458cb121997ac6e3f619",
+     "model": "s2.1-pro-free"
+    }
+   },
+   "backup_voice": {
+    "voice_id": "015e4f0be89c4c7b834ac30876597fc0",
+    "model": "s2.1-pro-free"
+   },
+   "speaking_rate": 1.0,
+   "tone_level": "mid",
+   "greeting_style": "standard",
+   "description": "Stock male persona (Hindi / Hinglish / English)",
+   "created_at": 1794702507.1089268,
+   "updated_at": 1794702507.1089268
+  },
+  {
+   "id": "priya",
+   "tenant": "",
+   "display_name": "Priya",
+   "gender": "female",
+   "languages": [
+    "hi",
+    "hinglish",
+    "en"
+   ],
+   "voices": {
+    "hi": {
+     "voice_id": "4d7609058bd34213b1378b29efbde1f1",
+     "model": "s2.1-pro-free"
+    },
+    "hinglish": {
+     "voice_id": "4d7609058bd34213b1378b29efbde1f1",
+     "model": "s2.1-pro-free"
+    },
+    "en": {
+     "voice_id": "2a9605eeafe84974b5b20628d42c0060",
+     "model": "s2.1-pro-free"
+    }
+   },
+   "backup_voice": {
+    "voice_id": "b1a1d760d9604bdb957a56eec3460f1b",
+    "model": "s2.1-pro-free"
+   },
+   "speaking_rate": 1.0,
+   "tone_level": "mid",
+   "greeting_style": "standard",
+   "description": "Stock female persona (Hindi / Hinglish / English)",
+   "created_at": 1794702507.1089268,
+   "updated_at": 1794702507.1089268
+  }
+ ]
+}

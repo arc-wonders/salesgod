@@ -261,12 +261,12 @@ def unknown_combo(p, lang: str, topics: list[Topic], idx: int = 0) -> str:
 
 def payer_variants(p, lang: str) -> list[str]:
     """"Can my grandson pay?": common sense, no pointing at a payment page. Anyone can pay; nothing is taken on the call."""
-    return {"en": ["Yes, anyone can pay for it, your grandson too; nothing is charged on this call, and I can send the details by SMS to this number if you like.",
-                   "Of course, whoever is paying can do it at the gym or through the link; just tell me if you want the details sent by SMS."],
-            "hi": ["जी हाँ, पेमेंट कोई भी कर सकता है, आपके पोते भी; इस कॉल पर कुछ नहीं कटता, और आप चाहें तो मैं इसी नंबर पर SMS से जानकारी भेज दूँ।",
-                   "बिल्कुल, जो भी पेमेंट करना चाहे वो जिम पर या लिंक से कर सकता है; चाहें तो बताइए, मैं SMS से जानकारी भेज दूँगा।"],
-            "hinglish": ["Ji haan, payment koi bhi kar sakta hai, aapke pote bhi; is call par kuch nahi katta, aur aap chahein to main isi number par SMS se jaankari bhej doon.",
-                         "Bilkul, jo bhi payment karna chahe wo gym par ya link se kar sakta hai; chahein to bataiye, main SMS se jaankari bhej dunga."]}[lang]
+    return {"en": ["Yes, anyone can pay for it, your grandson too; nothing is charged on this call, and our team can send you the details if you like.",
+                   "Of course, whoever is paying can do it at the gym or through the link; just tell me if you want our team to send you the details."],
+            "hi": ["जी हाँ, पेमेंट कोई भी कर सकता है, आपके पोते भी; इस कॉल पर कुछ नहीं कटता, और आप चाहें तो हमारी टीम आपको जानकारी भेज सकती है।",
+                   "बिल्कुल, जो भी पेमेंट करना चाहे वो जिम पर या लिंक से कर सकता है; चाहें तो बताइए, हमारी टीम आपको जानकारी भेज देगी।"],
+            "hinglish": ["Ji haan, payment koi bhi kar sakta hai, aapke pote bhi; is call par kuch nahi katta, aur aap chahein to hamari team aapko jaankari bhej sakti hai.",
+                         "Bilkul, jo bhi payment karna chahe wo gym par ya link se kar sakta hai; chahein to bataiye, hamari team aapko jaankari bhej degi."]}[lang]
 
 
 def offer_end_variants(p, lang: str) -> list[str]:
@@ -336,6 +336,8 @@ def info_request(text: str) -> str | None:
     low = text.lower()
     if not re.search(_SEND, low, _I) and not re.search(_INFO_NOUN["free_signup"], low, _I):
         return None
+    if re.search(r"\b(likh\w*|write|writes|writing|draft\w*|reply to)\b|लिख", low, _I) and not re.search(r"\bsend\b|bhej|भेज", low, _I):
+        return None  # "will it write my emails?" asks what the PRODUCT does, not for an email from us
     for kind in ("free_signup", "trial", "branch", "whatsapp"):
         if re.search(_INFO_NOUN[kind], low, _I) and not (kind == "free_signup" and _PAID.search(low)):
             return kind
@@ -348,15 +350,15 @@ def info_request_variants(p, kind: str, lang: str) -> list[str]:
     where = {"en": site or "the official website", "hi": site or "ऑफिशियल वेबसाइट", "hinglish": site or "official website"}[lang]
     link = {"en": "the payment link", "hi": "पेमेंट लिंक", "hinglish": "payment link"}[lang]
     if kind == "free_signup":
-        return {"en": [f"I can't send a separate free sign-up link; the only SMS I send is {link}, and only if you ask for it. You can start the free plan yourself on {where}."],
+        return {"en": [f"I can't send a separate free sign-up link; the only thing our team sends is {link}, and only if you ask for it. You can start the free plan yourself on {where}."],
                 "hi": [f"मैं अलग से फ्री साइन-अप का लिंक नहीं भेज सकता; मैं सिर्फ़ {link} भेजता हूँ, और वो भी तभी जब आप कहें। फ्री प्लान आप ख़ुद {where} पर शुरू कर सकते हैं।"],
                 "hinglish": [f"Main alag se free sign-up ka link nahi bhej sakta; main sirf {link} bhejta hoon, aur wo bhi tabhi jab aap kahein. Free plan aap khud {where} par shuru kar sakte hain."]}[lang]
     if kind == "whatsapp":
-        return {"en": [f"I can only send an SMS to this number, not a WhatsApp or an email. If you'd like {link} by SMS, tell me; otherwise {S}."],
-                "hi": [f"मैं सिर्फ़ इसी नंबर पर SMS भेज सकता हूँ, WhatsApp या ईमेल नहीं। आप चाहें तो {link} SMS से भेज दूँ; वरना {S}।"],
-                "hinglish": [f"Main sirf isi number par SMS bhej sakta hoon, WhatsApp ya email nahi. Aap chahein to {link} SMS se bhej doon; warna {S}."]}[lang]
+        return {"en": [f"I can't send a WhatsApp or an email from this call. If you'd like, our team can send you {link}; otherwise {S}."],
+                "hi": [f"मैं इस कॉल से WhatsApp या ईमेल नहीं भेज सकता। आप चाहें तो हमारी टीम आपको {link} भेज सकती है; वरना {S}।"],
+                "hinglish": [f"Main is call se WhatsApp ya email nahi bhej sakta. Aap chahein to hamari team aapko {link} bhej sakti hai; warna {S}."]}[lang]
     what = {"trial": ("a trial pass", "ट्रायल पास", "trial pass"), "branch": ("branch details", "ब्रांच की जानकारी", "branch ki jaankari")}[kind]
-    return {"en": [f"I can't send {what[0]} from here; the only SMS I send is {link}, and only if you ask for it. {cap(S)}."],
+    return {"en": [f"I can't send {what[0]} from here; the only thing our team sends is {link}, and only if you ask for it. {cap(S)}."],
             "hi": [f"मैं यहाँ से {what[1]} नहीं भेज सकता; मैं सिर्फ़ {link} भेजता हूँ, और वो भी तभी जब आप कहें। {S}।"],
             "hinglish": [f"Main yahan se {what[2]} nahi bhej sakta; main sirf {link} bhejta hoon, aur wo bhi tabhi jab aap kahein. {cap(S)}."]}[lang]
 

@@ -49,4 +49,15 @@ def trace(result, dialog: dict | None) -> dict:
         "pending": d.get("pending"),
         "issues": result.validation.issues,
         "fallback": result.validation.used_fallback,
+        "social": _social(d),
     }
+
+
+def _social(d: dict) -> dict | None:
+    """The caller's social signals this turn (acie/state/social.py), for the console's meters."""
+    import json
+    try:
+        v = json.loads(d.get("_social") or "null")
+    except (ValueError, TypeError):
+        return None
+    return {k: v[k] for k in ("sarcasm", "humour", "hostility", "interest", "impatience", "scepticism", "rapport") if k in v} if isinstance(v, dict) else None

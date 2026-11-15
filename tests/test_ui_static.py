@@ -21,7 +21,7 @@ SPEC = ["/api/projects", "/api/projects/*", "/api/projects/*/fields", "/api/proj
         "/api/customers", "/api/customers/*", "/api/customers/import", "/api/leads/webhook/*", "/api/customers/*/timeline",
         "/api/campaigns", "/api/campaigns/*", "/api/campaigns/*/start", "/api/campaigns/*/pause", "/api/campaigns/*/queue", "/api/campaigns/*/call/*", "/api/customers/*/call",
         "/api/followups", "/api/ai/assist"]
-EXISTING = ["/api/tenants", "/api/tenants/*", "/api/products", "/api/calls", "/api/sim/start", "/api/sim/*", "/api/progress", "/productgen"]
+EXISTING = ["/api/tenants", "/api/tenants/*", "/api/products", "/api/agents", "/api/agents/*", "/api/agents-default", "/api/agents-default/*", "/api/calls", "/api/sim/start", "/api/sim/*", "/api/progress", "/productgen"]
 
 
 def used_paths(text: str) -> set[str]:

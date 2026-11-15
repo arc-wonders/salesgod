@@ -1,7 +1,7 @@
 import pytest
 
-# The crisis/helpline guardrail is OFF by default (ACIE_SAFETY, owner 15 Nov 2026). The tests that exercise it
-# (names mention crisis/distress/safety) run with it switched on, so the guardrail keeps working if it is re-enabled.
+# The crisis/helpline guardrail is ON by default (ACIE_SAFETY=0 turns it off). The tests that exercise it
+# (names mention crisis/distress/safety) pin it on explicitly, whatever the environment says.
 _GUARD_WORDS = ("crisis", "distress", "safety")
 
 

@@ -16,6 +16,7 @@ import re
 import inspect
 import os
 import json
+import logging
 import os
 import time
 from collections.abc import Awaitable, Callable
@@ -31,14 +32,20 @@ from .safety import CONCERN_T, DISTRESS_T, concern_plan, distress_followup_plan,
 from . import safety
 from . import psyche
 from .psyche import emotion_policy
+from .psyche import style as style_mod
 from .psyche.ledger import (CustomerFacts, SaidLedger, clear_input, explicit_bye, firm_no, invented_memory, is_repeat_ask, next_unsaid,
                             norm as _lnorm, one_word_fragment, pure_farewell, sentences as _lsentences, unsourced_claims, _FORWARD)
 from .psyche.moves import Move, MoveContext, choose_move, repeat_move
 from .psyche.needs import NeedInput, estimate_need
 from .schemas import ExpressionParams, HumanState, SessionState, TurnInput, TurnPlan, TurnResult, Utterance
 from .state.estimator import HumanStateEstimator
+from .state import social as social_mod
 from .tree import enrich_plan
 from .validator import StreamingValidator
+
+log = logging.getLogger("acie.pipeline")
+_HANGUP_TXT = re.compile(r"(फ़ोन|फोन|phone|fon) (रख|rakh|काट|kaat)|रख दीजिए|rakh dijiye|(कुछ|कोई) (नहीं|नही) (खरीदना|लेना|चाहिए)|"
+                         r"(kuch|koi) (nahi|nahin) (kharidna|lena|chahiye)|राम[- ]राम|\bram[- ]ram\b", re.I)
 
 _FILLER_OPEN = re.compile(r"^(aapke sawal ka jawab (yeh |ye )?(hai )?(ki |hai ki )?|आपके सवाल का जवाब (यह |ये )?(है )?(कि )?|"
                           r"आपके सवाल का जवाब देते हुए,? |to answer your question,? |the answer to your question is,? )", re.I)
@@ -57,6 +64,7 @@ _DISC_Q = re.compile(r"\b(what|which)\b.{0,40}\b(use|using|goal|work|study|need|
                      r"किस (काम|चीज़|चीज)|आपका (main )?(goal|लक्ष्य)|इस्तेमाल करेंगे|\bkis (kaam|cheez)\b|aapka (main )?goal|use karenge|काम या पढ़ाई|kaam ya padhai|"
                      r"लक्ष्य", re.I)
 _GOAL_WORDS = re.compile(r"muscle|bulk|मसल|बॉडी|body ?build|weight ?(loss|lose)|lose weight|वज़न|वजन|fat loss|stay fit|fitness|fit rehna|फिट रहना|"
+                         r"marathon|मैराथन|\brun(ning)?\b|\b\d+\s*(km|kilomet)|stamina|endurance|\blean\b|physique|power ?lift|lifting|strength|"
                          r"coding|code|कोडिंग|writing|study|padhai|पढ़ाई|resume|assignment|report", re.I)
 
 _FILLER = {"haan", "han", "ha", "ji", "ok", "okay", "yes", "yeah", "hmm", "hm", "acha", "achha", "accha", "theek", "thik", "hai", "hello", "हाँ", "हां",
@@ -79,6 +87,25 @@ _REASSURED = re.compile(
     r"\b(just|only)\s+(asking|wanted|want|checking)|\bbas\s+\w+\s+(puch|pooch|bata|jaan)|\bbas\s+(fees|price|rate|kimat)|बस\s+\S+\s+(पूछ|बता|जान)|"
     r"बस\s+(फ़ीस|फीस|कीमत|रेट)|कोई\s+(दिक्कत|परेशानी)\s+नहीं|no\s+problem|nothing\s+(wrong|like that)|koi\s+(dikkat|problem|baat)\s+nahi", re.I)
 _NO_SELL_ROWS = ("sad", "anxious", "angry", "crisis")
+
+
+# the domain's "what I just said / asked" keys: rolled back when the end of a turn was not heard
+_DOMAIN_TURN_KEYS = ("pending", "last_intent", "last_plan", "repeat_n", "sms_offered", "need_asked")
+
+
+def _amounts_in(text: str) -> set[float]:
+    from .context import amounts
+    return set(amounts(text or ""))
+
+
+def _deal_offer(deal) -> float | None:
+    if deal is None:
+        return None
+    v = deal.get("last_agent_offer") if isinstance(deal, dict) else getattr(deal, "last_agent_offer", None)
+    try:
+        return float(v) if v else None
+    except (TypeError, ValueError):
+        return None
 
 
 class ACIEPipeline:
@@ -107,6 +134,8 @@ class ACIEPipeline:
         # optional durable copy (acie.store.sessions): loaded at turn start if this process has not seen the
         # session yet (restart mid-call), saved at turn end. None = today's in-process behaviour.
         self.session_store = session_store
+        self._undo: dict[str, dict] = {}  # session id -> the last turn's undo point (apply_heard after a barge-in)
+        self.caller_memory = None  # acie.caller_memory.CallerMemoryStore: long-term caller memory, loaded at the first turn
         # acie.providers: None = built from ACIE_SIGNAL_PROVIDERS (default: rules, plus the LLM NLU when `nlu` is given)
         self._signal_hub = None
         self._hub_cache = None
@@ -120,10 +149,246 @@ class ACIEPipeline:
             await self.session_store.delete(session_id)
         return sess
 
+    @staticmethod
+    def _empty(s: SessionState | None) -> bool:
+        """No finished turn in this copy (missing, fresh, or only the greeting)."""
+        return s is None or s.turn_index == 0
+
     def session(self, turn: TurnInput) -> SessionState:
-        if turn.session_id not in self.sessions:
-            self.sessions[turn.session_id] = SessionState(session_id=turn.session_id, customer_id=turn.customer_id)
-        return self.sessions[turn.session_id]
+        """The call's session. Missing or empty here (pipeline recreated, session evicted) -> transparently restored from
+        the session store's in-process mirror; `restore_session` (run at every turn start) also asks the durable store."""
+        sid = turn.session_id
+        cur = self.sessions.get(sid)
+        if self._empty(cur) and self.session_store is not None and hasattr(self.session_store, "get_cached"):
+            saved = self.session_store.get_cached(sid)
+            if saved is not None and not self._empty(saved):
+                if cur is not None and cur.history:
+                    saved.history += [u for u in cur.history if u not in saved.history]
+                self.sessions[sid] = cur = saved
+        if cur is None:
+            self.sessions[sid] = cur = SessionState(session_id=sid, customer_id=turn.customer_id)
+        return cur
+
+    async def restore_session(self, turn: TurnInput) -> SessionState:
+        """Turn start, the normal path: if this process has no (or an empty) copy of the session, load the latest
+        snapshot (NATS KV / stream, Redis) within a tight budget (ACIE_RESTORE_TIMEOUT_MS, default 50); else memory."""
+        sid = turn.session_id
+        if self._empty(self.sessions.get(sid)) and self.session_store is not None:
+            budget = float(os.getenv("ACIE_RESTORE_TIMEOUT_MS", "50")) / 1000
+            try:
+                saved = await asyncio.wait_for(self.session_store.get(sid), budget)
+            except asyncio.TimeoutError:
+                saved = None
+                log.warning("session %s: restore timed out after %.0f ms, continuing from memory", sid, budget * 1000)
+            except Exception as e:  # the durable copy must never break a live call
+                saved = None
+                log.warning("session %s: restore failed (%s), continuing from memory", sid, e)
+            if saved is not None and not self._empty(saved):
+                cur = self.sessions.get(sid)
+                if cur is not None and cur.history:  # e.g. a line spoken into the fresh copy meanwhile: keep it
+                    saved.history += [u for u in cur.history if u not in saved.history]
+                self.sessions[sid] = saved
+                log.info("session %s restored at turn %d (deal %s, checklist turn %d)", sid, saved.turn_index,
+                         (saved.context.deal_view or {}).get("status", "-"), saved.context.checklist.updated_turn)
+        sess = self.session(turn)
+        if self.caller_memory is not None and not sess.context.caller and not sess.dialog.get("_caller_tried"):
+            sess.dialog["_caller_tried"] = "1"
+            try:
+                mem = await asyncio.wait_for(self.caller_memory.get(sess.customer_id or turn.customer_id), 0.3)
+            except Exception:
+                mem = None
+            if mem:
+                sess.context.caller = mem
+        return sess
+
+    # ------------------------------------------------------------------ only what the caller HEARD counts (barge-in)
+
+    _AGENT_SIDE = ("told", "quoted", "promised", "last_agent_line", "last_agent_intent")
+
+    def _undo_point(self, session: SessionState, facts) -> dict:
+        import copy
+        ctx = session.context
+        return {"ctx": {k: copy.deepcopy(getattr(ctx, k)) for k in self._AGENT_SIDE},
+                "checklist": ctx.checklist.model_copy(deep=True), "deal_view": dict(ctx.deal_view),
+                "deal": copy.deepcopy(ctx.deal), "dialog": {k: session.dialog.get(k) for k in ("_deal", "_neg", "_said", "_cf") + _DOMAIN_TURN_KEYS},
+                "facts": copy.deepcopy(facts)}
+
+    def _product_names(self) -> tuple[str, str, str]:
+        p = getattr(self.decision.domain, "p", None)
+        return (getattr(p, "agent_name", "") or "", getattr(p, "seller_name", "") or "", getattr(p, "product_name", "") or "")
+
+    def purpose_texts(self) -> dict[str, str] | None:
+        agent, seller, product = self._product_names()
+        if not (seller and product):
+            return None
+        fem = getattr(getattr(self.decision.domain, "p", None), "agent_gender", "male") == "female"
+        rh, rg = ("रही", "rahi") if fem else ("रहा", "raha")
+        return {"en": f"Just so you know, I'm {agent} calling from {seller} about an offer on {product}.",
+                "hi": f"बता दूँ, मैं {seller} से {agent} बोल {rh} हूँ, {product} के एक ऑफ़र के बारे में।",
+                "hinglish": f"Bata doon, main {seller} se {agent} bol {rg} hoon, {product} ke ek offer ke baare mein."}
+
+    def _purpose_first(self, plan, session: SessionState, lang: str):
+        """The caller must know who is calling and that it is a sales call about the product. If a barge-in cut the
+        opening/pitch before they heard it, the next agent turn says it first, briefly (once per cut)."""
+        ctx = session.context
+        if session.dialog.get("_purpose_due") != "1" or ("who_is_calling" in ctx.told and "what_the_product_is" in ctx.told):
+            session.dialog.pop("_purpose_due", None)
+            return plan
+        if plan.end_call or plan.intent in ("goodbye", "opt_out", "opt_out_confirmed", "declined", "annoyed_exit", "safety_distress",
+                                            "safety_followup", "constraint_stop", "repeat_last", "pitch", "opening", "identify"):
+            return plan
+        texts = self.purpose_texts()
+        if not texts:
+            return plan
+        session.dialog.pop("_purpose_due", None)
+        lead = {l: (t + " " + ((plan.lead or {}).get(l) or "")).strip() for l, t in texts.items()}
+        for what in ("who_is_calling", "what_the_product_is"):
+            if what not in ctx.told:
+                ctx.told.append(what)
+        return plan.model_copy(update={"lead": lead})
+
+    def apply_heard(self, session_id: str, heard_text: str, heard_ratio: float, intent: str = "") -> bool:
+        """Barge-in: the caller heard only `heard_text` of the last agent turn. Roll the agent side of the context back to
+        before that turn and re-apply only what was heard: last line, told/quoted/promised, checklist, SaidLedger slots,
+        the deal's last agent offer. Unheard facts stay unsaid, so the next turns state them again. -> applied?"""
+        sess = self.sessions.get(session_id)
+        if sess is None:
+            return False
+        ctx, d = sess.context, sess.dialog
+        undo = self._undo.get(session_id)
+        heard = (heard_text or "").strip()
+        full = undo.get("text", "") if undo else ""
+        if undo is not None and undo.get("turn") == sess.turn_index - 1:
+            for k, v in undo["ctx"].items():
+                setattr(ctx, k, v)
+            ctx.checklist, ctx.deal_view = undo["checklist"], undo["deal_view"]
+            plan = undo["plan"]
+            intent = plan.intent
+            # the deal: an offer the caller never heard was never made
+            new_offer = _deal_offer(ctx.deal)
+            if new_offer and new_offer != _deal_offer(undo["deal"]) and new_offer not in _amounts_in(heard):
+                ctx.deal = undo["deal"]
+                for k in ("_deal", "_neg"):
+                    if undo["dialog"].get(k) is None:
+                        d.pop(k, None)
+                    else:
+                        d[k] = undo["dialog"][k]
+            for k in ("_said", "_cf") + (_DOMAIN_TURN_KEYS if heard_ratio < 0.9 else ()):  # the unheard question isn't pending
+                if undo["dialog"].get(k) is None:
+                    d.pop(k, None)
+                else:
+                    d[k] = undo["dialog"][k]
+            if heard:
+                self._learn_said(SaidLedger.load(d), sess, plan, undo.get("move"), heard, undo["facts"])
+            agent, seller, product = self._product_names()
+            low = heard.lower()
+            from .context import _AGENT_EVENTS
+            if intent in _AGENT_EVENTS:
+                kind, what = _AGENT_EVENTS[intent]
+                ok = {"offer_price": bool(_amounts_in(heard)) or "₹" in heard,
+                      "what_the_product_is": bool(product) and product.lower().split()[0] in low,
+                      "who_is_calling": any(x and x.lower() in low for x in (agent, seller)),
+                      "payment_link": "link" in low or "लिंक" in heard}.get(what, heard_ratio >= 0.9)
+                if ok and what not in getattr(ctx, kind):
+                    getattr(ctx, kind).append(what)
+            if any(t and t in heard for t in (self.purpose_texts() or {}).values()):  # the purpose line itself was heard
+                for what in ("who_is_calling", "what_the_product_is"):
+                    if what not in ctx.told:
+                        ctx.told.append(what)
+            p_ = getattr(self.decision.domain, "p", None)
+            eco = getattr(p_, "economics", None)
+            ctx.after_reply(undo["turn"], undo.get("customer_text", ""), intent if heard_ratio >= 0.9 else "partial", heard,
+                            undo.get("lang", ""), d, float(getattr(eco, "list_price", 0) or 0), getattr(eco, "currency", "") or "")
+            if not heard:
+                ctx.last_agent_line = undo["ctx"]["last_agent_line"]
+        else:  # e.g. the opening (spoken outside run_turn): only drop the facts it did not get across
+            agent, seller, product = self._product_names()
+            low = heard.lower()
+            if "who_is_calling" in ctx.told and not any(x and x.lower() in low for x in (agent, seller)):
+                ctx.told.remove("who_is_calling")
+            if "what_the_product_is" in ctx.told and not (product and product.lower().split()[0] in low):
+                ctx.told.remove("what_the_product_is")
+            if heard:
+                ctx.last_agent_line = heard
+        for u in reversed(sess.history):  # the transcript the LLM sees: only the heard words
+            if u.role == "agent":
+                u.text = (heard + " —") if heard else "(cut off before saying anything)"
+                break
+        if not ("who_is_calling" in ctx.told and "what_the_product_is" in ctx.told) and self.purpose_texts():
+            d["_purpose_due"] = "1"
+        ctx.add(__import__("acie.context", fromlist=["ContextEvent"]).ContextEvent(
+            turn=max(sess.turn_index - 1, 0), who="system", kind="interrupted", detail=f"heard {heard_ratio:.0%}"), self.context_sinks)
+        st = self.session_store
+        if st is not None and hasattr(st, "record_turn"):
+            st.record_turn(sess, {"type": "heard", "v": 1, "session_id": session_id, "turn": sess.turn_index - 1, "ts": time.time(),
+                                  "heard_text": heard, "heard_ratio": round(heard_ratio, 2), "checklist": ctx.checklist.model_dump(),
+                                  "deal_view": ctx.deal_view})
+        return True
+
+    def _recall_plan(self, text: str, session: SessionState) -> TurnPlan | None:
+        """'Can you repeat that?' -> the last agent line, word for word. 'Where were we?' -> the state restated from the
+        ledger (checklist + deal). Both are answered from state, before any domain logic, so neither turns into a new
+        pitch, a guess or a fresh concession."""
+        from .context import recall_kind, repeat_texts, where_texts
+        if os.getenv("ACIE_RECALL", "1") == "0" or session.turn_index == 0 and not session.history:
+            return None
+        kind = recall_kind(text)
+        if kind is None:
+            return None
+        ctx = session.context
+        fallback_line = next((u.text for u in reversed(session.history) if u.role == "agent"), "")
+        if kind == "repeat":
+            texts = repeat_texts(ctx, fallback_line)
+            if not texts:
+                return None
+            return TurnPlan(intent="repeat_last", llm_allowed=False, decision="repeat request: replay the last agent line from state",
+                            objective="They asked to hear the last thing again: say it again, word for word", fallback=texts)
+        dom = self.decision.domain
+        deal = ctx.deal
+        if deal is None and session.dialog.get("_deal"):
+            try:
+                deal = json.loads(session.dialog["_deal"])
+            except (ValueError, TypeError):
+                deal = None
+        status = (deal.get("status") if isinstance(deal, dict) else getattr(deal, "status", "")) if deal is not None else ""
+        if status in ("open", "countering", "agreed", "closed", "walked") and getattr(dom, "name", "") == "product_sales":
+            return None  # a live deal: the negotiation domain (agent haggle) restates it from DealState, no new concession
+        p = getattr(dom, "p", None)
+        recap = None
+        if hasattr(dom, "deal_recap"):  # the negotiation domain (agent haggle) phrases the deal part
+            try:
+                recap = dom.deal_recap(session)
+            except Exception as e:
+                log.warning("deal_recap failed: %s", e)
+        texts = where_texts(ctx, getattr(p, "product_name", "") if p is not None else "", recap)
+        return TurnPlan(intent="where_were_we", llm_allowed=False, decision="where were we: restate the state from the ledger",
+                        objective="They lost the thread: restate where we are (deal, what is agreed, the open question); no new offer",
+                        fallback=texts)
+
+    def _turn_event(self, turn: TurnInput, session: SessionState, plan, text: str, expr, delta: dict, t: dict) -> dict:
+        ctx = session.context
+        return {"v": 1, "session_id": session.session_id, "turn": session.turn_index, "ts": time.time(),
+                "customer_text": turn.text, "agent_text": text, "intent": plan.intent, "decision": str(plan.decision or "")[:200],
+                "end_call": bool(plan.end_call), "language": expr.language, "checklist_delta": delta,
+                "checklist": ctx.checklist.model_dump(), "deal_view": ctx.deal_view, "outcome": ctx.outcome,
+                "ctx_decision": ctx.decision, "timings_ms": t}
+
+    async def _persist(self, turn: TurnInput, session: SessionState, plan, text: str, expr, delta: dict, t: dict) -> None:
+        """After every turn: the snapshot + one event. NATS: queued, sent in the background (never waits). Other stores
+        (Redis): awaited with a small budget."""
+        st = self.session_store
+        if st is None:
+            return
+        if hasattr(st, "record_turn"):
+            try:
+                st.record_turn(session, self._turn_event(turn, session, plan, text, expr, delta, t))
+            except Exception as e:
+                log.warning("session %s: snapshot not queued (%s)", session.session_id, e)
+            return
+        try:
+            await asyncio.wait_for(st.put(session), float(os.getenv("ACIE_PERSIST_BUDGET_MS", "250")) / 1000)
+        except Exception:  # the durable copy must never break a live call
+            pass
 
     def _hub(self):
         """The signal providers for this pipeline (acie.providers), rebuilt when their configuration changes."""
@@ -142,7 +407,13 @@ class ACIEPipeline:
         dom = self.decision.domain
         session.dialog.pop("_nlu", None)
         session.dialog.pop("_signals", None)
+        session.dialog.pop(social_mod.NLU_KEY, None)
         sig = await self._hub().run(turn, session, dom, getattr(dom, "classifier", None))
+        try:  # social signals (sarcasm, humour, hostility, interest, impatience, scepticism, rapport): lexicon + NLU, smoothed
+            raw_soc = session.dialog.get(social_mod.NLU_KEY)
+            social_mod.update(session.dialog, turn.text, json.loads(raw_soc) if raw_soc else None)
+        except Exception as e:  # never let a signal break a turn
+            log.info("social signals failed: %s", type(e).__name__)
         if sig.learned:
             session.dialog["_nlu"] = sig.to_understanding().model_dump_json()  # console / logs compat
             session.dialog["_rule_intent"] = sig.rule_intent
@@ -262,7 +533,7 @@ class ACIEPipeline:
             sl, line = next_unsaid(None if (hold or ledger.refused or link_ok) else p, lang, ledger, facts, lang_text, allow_sell=sell_ok, allow_link=link_ok)
             if not (hold or ledger.refused or link_ok):
                 q = facts.next_discovery(p, lang)  # the NEXT unanswered level of the discovery ladder, never one already answered
-                if q and not ledger.repeats(q) and not ledger.reply_repeats(q):
+                if q and not ledger.repeats(q) and not ledger.reply_repeats(q) and style_mod.discovery_ok(session.dialog):
                     if sl is None:
                         line = q
                     elif facts.just_answered:  # they just answered a level: a new point, then the next level down
@@ -271,6 +542,23 @@ class ACIEPipeline:
             if lang == cur:
                 slot = sl
         return text, slot
+
+    _PLACEHOLDER = re.compile(r"\{[A-Za-z_][\w\[\]\.]*\}|\{\{|\}\}")
+    _SMS_CLAIM = re.compile(r"\bsms\b|एसएमएस|text message", re.I)
+
+    def _drop_broken(self, reply: list[str]) -> list[str]:
+        """LLM reply: a sentence with a raw template slot ("{talking_points[0]}") is never spoken; nor an SMS claim when the product
+        sends no SMS (the domain's own link lines handle that honestly)."""
+        dom = self.decision.domain
+        sms_on = bool(getattr(dom, "_sms_on", lambda: True)()) if getattr(dom, "name", "") == "product_sales" else True
+        out, changed = [], False
+        for r in reply:
+            sents = [x for x in re.split(r"(?<=[.!?।])\s+", (r or "").strip()) if x]
+            keep = [x for x in sents if not self._PLACEHOLDER.search(x) and (sms_on or not self._SMS_CLAIM.search(x))]
+            changed = changed or len(keep) != len(sents)
+            if keep:
+                out.append(" ".join(keep))
+        return out if changed else reply
 
     def _facts_guard(self, plan, expr, session: SessionState, ledger: SaidLedger, facts: CustomerFacts, state, text: str):
         """_facts_guard_core, then the same filler is never used twice: a used leading filler becomes the next unused synonym."""
@@ -345,6 +633,320 @@ class ACIEPipeline:
         return TurnPlan(intent="acknowledge", objective="Invite the caller to finish", llm_allowed=False, decision="fragment",
                         fallback={l: v[n % 2] for l, v in lines.items()})
 
+    # ------------------------------------------------------------------ conversational style (acie/psyche/style.py, ACIE_STYLE)
+
+    def _decide_style(self, session: SessionState, state, strat, text: str, intent: str, facts: CustomerFacts, before: dict):
+        """This turn's style row, stored in session.dialog['_style'] (the compiler reads it for the LLM). None when off."""
+        session.dialog.pop(style_mod.STYLE_KEY, None)
+        session.dialog.pop("_style_used", None)
+        if not style_mod.enabled() or getattr(self.decision.domain, "name", "") != "product_sales":
+            return None
+        new = [h for k, v in facts.caller.items() if k != "name" for h in v if h not in before.get(k, [])]
+        dom = self.decision.domain
+        elder = session.dialog.get("_elder") == "1" or (getattr(dom, "customer_age", None) or 0) >= 55
+        st = style_mod.decide_style(row=strat.row, state=state, text=text, intent=intent, turn_index=session.turn_index,
+                                    dialog=session.dialog, facts=facts, elder=elder, garbled=not clear_input(text), new_detail=new)
+        session.dialog[style_mod.STYLE_KEY] = st.to_json()
+        return st
+
+    def _backchannel_plan(self, session: SessionState, expr, ledger: SaidLedger) -> TurnPlan:
+        """The caller is mid-sentence ("So basically,"): a short backchannel, no fact, no price, no question."""
+        n = ledger.count_move("backchannel")
+        ledger.add_move("backchannel")
+        g = self._agent_gender()
+        return TurnPlan(intent="acknowledge", objective="Let the caller finish their sentence", llm_allowed=False, decision="style:backchannel",
+                        fallback={l: style_mod.pick("GO_ON", l, n, g) for l in ("en", "hi", "hinglish")})
+
+    def _handback_plan(self, session: SessionState, expr, ledger: SaidLedger) -> TurnPlan:
+        """The caller says we pushed ("rude", "did you even ask me?"): own it and hand control back with one question."""
+        n = ledger.count_move("handback")
+        ledger.add_move("handback")
+        g = self._agent_gender()
+        session.dialog["pending"] = "pitch"  # their next yes means "tell me what's included", never a confirmation
+        return TurnPlan(intent="apology", objective="Own that you rushed, then ask whether they want to hear what's included or stop",
+                        llm_allowed=False, decision="style:own_and_hand_back",
+                        fallback={l: style_mod.pick("HANDBACK", l, n, g) for l in ("en", "hi", "hinglish")})
+
+    def _agent_gender(self, plan=None) -> str:
+        from .agents import gender_from_packs
+        g = gender_from_packs(getattr(plan, "rule_packs", None)) if plan is not None else ""
+        if not g:
+            g = getattr(getattr(self.decision.domain, "p", None), "agent_gender", "") or ""
+        return g if g in ("male", "female") else ""
+
+    _STYLE_KEEP_ASK = frozenset({"negotiation", "confirm_close", "link_sent", "price_floor", "callback", "callback_time", "opening", "clarify",
+                                 "reason_ask", "language_switch", "opt_out", "declined", "human_agent", "identify", "are_you_ai"})
+    _ASKS_PRICE = re.compile(r"price|cost|kitne|कितन|कीमत|rate|how much|fees?|फ़ीस|फीस|charge|paisa|पैसे|₹|\d", re.I)
+
+    def _style_keeps_asks(self, plan) -> bool:
+        return plan.intent in self._STYLE_KEEP_ASK or str(plan.decision or "").startswith(("negotiation", "garbled")) \
+            or plan.intent.startswith(("safety", "distress", "concern"))
+
+    def _permission_first(self, session: SessionState, text: str) -> bool:
+        """A price quote the caller did not ask for, after appreciation ("love it", "nice", "okay") instead of a clear yes:
+        ask permission first (once). A plain "ok / yes / sure" right after our own "shall I tell you the price?" is consent."""
+        d = session.dialog
+        if not style_mod.enabled() or self._ASKS_PRICE.search(text or "") or int(d.get("_style_perm", "0") or 0) >= 1:
+            return False
+        if not style_mod.APPRECIATE.search(text or ""):
+            return False
+        last = next((u.text for u in reversed(session.history) if u.role == "agent"), "")
+        asked_price = bool(re.search(r"(price|offer|कीमत|ऑफर|daam|keemat|kimat)[^?]*\?", last, re.I))
+        consent = bool(re.fullmatch(r"\W*(ok(ay)?|yes|yeah|yep|sure|haan|haan ji|ji|हाँ|हां|जी|हाँ जी|theek hai|ठीक है|go ahead|bataiye|बताइए)\W*",
+                                    text or "", re.I))
+        return not (asked_price and consent)
+
+    _PRICE_TURN = frozenset({"price", "confirm_close", "negotiation", "price_floor", "reoffer", "link_sent"})
+
+    def _price_turn(self, plan, text: str) -> bool:
+        return plan.intent in self._PRICE_TURN or str(plan.decision or "").startswith("negotiation") \
+            or bool(self._ASKS_PRICE.search(text or "")) or bool(re.search(r"discount|offer|deal|sasta|mehnga|महंग|सस्ता|छूट", text or "", re.I))
+
+    def _offer_off_topic(self, plan, text: str) -> bool:
+        return "offer" in plan.facts and not plan.facts["offer"].hidden and not self._price_turn(plan, text) \
+            and "{offer}" not in " ".join(list((plan.lead or {}).values()) + [plan.objective or ""])
+
+    def _style_drop_recent_price(self, reply: list[str], plan, session: SessionState, text: str) -> list[str]:
+        """LLM reply: a sentence restating a price said in the last 2 agent turns goes, unless the caller asked about price or
+        this is a price / negotiation / close turn (only when a sentence without it is left)."""
+        if not style_mod.enabled() or not reply or self._price_turn(plan, text):
+            return reply
+        b = style_mod.budgets(session.dialog)
+        recent = {p for p, n in b["prices"].items() if b["turns"] - n < 2}
+        if not recent:
+            return reply
+        sents = [x for r in reply for x in re.split(r"(?<=[.!?।])\s+", r.strip()) if x]
+        keep = [x for x in sents if not any(m.group(0).replace(" ", "") in recent for m in style_mod.PRICE_RX.finditer(x))]
+        if len(keep) == len(sents) or not keep:
+            return reply
+        return [" ".join(keep)]
+
+    def _style_drop_asks(self, reply: list[str], plan, session: SessionState) -> list[str]:
+        """LLM reply: a turn that may not ask loses its questions (only when a statement is left); a discovery question
+        outside the discovery budget goes too. Negotiation / close / safety lines keep theirs."""
+        st = style_mod.Style.from_json(session.dialog.get(style_mod.STYLE_KEY))
+        if st is None or not reply or self._style_keeps_asks(plan):
+            return reply
+        disc_ok = style_mod.discovery_ok(session.dialog)
+        sents = [x for r in reply for x in re.split(r"(?<=[.!?।])\s+", r.strip()) if x]
+        keep = [x for x in sents if not (x.rstrip().endswith("?") and (not st.ask_ok or (style_mod.is_discovery(x) and not disc_ok)))]
+        if not keep or not any(not x.rstrip().endswith("?") for x in keep):
+            return reply
+        return [" ".join(keep)] if len(keep) != len(sents) else reply
+
+    def _apply_style(self, plan, expr, session: SessionState, st, text: str):
+        """Template turns: prepend a rotated lead (label / mirror / backchannel / humour / proof) and drop the ask when this turn
+        may not ask; a price line said in the last 2 turns is not said again unless they asked. LLM turns: the plan's ask is
+        dropped when the turn may not ask (the compiler adds the style card). Negotiation and close lines keep their numbers and
+        their ask; only a lead may be prepended."""
+        if st is None or st.style in ("safety", "listening") or getattr(self.decision.domain, "name", "") != "product_sales":
+            return plan
+        if plan.intent in _GUARD_KEEP and plan.intent not in ("callback",) or plan.intent in ("repeat_last", "where_were_we", "acknowledge") \
+                or plan.intent.startswith(("safety", "distress", "concern")) or explicit_bye(text) or plan.end_call:
+            return plan
+        d = session.dialog
+        if st.row in (6, 7):
+            d["_style_price_obj"] = str(int(d.get("_style_price_obj", "0") or 0) + 1)
+        keeps = self._style_keeps_asks(plan)
+        template = not plan.llm_allowed or isinstance(self.backend, TemplateBackend)
+        if plan.intent == "price" and self._permission_first(session, text):
+            # owner (call f79a90af02): "Love it." after the pitch got the whole price + a goal question -> "too rude". Ask first.
+            n = int(d.get("_style_perm", "0") or 0)
+            d["_style_perm"] = str(n + 1)
+            d["last_intent"] = "pitch"
+            d["pending"] = "pitch"
+            d["quoted_last"] = "0"
+            g = self._agent_gender(plan)
+            return plan.model_copy(update={"intent": "pitch", "llm_allowed": False, "lead": None, "ask": None, "facts": {},
+                                           "decision": "style:permission_before_price",
+                                           "objective": "Glad they like it; ask if they want to hear the offer (no price yet)",
+                                           "fallback": {l: style_mod.pick("PERMISSION", l, n, g) for l in ("en", "hi", "hinglish")}})
+        if not template:
+            upd = {}
+            if plan.ask and not st.ask_ok and not keeps:
+                upd["ask"] = None
+            if self._offer_off_topic(plan, text):
+                # the LLM may use the {offer} slot only on a price turn (live sim: "help your ₹2,999 for 3 months... training")
+                upd["facts"] = {k: (f.model_copy(update={"hidden": True}) if k == "offer" else f) for k, f in plan.facts.items()}
+            return plan.model_copy(update=upd) if upd else plan
+        b = style_mod.budgets(d)
+        lang = expr.language
+        g = self._agent_gender(plan)
+        dom = self.decision.domain
+        elder = d.get("_elder") == "1" or (getattr(dom, "customer_age", None) or 0) >= 55
+        # the lead
+        key = st.lead_key
+        if key == "HUMOR" and not style_mod.humour_allowed(st, d.get("_row", ""), elder, session.turn_index, text, d):
+            key = ""
+        if key == "PROOF":
+            key = ""  # proof lines come only from an operator-approved product list (none configured yet)
+            proof = list(getattr(getattr(dom, "p", None), "proof", None) or [])
+            if proof:
+                key = "PROOF"
+        if key in ("LABEL_UPSET",) and keeps and plan.intent != "negotiation" or plan.intent in ("clarify", "not_understood", "apology") \
+                or str(plan.decision or "").startswith(("garbled", "audio")):
+            key = ""  # a "say that again" or an apology line carries its own acknowledgement
+        neg = str(plan.decision or "").startswith("negotiation") or plan.intent in ("negotiation", "confirm_close", "link_sent", "price_floor")
+        if neg and key not in ("LABEL_PRICE", "LABEL_UPSET"):
+            key = ""  # negotiation lines: only a label lead, the line itself (numbers, ask) stays as it is
+        if neg and key and len(self._plan_text(plan, lang).split()) > 16:
+            key = ""  # a long terms line gets no extra sentence in front
+        if not key and (plan.intent == "price" or (st.row == 2 and not neg)) \
+                and plan.intent not in ("clarify", "not_understood", "apology"):
+            key = "SOFT"  # owner: short is not curt; one warm word ("Sure." / "Ji.") in front of price and held-back lines
+        out: dict[str, str] = {}
+        leads: dict[str, str] = {}
+        used = ""
+        asked_price = bool(self._ASKS_PRICE.search(text or ""))
+        disc_ok = style_mod.discovery_ok(d)
+        probe = StreamingValidator(plan, ExpressionParams(language=lang), trusted=True, customer_text="")
+        for l in ("en", "hi", "hinglish"):
+            raw = plan.fallback.get(l)
+            if not raw:
+                continue
+            # the plan's own words keep their {slots}, lead and facts; only whole sentences are dropped and a lead prepended
+            sents = [x for x in re.split(r"(?<=[.!?।])\s+", raw.strip()) if x]
+            keep = sents
+            if not neg:
+                keep = [x for x in keep if not (x.rstrip().endswith("?") and (
+                    (not st.ask_ok and not keeps) or (style_mod.is_discovery(x) and (not disc_ok or plan.intent == "price"))))]
+                if not asked_price and plan.intent not in ("price", "price_floor"):
+                    recent = {p for p, n in b["prices"].items() if b["turns"] - n < 2}
+                    keep = [x for x in keep if not any(m.group(0).replace(" ", "") in recent for m in style_mod.PRICE_RX.finditer(probe.fill(x)))]
+                stmt = " ".join(probe.fill(x) for x in keep if not x.rstrip().endswith("?"))
+                if len(stmt.split()) < 5 or _DIDNT.search(stmt):
+                    keep = sents  # a bare filler or "didn't catch that" needs its question
+            if keep != sents:
+                out[l] = " ".join(keep)
+            lead = ""
+            if key == "PROOF":
+                lead = proof[style_mod.crc_n(session.session_id, str(b["leads"])) % len(proof)]
+                lead = lead.get(l, "") if isinstance(lead, dict) else (lead if l == "en" else "")
+            elif key == "MIRROR":
+                lead = style_mod.pick("MIRROR", l, b["leads"], g, " ".join(st.mirror[:3]))
+            elif key:
+                lead = style_mod.pick(key, l, b["leads"], g)
+            old_lead = (plan.lead or {}).get(l) or ""
+            first = probe.fill(old_lead or (keep[0] if keep else ""))
+            if lead and re.match(r"(sorry|i.?m sorry|you.?re right|माफ़|माफ|maaf|aap sahi|आप सही|that.?s okay|right|okay|ok|got it|ji|जी|achha|अच्छा|"
+                                 r"hmm|हम्म|sure|of course|no problem|fair|ठीक|theek|lagta|लगता|sounds like)\b", first, re.I):
+                lead = ""  # the line already opens with an acknowledgement: no stacked fillers
+            if lead:
+                leads[l] = (lead + " " + old_lead).strip()
+                if l == lang:
+                    used = key
+        if not out and not leads:
+            return plan
+        if used:
+            d["_style_used"] = used
+        upd = {"fallback": {**plan.fallback, **out}, "decision": (str(plan.decision or "") + " +style:" + st.style)[:200]}
+        if leads:
+            upd["lead"] = {**(plan.lead or {}), **leads}
+        return plan.model_copy(update=upd)
+
+    # ------------------------------------------------------------------ length budget (owner, 15 Nov: "replies are far too long")
+
+    _LEN_EXEMPT = frozenset({"opening", "opt_out", "opt_out_confirmed", "are_you_ai", "number_source", "identify", "human_agent",
+                             "sensitive_stop", "constraint_stop", "repeat_last", "where_were_we", "language_switch", "link_sent",
+                             "declined", "goodbye", "callback", "callback_time", "personal"})
+    _LEN_TERMS = frozenset({"price", "confirm_close", "negotiation", "price_floor", "reoffer"})
+    _NUM = re.compile(r"\d|₹|\$")
+    _PRICE = re.compile(r"(₹|\$|rs\.?\s?)\s?\d[\d,.]*|\d[\d,]*\s*(rupees|rupaye|रुपये|रुपए)", re.I)
+
+    def _length_cap(self, plan, customer_text: str, dialog: dict | None = None) -> dict | None:
+        """The turn's budget: acks <= 6 words, an answer to a direct question <= 25 words, other turns <= 22 words and <= 2
+        sentences (a 1-4 word filler such as "Koi baat nahi." does not count as one). Price / terms lines keep everything up to
+        their last sentence with a number, then only the closing question. None = exempt (compliance wording, safety, replays,
+        link / goodbye / callback lines, a sad caller's row). Off by default (owner, 15 Nov: the older length was right); ACIE_LENGTH_CAP=1 turns it on."""
+        short = False
+        if dialog is not None and os.getenv("ACIE_LENGTH_CAP", "0") != "1" and getattr(self.decision.domain, "name", "") == "product_sales":
+            st = style_mod.Style.from_json(dialog.get(style_mod.STYLE_KEY))
+            short = st is not None and st.style in ("brief", "calm", "dry-honest")  # a hurried / rude / sarcastic caller: short, always
+        if not short and (os.getenv("ACIE_LENGTH_CAP", "0") != "1" or getattr(self.decision.domain, "name", "") != "product_sales"):
+            return None
+        if plan.intent in self._LEN_EXEMPT or plan.intent.startswith(("safety", "distress", "concern")):
+            return None
+        dec = str(plan.decision or "")
+        if dec.startswith(("style:backchannel", "fragment")):
+            return {"w": 6, "s": 1, "terms": False}
+        terms = plan.intent in self._LEN_TERMS or dec.startswith("negotiation")
+        return {"w": 25 if is_question(customer_text) else 22, "s": 2, "terms": terms}
+
+    def _fit_length(self, text: str, cap: dict, spent: dict) -> str:
+        """Keep whole sentences while they fit; the first sentence of the turn is always spoken (cut at a clause boundary
+        if it alone is too long, never inside a number). A sentence with a number (price, terms) is never dropped. The turn's
+        closing question (the ask / permission question) is never dropped: its words are reserved first and the middle is trimmed."""
+        parts = [x for x in re.split(r"(?<=[.!?।])\s+", (text or "").strip()) if x]
+        if not cap["terms"] and cap["w"] > 6 and len(parts) > 1 and parts[-1].rstrip().endswith("?") and not cap.get("_ask") \
+                and len(parts[-1].split()) <= 10 and not self._PRICE.search(parts[-1]):
+            ask = parts[-1]
+            aw = len(ask.split())
+            inner = dict(cap, w=max(cap["w"] - aw, 8), s=max(cap["s"] - 1, 1), _ask=True)
+            body = self._fit_length(" ".join(parts[:-1]), inner, spent)
+            spent["w"] += aw
+            spent["s"] += 1
+            return (body + " " + ask).strip()
+        out = []
+        for part in [x for x in re.split(r"(?<=[.!?।])\s+", (text or "").strip()) if x]:
+            w = len(part.split())
+            num = bool(self._NUM.search(part)) if cap["terms"] else bool(self._PRICE.search(part))
+            if cap["terms"]:
+                if spent.get("num") and not num and not part.rstrip().endswith("?"):
+                    continue  # nothing extra after the terms except the closing question
+                out.append(part)
+            elif num and not cap["w"] <= 6:
+                if spent["w"] + w > cap["w"]:
+                    part = self._price_cut(part)  # the price stays; a question or extra clause glued after it goes
+                    w = len(part.split())
+                out.append(part)  # a price said inside an answer stays
+            elif spent["s"] == 0:  # the first sentence of content (after at most a short filler) is always spoken
+                if spent["w"] + w > cap["w"]:
+                    part = self._clause_cut(part, max(cap["w"] - spent["w"], 4))
+                    if cap["w"] <= 6 and len(part.split()) > cap["w"] and not self._NUM.search(part):
+                        part = " ".join(part.split()[:cap["w"]]).rstrip(",;:") + "."  # an ack: words only, no numbers to break
+                    w = len(part.split())
+                out.append(part)
+            elif spent["s"] < cap["s"] and spent["w"] + w <= cap["w"]:
+                out.append(part)
+            elif spent["s"] < cap["s"] and cap["w"] - spent["w"] >= 4 and \
+                    len((cut := self._clause_cut(part, cap["w"] - spent["w"])).split()) <= cap["w"] - spent["w"]:
+                part, w = cut, len(cut.split())  # the main clause of the second sentence still fits
+                out.append(part)
+            else:
+                continue
+            spent["w"] += w
+            if w > 4 or cap["w"] <= 6:
+                spent["s"] += 1  # a short filler is not a sentence of content
+            if cap["terms"] and num:
+                spent["num"] = True
+        return " ".join(out)
+
+    def _price_cut(self, sent: str) -> str:
+        """The sentence up to the first clause boundary after its last price ("₹6,000 hai, kya aapne ...?" -> "₹6,000 hai.")."""
+        ms = list(self._PRICE.finditer(sent))
+        if not ms:
+            return sent
+        m = re.compile(r"[,;:]\s|\s[-–]\s").search(sent, ms[-1].end())
+        if not m:
+            return sent
+        pre = sent[:m.start()].rstrip()
+        return pre + ("।" if sent.rstrip().endswith("।") else ".")
+
+    @staticmethod
+    def _clause_cut(sent: str, limit: int) -> str:
+        """Longest clause prefix ("," ";" ":" " - " boundaries followed by a space) within `limit` words; the sentence as is if none."""
+        best = ""
+        if sent.rstrip().endswith("?"):
+            return sent  # a question is asked whole or not at all
+        for m in re.finditer(r"[,;:]\s|\s[-–]\s", sent):
+            pre = sent[:m.start()].rstrip()
+            if len(pre.split()) <= limit and len(pre.split()) >= min(4, max(2, limit // 2)):
+                best = pre
+        if not best:
+            return sent
+        end = "।" if re.search(r"[\u0900-\u097f]", best) and not re.search(r"[A-Za-z]{3,}\s*$", best) else "."
+        return best + end
+
     def _keep_call_open(self, plan, expr, session: SessionState, ledger: SaidLedger, facts: CustomerFacts, text: str):
         """The call ends only on an explicit bye / opt-out / firm no (and the crisis and handoff plans). A link that was just sent, or a
         caller still mid-explanation, never ends it; the farewell text is replaced by something that continues the conversation."""
@@ -354,8 +956,9 @@ class ACIEPipeline:
             return plan
         if plan.intent in ("opt_out", "opt_out_confirmed", "human_agent", "constraint_stop") or plan.intent.startswith(("safety", "distress")) or explicit_bye(text) \
                 or (plan.intent in _FIRM_END and plan.decision != "psyche_move" and (plan.intent != "declined" or firm_no(text))) \
-                or (plan.intent in _FIRM_END and (firm_no(text) or re.search(r"call|कॉल|फ़ोन|फोन|phone|बाद|later|कल|शाम|evening|tomorrow|baad|kal|subah|सुबह|morning", text, re.I))):
-            return plan
+                or (plan.intent in _FIRM_END and (firm_no(text) or re.search(r"call|कॉल|फ़ोन|फोन|phone|बाद|later|कल|शाम|evening|tomorrow|baad|kal|subah|सुबह|morning", text, re.I))) \
+                or _HANGUP_TXT.search(text):
+            return plan  # "मुझे कुछ नहीं खरीदना, आप फ़ोन रख दीजिए। राम-राम।": they want the call over
         lang = expr.language
         cur = self._plan_text(plan, lang)
         upd: dict = {"end_call": False}
@@ -448,11 +1051,7 @@ class ACIEPipeline:
         def mark(name: str) -> None:
             t[name] = round((time.perf_counter() - t0) * 1000, 2)
 
-        if self.session_store is not None and turn.session_id not in self.sessions:
-            saved = await self.session_store.get(turn.session_id)
-            if saved is not None:
-                self.sessions[turn.session_id] = saved
-        session = self.session(turn)
+        session = await self.restore_session(turn)
         SESSION_KEY.set(session.session_id)  # sticky A/B variant per session (acie/expression.py)
         if session.turn_index == 0 and hasattr(self.feedback, "recall"):
             await self.feedback.recall(session, turn.text)  # semantic memory (ACIE_MEMORY=1), else a no-op
@@ -492,10 +1091,13 @@ class ACIEPipeline:
         ledger = SaidLedger.load(session.dialog)
         facts = CustomerFacts.load(session.dialog)
         facts.use_ladder(getattr(self.decision.domain, "p", None))
+        before_facts = {k: list(v) for k, v in facts.caller.items()}
         facts.learn_caller(turn.text, asked_goal=session.dialog.get("need_asked") == "1")
         self._track_need(session, turn.text)
         move = None
+        style = self._decide_style(session, state, strat, turn.text, intent, facts, before_facts)
 
+        undo = self._undo_point(session, facts)  # what the context was before this turn (barge-in: keep only what was heard)
         if strat.row == "crisis":  # sticky: once in crisis, never back to business
             if session.dialog.get("safety_flag"):
                 plan = distress_followup_plan(turn.text)
@@ -527,16 +1129,30 @@ class ACIEPipeline:
                         if inspect.isawaitable(r):
                             await r
                 dom.interim = interim
-            if os.getenv("ACIE_FRAGMENT_GUARD", "1") != "0" and one_word_fragment(turn.text) and getattr(dom, "name", "") == "product_sales" \
+            session.dialog["_where"] = session.context.where_we_are()  # the decision layer's view of where the call is
+            if session.context.caller:
+                from .caller_memory import about_block
+                session.dialog["_caller"] = about_block(session.context.caller)
+            recall = self._recall_plan(turn.text, session)
+            if recall is not None:
+                plan = recall  # answered from state: no domain step, no repeat/facts guard may swap it
+            elif os.getenv("ACIE_FRAGMENT_GUARD", "1") != "0" and one_word_fragment(turn.text) and getattr(dom, "name", "") == "product_sales" \
                     and session.turn_index > 0:
                 plan = self._fragment_plan(session, expr, ledger)  # "मुझे" / "mujhe": they are about to say it; no answer, no price
+            elif style is not None and style.partial and getattr(dom, "name", "") == "product_sales":
+                plan = self._backchannel_plan(session, expr, ledger)  # "So basically," / "I was thinking about...": let them finish
+            elif style is not None and style.move == "own_and_hand_back" and getattr(dom, "name", "") == "product_sales" \
+                    and not explicit_bye(turn.text) and not firm_no(turn.text):
+                plan = self._handback_plan(session, expr, ledger)  # "you're being rude, did you even ask me?": own it, give control back
             else:
                 plan = await self.decision.decide(intent, turn, session)
                 plan = enrich_plan(plan, session, None, turn.text, getattr(self.decision.domain, "p", None))  # knowledge base + tree (ACIE_KB=1), else a no-op
                 plan = self._no_repeat(plan, expr, session, ledger, state, intent)
                 plan = self._facts_guard(plan, expr, session, ledger, facts, state, turn.text)
                 plan = self._keep_call_open(plan, expr, session, ledger, facts, turn.text)
+                plan = self._apply_style(plan, expr, session, style, turn.text)
         mark("decide")
+        plan = self._purpose_first(plan, session, expr.language)
         # whole-call memory: what was promised / quoted / asked survives beyond the prompt window
         session.context.record_turn(session.turn_index, turn.text, plan.intent, is_question(turn.text),
                                     objection=session.dialog.pop("_objection", None), sinks=self.context_sinks)
@@ -551,8 +1167,12 @@ class ACIEPipeline:
         sentences: list[str] = []
 
         spoken_parts: list[str] = []  # every sentence already spoken this turn (lead, interim, reply)
+        cap = self._length_cap(plan, turn.text, session.dialog)  # owner: phone-call length, enforced on every agent turn after wording
+        spent = {"w": 0, "s": 0}
 
         async def emit(batch: list[str]) -> None:
+            if cap is not None:
+                batch = [x for x in (self._fit_length(b_, cap, spent) for b_ in batch) if x]
             for s in batch:
                 # live call 7abf60f9bd: the lead and the safe template carried the same answer, so one reply said
                 # "अच्छा सवाल है। ये इस हफ्ते का लॉन्च ऑफर है…" twice. Never speak a sentence twice in one turn.
@@ -670,9 +1290,24 @@ class ACIEPipeline:
                     else:
                         validator.used_fallback = True
             if plan.llm_allowed and not validator.used_fallback and reply:
+                kept = self._drop_broken(reply)
+                if kept != reply:
+                    validator.add_issue("dropped a sentence with a template placeholder or an SMS claim", "broken_sentence")
+                    reply = kept
+                    if not reply:
+                        validator.used_fallback = True
+            if plan.llm_allowed and not validator.used_fallback and reply:
                 kept = self._drop_repeated_questions(reply, ledger, session)
                 if kept != reply:
                     validator.add_issue("dropped a question the call already asked or answered", "question_repeated")
+                    reply = kept
+                kept = self._style_drop_recent_price(reply, plan, session, turn.text)
+                if kept != reply:
+                    validator.add_issue("style: dropped a price said in the last 2 turns", "style_price")
+                    reply = kept
+                kept = self._style_drop_asks(reply, plan, session)
+                if kept != reply:
+                    validator.add_issue("style: dropped a question (question budget)", "style_ask")
                     reply = kept
             if plan.llm_allowed and reply and os.getenv("ACIE_FACTS_GUARD", "1") != "0" and getattr(self.decision.domain, "name", "") == "product_sales":
                 # the model's reply, or the safe template that replaces it, still repeats / restates / re-asks: regenerate once with the
@@ -708,8 +1343,16 @@ class ACIEPipeline:
         if plan.llm_allowed and (plan.intent == "answer" and plan.lead or "offer" in plan.facts and plan.facts["offer"].value in text) \
                 and "offer_price" not in session.context.quoted:
             session.context.quoted.append("offer_price")  # the price was told inside an answer: don't offer it again
-        self._learn_said(ledger, session, plan, move, text, facts)
+        if plan.intent not in ("repeat_last", "where_were_we"):  # a replay says nothing new
+            self._learn_said(ledger, session, plan, move, text, facts)
+        style_mod.note_reply(session.dialog, text)
+        p_ = getattr(self.decision.domain, "p", None)
+        eco = getattr(p_, "economics", None)
+        delta = session.context.after_reply(session.turn_index, turn.text, plan.intent, text, expr.language, session.dialog,
+                                            float(getattr(eco, "list_price", 0) or 0), getattr(eco, "currency", "") or "")
         session.history += [Utterance(role="customer", text=turn.text), Utterance(role="agent", text=text)]
+        undo.update(plan=plan, move=move, turn=session.turn_index, customer_text=turn.text, lang=expr.language, text=text)
+        self._undo[session.session_id] = undo
         session.state, session.expression = state, expr
         if turn.prosody is not None:  # this turn becomes part of the caller's voice baseline
             session.prosody_history = (session.prosody_history + [turn.prosody])[-20:]
@@ -721,11 +1364,7 @@ class ACIEPipeline:
             self.feedback.end_session(profile, session)
             await self.feedback.remember(session, profile)
         await self.store.save(profile)
-        if self.session_store is not None:
-            try:
-                await self.session_store.put(session)
-            except Exception:  # the durable copy must never break a live call
-                pass
+        await self._persist(turn, session, plan, text, expr, delta, t)
 
         return TurnResult(text=text, plan=plan, state=state, expression=expr,
                           validation=validator.report(), timings_ms=t, result=session.context.result or None)

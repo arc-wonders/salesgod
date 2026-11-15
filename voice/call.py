@@ -24,6 +24,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
+from acie.agents import gendered, voice_chain
 from acie.trace import trace
 from acie.text import detect_language
 from acie.schemas import ExpressionParams, TurnInput, TurnTiming, Utterance
@@ -108,10 +109,11 @@ class CallRecord:
     machine: bool = False  # Plivo answering-machine detection said a machine answered
     sms: list[dict] = field(default_factory=list)
     context: dict = field(default_factory=dict)  # the call's context ledger (acie/context.py), saved at the end
+    agent_id: str = ""  # persona override (acie/agents.py); the session writes the resolved one here
 
     def public(self) -> dict:
         return {k: getattr(self, k) for k in ("call_id", "to", "customer_id", "language", "backend", "campaign",
-                                              "customer_name", "customer_age", "status",
+                                              "customer_name", "customer_age", "agent_id", "status",
                                               "created_at", "answered_at", "ended_at", "end_reason", "turns", "events", "sms", "context")}
 
 
@@ -154,6 +156,12 @@ class CallSession:
         self.barge_checked_run = -1  # VAD run already voice-checked for barge-in
         self.paused: dict | None = None  # agent paused by a possible barge-in: {"at", "parts", "epoch", "speech_ms"}
         self.sent_parts: list[tuple[float, bytes]] = []  # (scheduled start, mu-law part) of audio still queued at Plivo
+        # what the caller HEARD (voice/heard.py): per TTS request text + line time; a barge-in cuts the turn to that
+        from .heard import PlayLog
+        self.playlog = PlayLog()
+        self._play_entry: dict | None = None
+        self.epoch_turn: dict[int, dict] = {}  # speaking epoch -> the agent turn record spoken in it
+        self.cut_at: dict[int, float] = {}  # speaking epoch -> when a confirmed barge-in cleared its audio
         self.barge_stage = 0
         self.accepted_turns = 0
         self.last_dropped_speech = 0.0  # a caller utterance with words that we dropped or could not use
@@ -167,8 +175,19 @@ class CallSession:
         self.protected_until = 0.0
         product = app.products().get(call.campaign) if call.campaign != "bank_demo" else None
         self.product = product
-        self.pronounce = [(re.compile(r"(?<![A-Za-z])" + re.escape(k) + r"(?![A-Za-z])"), v)
-                          for k, v in (product.pronunciations if product else {}).items() if k and v]
+        # the persona (acie/agents.py): its voices speak this call and Hindi first-person verbs follow its gender
+        agent_for = getattr(app, "agent_for", None)
+        self.agent = agent_for(call, product) if callable(agent_for) else None
+        self.agent_gender = "male"
+        if self.agent is not None:
+            from acie.agents import grammar_gender
+            self.agent_gender = grammar_gender(self.agent)
+            call.agent_id = self.agent.id
+        # pronunciation lexicon (acie/pronounce.py): global -> tenant -> product -> agent, per voice language
+        from acie.pronounce import resolver_for
+        self.pronounce = resolver_for(product, getattr(self.agent, "id", "") or "",
+                                      os.getenv("VOICE_DATA_DIR") or os.path.join(os.path.dirname(os.path.dirname(
+                                          os.path.abspath(__file__))), "data", "voice"))
 
     # ------------------------------------------------------------------ plivo I/O
 
@@ -201,6 +220,8 @@ class CallSession:
             if self.rec_t0 is not None:
                 self.rec_out.append((start - self.rec_t0, part, now - self.rec_t0))
             self.play_until = start + len(part) / LINE_RATE
+            if getattr(self, "_play_entry", None) is not None and self._play_entry["epoch"] == epoch:
+                self.playlog.sent(self._play_entry, start, self.play_until)
             self.sent_parts = [x for x in self.sent_parts if x[0] + len(x[1]) / LINE_RATE > now] + [(start, part)]
         return True
 
@@ -227,6 +248,7 @@ class CallSession:
         p, self.paused = self.paused, None
         if p is None or p["epoch"] != self.speaking_epoch:
             return
+        resume_start = None
         for part in p["parts"]:
             await self.send({"event": "playAudio", "media": {
                 "contentType": "audio/x-mulaw", "sampleRate": LINE_RATE, "payload": base64.b64encode(part).decode()}})
@@ -236,15 +258,37 @@ class CallSession:
                 self.rec_out.append((start - self.rec_t0, part, now - self.rec_t0))
             self.play_until = start + len(part) / LINE_RATE
             self.sent_parts.append((start, part))
+            if resume_start is None:
+                resume_start = start
+        if resume_start is not None:
+            self.playlog.resumed(p["epoch"], p["at"], resume_start, self.play_until, BARGE_RESUME_BACKUP_S)
         self.event("barge_resume", {"why": why, "paused_ms": round((time.monotonic() - p["at"]) * 1000)})
 
     async def _confirm_barge(self, now: float) -> None:
         p, self.paused = self.paused, None
+        cut_epoch = self.speaking_epoch
+        self.cut_at[cut_epoch] = p["at"] if p else now  # audio stopped at the pause (clearAudio), else now
         self.speaking_epoch += 1  # drops the held parts and the rest of the reply
         self.barge_in_pending = True
         self.play_until = now
         self.event("barge_in", {"after_speech_ms": p["speech_ms"] if p else None,
                                 "confirmed_after_ms": round((now - p["at"]) * 1000) if p else None})
+        self.apply_heard(cut_epoch)
+
+    def apply_heard(self, epoch: int) -> None:
+        """The turn spoken in `epoch` was cut: keep only what the caller heard (turn record, context, ledger, deal)."""
+        rec = self.epoch_turn.get(epoch)
+        if rec is None or epoch not in self.cut_at or "heard_text" in rec:
+            return
+        try:
+            heard, full, ratio = self.playlog.heard(epoch, self.cut_at[epoch])
+            if not full or ratio >= 0.999:
+                return
+            rec.update({"heard_text": heard, "interrupted": True, "heard_ratio": round(ratio, 2)})
+            self.pipeline.apply_heard(self.session_id, heard, ratio, rec.get("intent", ""))
+            self.event("heard", {"turn_t": rec.get("t"), "heard_text": heard, "heard_ratio": round(ratio, 2), "intent": rec.get("intent")})
+        except Exception:  # noqa: BLE001 - bookkeeping never breaks the call
+            log.exception("[%s] heard-cut bookkeeping failed", self.call.call_id)
 
     def agent_speaking(self) -> bool:
         return time.monotonic() < self.play_until
@@ -435,6 +479,8 @@ class CallSession:
             self.no_response_count = MAX_NO_RESPONSE_PROMPTS - 1  # someone spoke recently: never hang up as silent
         last = self.no_response_count > MAX_NO_RESPONSE_PROMPTS - 1
         text = NO_RESPONSE.get(lang, NO_RESPONSE["hi"])[1 if last else 0]
+        if self.agent is not None:
+            text = gendered(text, self.agent_gender)  # "मैं बाद में कॉल करता/करती हूँ"
         self.event("no_response", {"count": self.no_response_count})
         turn = {"role": "agent", "text": text, "intent": "no_response_hangup" if last else "no_response_check",
                 "t": time.time()}
@@ -470,6 +516,7 @@ class CallSession:
         sess.history.append(Utterance(role="agent", text=text))
         sess.context.record_turn(0, "", plan.intent, False, sinks=self.pipeline.context_sinks)
         turn = {"role": "agent", "text": text, "intent": "greet", "t": time.time()}
+        self.epoch_turn[self.speaking_epoch] = turn
         self.call.turns.append(turn)
         self.event("turn", turn)
         self.protected_until = time.monotonic() + OPENING_PROTECTED_S
@@ -630,6 +677,9 @@ class CallSession:
             "trace": trace(result, sess.dialog if sess else None),
         }
         self.call.turns += [cust, agent]
+        self.epoch_turn[epoch] = agent
+        if epoch in self.cut_at:  # barged in while this reply was still being produced
+            self.apply_heard(epoch)
         self.last_replied_at = time.monotonic()
         self.event("turn", cust)
         self.event("turn", agent)
@@ -748,17 +798,27 @@ class CallSession:
         for s in sentences:
             if epoch != self.speaking_epoch:
                 return
-            if DEVA.search(s):  # Hindi turn: respell English names the Hindi voice misreads
-                for rx, say in self.pronounce:
-                    s = rx.sub(say, s)
+            pl = getattr(self, "playlog", None)
+            self._play_entry = pl.begin(epoch, s) if pl is not None else None  # the words as written, not respelled
+            try:  # names, acronyms, units and ₹ amounts respelled for the voice that speaks this line
+                s = self.pronounce.apply(s, language)
+            except Exception:  # noqa: BLE001 - a lexicon problem never silences the agent
+                log.exception("[%s] pronunciation failed", self.call.call_id)
             t0 = time.monotonic()
+            kw = {}
+            if self.agent is not None:
+                s = gendered(s, self.agent_gender)  # safety net for lines that skipped the validator
+                if getattr(self.app.tts, "accepts_voice", False):
+                    kw = {"voices": voice_chain(self.agent, language), "speed": self.agent.speaking_rate}
             try:
-                async for pcm in self.app.tts.stream(s, language):
+                async for pcm in self.app.tts.stream(s, language, **kw):
                     if first_audio is not None and "ms" not in first_audio and t_end is not None:
                         first_audio["ms"] = round((time.monotonic() - t_end) * 1000)
                         first_audio["tts_ms"] = round((time.monotonic() - t0) * 1000)
                     if not await self.play_pcm(pcm, epoch):
                         return
+                if self._play_entry is not None:
+                    self._play_entry["done"] = True
             except Exception as e:
                 log.warning("[%s] TTS failed: %s", self.call.call_id, e)
                 self.event("error", {"message": f"TTS: {e}"})

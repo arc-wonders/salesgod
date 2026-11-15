@@ -15,9 +15,10 @@ import re
 
 
 def enabled() -> bool:
-    """Crisis/helpline guardrail switch. OFF by default (owner, 15 Nov 2026: no Tele-MANAS / mental-health handling
-    inside sales calls; a false trigger on "give me a good discount" stopped a live call). ACIE_SAFETY=1 turns it back on."""
-    return os.getenv("ACIE_SAFETY", "0") == "1"
+    """Crisis/helpline guardrail switch. ON by default (owner's standing rule: a caller in distress stops all selling;
+    live miss 2ccf3f1387 "मेरा गोल है छत से कूदना" got a gym pitch while it was off). The false trigger that had it switched
+    off ("give me a good discount", 1e2a92c585) is fixed in skeletons()/_BENIGN_RAW. ACIE_SAFETY=0 turns it off."""
+    return os.getenv("ACIE_SAFETY", "1") != "0"
 
 from .schemas import Fact, TurnPlan
 from .text import normalize, tokens

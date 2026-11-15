@@ -5,79 +5,102 @@
 <meta name="theme-color" content="#0b0c10">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <title>SalesGod</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script>try{if(localStorage.getItem('sg_theme')==='light')document.documentElement.classList.add('light')}catch(e){}</script>
 <style>
-:root{--bg:#0b0c10;--card:#15171d;--card2:#1c1f27;--line:#262a33;--fg:#eef0f4;--mute:#8b92a0;--acc:#ff6a2b;--ok:#34d399;--bad:#f87171;--warn:#fbbf24;--blue:#60a5fa;
---top:env(safe-area-inset-top);--bot:env(safe-area-inset-bottom)}
+:root{--bg:hsl(220 10% 5.7%);--card:hsl(214 12% 8%);--card2:hsl(216 10% 11%);--line:hsl(210 9% 14.5%);--line2:hsl(214 8% 20%);--fg:hsl(60 8% 92%);--mute:hsl(216 5% 62%);--dim:hsl(217 5% 48%);
+--acc:hsl(16 100% 56%);--onacc:hsl(220 10% 6%);--ok:hsl(153 44% 49%);--bad:hsl(358 70% 62%);--warn:hsl(38 85% 55%);--blue:hsl(216 70% 66%);--bar:hsl(220 10% 5.7%/.92);
+--top:env(safe-area-inset-top);--bot:env(safe-area-inset-bottom);color-scheme:dark}
+.light{--bg:hsl(45 14% 96%);--card:hsl(45 18% 99%);--card2:hsl(45 12% 93%);--line:hsl(40 8% 86%);--line2:hsl(40 6% 76%);--fg:hsl(220 10% 9%);--mute:hsl(220 5% 36%);--dim:hsl(220 4% 46%);
+--acc:hsl(16 100% 50%);--onacc:#fff;--ok:hsl(153 45% 32%);--bad:hsl(358 65% 46%);--warn:hsl(38 80% 36%);--blue:hsl(216 55% 45%);--bar:hsl(45 14% 96%/.92);color-scheme:light}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-html,body{margin:0;height:100%;background:var(--bg);color:var(--fg);font:15px/1.45 -apple-system,BlinkMacSystemFont,"Inter","Segoe UI",Roboto,sans-serif;overscroll-behavior:none}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--fg);font:15px/1.5 'Geist',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;overscroll-behavior:none;font-feature-settings:'ss01','tnum';-webkit-font-smoothing:antialiased}
 button,input,select,textarea{font:inherit;color:inherit}
-input,select,textarea{width:100%;font-size:16px;padding:13px 14px;border:1px solid var(--line);border-radius:12px;background:var(--card2);outline:none;appearance:none}
-input:focus,select:focus,textarea:focus{border-color:var(--acc)}
+button{cursor:pointer}
+input,select,textarea{width:100%;font-size:16px;padding:12px 14px;border:1px solid var(--line2);border-radius:12px;background:var(--card);outline:none;appearance:none}
+input:focus,select:focus,textarea:focus{border-color:var(--acc);box-shadow:0 0 0 3px color-mix(in srgb,var(--acc) 18%,transparent)}
+input.invalid,textarea.invalid{border-color:var(--bad)}
+input::placeholder,textarea::placeholder{color:var(--dim)}
 select{background-image:linear-gradient(45deg,transparent 50%,var(--mute) 50%),linear-gradient(135deg,var(--mute) 50%,transparent 50%);background-position:calc(100% - 18px) 55%,calc(100% - 13px) 55%;background-size:5px 5px;background-repeat:no-repeat;padding-right:34px}
-label{display:block;font-size:12px;color:var(--mute);margin:14px 2px 6px;font-weight:500;letter-spacing:.02em}
+textarea{resize:vertical;line-height:1.5}
+label{display:block;font-size:13px;color:var(--mute);margin:16px 2px 7px;font-weight:500}
+label .opt{color:var(--dim);font-weight:400}
 .app{display:flex;flex-direction:column;height:100dvh}
-.top{padding:calc(var(--top) + 10px) 16px 10px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--line);background:rgba(11,12,16,.92);backdrop-filter:blur(12px)}
-.top h1{font-size:20px;margin:0;font-weight:650;letter-spacing:-.02em;flex:1}
-.top .ten{width:auto;max-width:46%;padding:7px 30px 7px 12px;font-size:14px;border-radius:999px}
-.dot{width:8px;height:8px;border-radius:50%;background:var(--mute);display:inline-block;flex:none}
-.dot.ok{background:var(--ok);box-shadow:0 0 0 0 rgba(52,211,153,.6);animation:pulse 2s infinite}
-.dot.bad{background:var(--bad)}
-@keyframes pulse{70%{box-shadow:0 0 0 7px rgba(52,211,153,0)}100%{box-shadow:0 0 0 0 rgba(52,211,153,0)}}
-.view{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:14px 14px 24px}
-.tabs{display:flex;border-top:1px solid var(--line);background:#0e1015;padding-bottom:var(--bot)}
-.tabs button{flex:1;border:0;background:none;padding:9px 0 8px;display:flex;flex-direction:column;align-items:center;gap:3px;font-size:11px;color:var(--mute);font-weight:500}
-.tabs button svg{width:23px;height:23px}
+.top{padding:calc(var(--top) + 10px) 14px 10px 16px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--line);background:var(--bar);backdrop-filter:blur(12px)}
+.top h1{font-size:19px;margin:0;font-weight:600;letter-spacing:-.02em;flex:1;min-width:0}
+.top .ten{width:auto;max-width:44%;padding:7px 30px 7px 12px;font-size:14px;border-radius:999px;background-color:var(--card)}
+.ib{width:36px;height:36px;flex:none;display:grid;place-items:center;border:1px solid var(--line2);border-radius:50%;background:none;color:var(--mute)}
+.ib svg{width:17px;height:17px}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--dim);display:inline-block;flex:none}
+.dot.ok{background:var(--ok);animation:pulse 2s infinite}
+.dot.bad{background:var(--warn)}
+@keyframes pulse{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--ok) 55%,transparent)}70%{box-shadow:0 0 0 7px transparent}100%{box-shadow:0 0 0 0 transparent}}
+.view{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:14px 14px 28px}
+.tabs{display:flex;border-top:1px solid var(--line);background:var(--bar);backdrop-filter:blur(12px);padding-bottom:var(--bot)}
+.tabs button{flex:1;border:0;background:none;padding:9px 0 8px;display:flex;flex-direction:column;align-items:center;gap:3px;font-size:11.5px;color:var(--dim);font-weight:500}
+.tabs button svg{width:22px;height:22px}
 .tabs button.on{color:var(--acc)}
-.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px}
-.list{display:flex;flex-direction:column;gap:10px}
-.call{display:flex;gap:12px;align-items:center}
-.av{width:42px;height:42px;border-radius:50%;background:var(--card2);display:grid;place-items:center;font-weight:600;color:var(--mute);flex:none;font-size:15px}
-.av.live{background:rgba(52,211,153,.15);color:var(--ok)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px}
+.list{display:flex;flex-direction:column;gap:8px}
+.call{display:flex;gap:12px;align-items:center;padding:12px 14px;cursor:pointer}
+.call:active{background:var(--card2)}
+.av{width:40px;height:40px;border-radius:50%;background:var(--card2);display:grid;place-items:center;font-weight:600;color:var(--mute);flex:none;font-size:15px;border:1px solid var(--line)}
+.av.live{background:color-mix(in srgb,var(--ok) 15%,transparent);color:var(--ok);border-color:color-mix(in srgb,var(--ok) 35%,transparent)}
 .call .b{flex:1;min-width:0}
-.call .n{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.call .s{font-size:13px;color:var(--mute);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.pill{font-size:11.5px;font-weight:600;padding:3px 9px;border-radius:999px;background:var(--card2);color:var(--mute);white-space:nowrap}
-.pill.live{background:rgba(52,211,153,.15);color:var(--ok)}.pill.failed{background:rgba(248,113,113,.14);color:var(--bad)}
-.pill.ringing,.pill.dialing{background:rgba(251,191,36,.14);color:var(--warn)}.pill.sold{background:rgba(255,106,43,.16);color:var(--acc)}
-.sec{font-size:12px;font-weight:600;color:var(--mute);text-transform:uppercase;letter-spacing:.07em;margin:18px 4px 8px}
+.call .n{font-weight:550;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.call .s{font-size:13px;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pill{font-size:12px;font-weight:500;padding:3px 9px;border-radius:999px;background:var(--card2);color:var(--mute);white-space:nowrap;border:0}
+.pill.live{background:color-mix(in srgb,var(--ok) 15%,transparent);color:var(--ok)}.pill.failed{background:color-mix(in srgb,var(--bad) 14%,transparent);color:var(--bad)}
+.pill.ringing,.pill.dialing{background:color-mix(in srgb,var(--warn) 15%,transparent);color:var(--warn)}.pill.sold{background:color-mix(in srgb,var(--acc) 16%,transparent);color:var(--acc)}
+.sec{font-size:12px;font-weight:500;color:var(--dim);text-transform:uppercase;letter-spacing:.08em;margin:20px 4px 8px}
 .sec:first-child{margin-top:4px}
-.btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;border:0;border-radius:14px;padding:15px;font-weight:650;font-size:16px;background:var(--acc);color:#fff}
+.btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;border:0;border-radius:999px;padding:14px;font-weight:600;font-size:16px;background:var(--acc);color:var(--onacc)}
 .btn:active{transform:scale(.98);opacity:.9}
-.btn.sec2{background:var(--card2);color:var(--fg);border:1px solid var(--line)}
-.btn.red{background:var(--bad)}
+.btn.sec2{background:var(--card);color:var(--fg);border:1px solid var(--line2)}
+.btn.red{background:var(--bad);color:#fff}
 .btn[disabled]{opacity:.5}
-.seg{display:flex;background:var(--card2);border:1px solid var(--line);border-radius:12px;padding:3px}
-.seg button{flex:1;border:0;background:none;padding:10px 0;border-radius:9px;font-size:14px;font-weight:550;color:var(--mute)}
-.seg button.on{background:var(--fg);color:var(--bg)}
+.seg{display:flex;background:var(--card);border:1px solid var(--line2);border-radius:999px;padding:3px}
+.seg button{flex:1;border:0;background:none;padding:9px 0;border-radius:999px;font-size:14px;font-weight:500;color:var(--mute)}
+.seg button.on{background:var(--card2);color:var(--fg);box-shadow:inset 0 0 0 1px var(--line2)}
 .row{display:flex;gap:10px}.row>*{flex:1;min-width:0}
-.bub{max-width:84%;padding:10px 13px;border-radius:18px;font-size:15px;white-space:pre-wrap;word-wrap:break-word}
+.bub{max-width:86%;padding:10px 13px;border-radius:18px;font-size:15px;white-space:pre-wrap;word-wrap:break-word}
 .bub.a{background:var(--card2);border-bottom-left-radius:6px;align-self:flex-start}
-.bub.c{background:var(--acc);color:#fff;border-bottom-right-radius:6px;align-self:flex-end}
-.bub small{display:block;font-size:11px;opacity:.65;margin-top:4px}
+.bub.c{background:color-mix(in srgb,var(--acc) 11%,var(--card));border:1px solid color-mix(in srgb,var(--acc) 24%,transparent);border-bottom-right-radius:6px;align-self:flex-end}
+.bub small{display:block;font-size:11.5px;color:var(--dim);margin-top:4px}
 .thread{display:flex;flex-direction:column;gap:8px}
 .ev{align-self:center;font-size:12px;color:var(--mute);background:var(--card);border:1px solid var(--line);padding:4px 10px;border-radius:999px}
 .sheet{position:fixed;inset:0;z-index:20;background:var(--bg);display:flex;flex-direction:column;animation:up .22s ease}
 @keyframes up{from{transform:translateY(30px);opacity:0}}
-.sheet .hd{padding:calc(var(--top) + 8px) 8px 10px;display:flex;align-items:center;gap:6px;border-bottom:1px solid var(--line)}
+.sheet .hd{padding:calc(var(--top) + 8px) 12px 10px 6px;display:flex;align-items:center;gap:6px;border-bottom:1px solid var(--line)}
 .back{border:0;background:none;padding:8px;display:flex;color:var(--acc)}
-.sheet .hd .t{flex:1;min-width:0}.sheet .hd b{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.sheet .hd small{color:var(--mute);font-size:12.5px}
-.sheet .ft{padding:10px 14px calc(var(--bot) + 10px);border-top:1px solid var(--line);background:#0e1015}
-.compose{display:flex;gap:8px;padding:8px 10px calc(var(--bot) + 8px);border-top:1px solid var(--line);background:#0e1015}
+.sheet .hd .t{flex:1;min-width:0}.sheet .hd b{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:600}.sheet .hd small{color:var(--dim);font-size:12.5px}
+.sheet .ft{padding:10px 14px calc(var(--bot) + 10px);border-top:1px solid var(--line);background:var(--bar)}
+.compose{display:flex;gap:8px;padding:8px 10px calc(var(--bot) + 8px);border-top:1px solid var(--line);background:var(--bar)}
 .compose input{border-radius:999px;padding:11px 16px}
-.send{width:46px;height:46px;flex:none;border-radius:50%;border:0;background:var(--acc);color:#fff;display:grid;place-items:center}
-.stats{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.send{width:46px;height:46px;flex:none;border-radius:50%;border:0;background:var(--acc);color:var(--onacc);display:grid;place-items:center}
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .stat{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px}
-.stat b{display:block;font-size:26px;font-weight:650;letter-spacing:-.02em}
-.stat span{font-size:12.5px;color:var(--mute)}
-.bar{height:8px;background:var(--card2);border-radius:99px;overflow:hidden;margin-top:8px}.bar i{display:block;height:100%;background:var(--acc);border-radius:99px}
-.empty{text-align:center;color:var(--mute);padding:50px 20px}
-.err{color:var(--bad);font-size:14px;margin-top:10px;min-height:1em}
-.toast{position:fixed;left:50%;bottom:calc(var(--bot) + 80px);transform:translateX(-50%);background:var(--fg);color:var(--bg);padding:10px 16px;border-radius:12px;font-size:14px;font-weight:550;z-index:50;max-width:90%}
-.typing{align-self:flex-start;color:var(--mute);font-size:13px;padding:4px 8px}
-.chk{display:flex;gap:10px;align-items:center;font-size:14px;color:var(--mute);margin-top:14px}.chk input{width:20px;height:20px;padding:0;appearance:auto;flex:none}
-audio{width:100%;margin-top:8px}
-.login{min-height:100dvh;display:flex;flex-direction:column;justify-content:center;padding:24px}
-.logo{width:52px;height:52px;border-radius:15px;background:linear-gradient(135deg,var(--acc),#ff3d6e);margin-bottom:18px}
+.stat b{display:block;font-size:24px;font-weight:600;letter-spacing:-.02em}
+.stat span{font-size:12.5px;color:var(--dim)}
+.bar{height:6px;background:var(--card2);border-radius:99px;overflow:hidden;margin-top:8px}.bar i{display:block;height:100%;background:var(--acc);border-radius:99px}
+.empty{text-align:center;color:var(--dim);padding:48px 20px}
+.empty b{display:block;color:var(--fg);font-weight:550;margin-bottom:4px}
+.err{color:var(--bad);font-size:14px;margin-top:10px;white-space:pre-wrap}
+.err:empty{display:none}
+.hint{color:var(--dim);font-size:13px;margin-top:6px}
+.toast{position:fixed;left:50%;bottom:calc(var(--bot) + 80px);transform:translateX(-50%);background:var(--fg);color:var(--bg);padding:10px 16px;border-radius:12px;font-size:14px;font-weight:500;z-index:50;max-width:90%}
+.typing{align-self:flex-start;color:var(--dim);font-size:13px;padding:4px 8px}
+.chk{display:flex;gap:10px;align-items:flex-start;font-size:14px;color:var(--mute);margin-top:16px}.chk input{width:20px;height:20px;padding:0;appearance:auto;flex:none;accent-color:var(--acc);margin-top:1px}
+.res{margin-top:14px;border:1px solid var(--line);border-radius:14px;overflow:hidden;background:var(--card)}
+.res .r{display:flex;gap:10px;align-items:flex-start;padding:11px 14px;border-bottom:1px solid var(--line);font-size:14px}.res .r:last-child{border-bottom:0}
+.res .ic{width:20px;height:20px;border-radius:50%;flex:none;display:grid;place-items:center;font-size:12px;font-weight:700;margin-top:1px}
+.res .ok .ic{background:color-mix(in srgb,var(--ok) 18%,transparent);color:var(--ok)}.res .warn .ic{background:color-mix(in srgb,var(--warn) 18%,transparent);color:var(--warn)}.res .bad .ic{background:color-mix(in srgb,var(--bad) 16%,transparent);color:var(--bad)}
+.res .num{font-family:'Geist Mono',ui-monospace,monospace;font-size:13px}.res .m{font-size:13px;color:var(--mute)}.res .warn .m{color:var(--warn)}.res .bad .m{color:var(--bad)}
+.res .r button{margin-left:auto;flex:none}
+audio{width:100%;margin-top:10px}
+.login{min-height:100dvh;display:flex;flex-direction:column;justify-content:center;padding:24px;max-width:420px;margin:0 auto}
+.logo{width:44px;height:44px;border-radius:12px;background:var(--acc);margin-bottom:18px;display:grid;place-items:center}.logo i{width:16px;height:16px;border-radius:50%;background:var(--bg)}
 </style></head>
 <body><div id="root"></div>
 <script>
@@ -88,13 +111,16 @@ dial:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1
 chat:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>',
 stats:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>',
 back:'<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>',
+sun:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>',
+moon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9z"/></svg>',
 send:'<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4z"/></svg>'};
 const S={tab:localStorage.sgm_tab||'calls',tenant:localStorage.sgm_tenant||'',tenants:[],products:[],calls:[],conn:'',open:null,sim:{sid:null,turns:[],busy:false,pid:'',lang:'hinglish'},nc:{lang:'hi'},stats:null};
-async function api(p,o={}){const r=await fetch(p,{credentials:'same-origin',headers:{'content-type':'application/json'},...o});if(r.status===401){S.authed=false;render();throw new Error('Sign in')}const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.detail||('Error '+r.status));return j}
+async function api(p,o={}){const r=await fetch(p,{credentials:'same-origin',headers:{'content-type':'application/json'},...o});if(r.status===401){S.authed=false;render();throw new Error('Sign in')}const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(errText(j.detail??j.error??j.message)||('Error '+r.status));return j}
+function errText(x){if(x==null)return'';if(typeof x==='string')return x;if(Array.isArray(x))return x.map(errText).filter(Boolean).join('\n');if(typeof x==='object'){if(x.msg){const l=(x.loc||[]).filter(k=>k!=='body'&&k!=='query').join(' > ');return(l?l.replace(/_/g,' ')+': ':'')+x.msg}return errText(x.message||x.error||x.detail)||Object.entries(x).map(([k,v])=>k+': '+errText(v)).join('\n')}return String(x)}
 function toast(m){const t=document.createElement('div');t.className='toast';t.textContent=m;document.body.append(t);setTimeout(()=>t.remove(),2600)}
 const ago=t=>{if(!t)return'';const s=Date.now()/1000-t;return s<60?'now':s<3600?Math.floor(s/60)+'m ago':s<86400?Math.floor(s/3600)+'h ago':Math.floor(s/86400)+'d ago'};
 const dur=c=>{if(!c.answered_at)return'';const e=c.ended_at||Date.now()/1000;const s=Math.round(e-c.answered_at);return Math.floor(s/60)+':'+String(s%60).padStart(2,'0')};
-const myProducts=()=>S.products.filter(p=>!S.tenant||p.tenant===S.tenant);
+const myProducts=()=>S.products.filter(p=>!S.tenant||(p.project_id||p.tenant||'default')===S.tenant);
 const pnm=p=>p.product_name||p.name||p.id;const pname=id=>{const p=S.products.find(p=>p.id===id);return p?pnm(p):(id||'')};
 const sold=c=>(c.turns||[]).some(t=>t.intent==='link_sent');
 const isLive=c=>['live','ringing','dialing'].includes(c.status);
@@ -114,16 +140,17 @@ let es;function sse(){if(es)es.close();es=new EventSource('/api/events');es.onop
   const cid=d.call_id||(d.call&&d.call.call_id);if(S.open&&cid===S.open)drawCall();if(S.tab==='calls'&&!S.open)drawView();}}
 
 function render(){const r=$('#root');
- if(S.authed===false){r.innerHTML=`<div class="login"><div class="logo"></div><h1 style="margin:0 0 6px;font-size:28px;letter-spacing:-.03em">SalesGod</h1><p style="color:var(--mute);margin:0 0 26px">Your AI voice sales agent.</p>
+ if(S.authed===false){r.innerHTML=`<div class="login"><div class="logo"><i></i></div><h1 style="margin:0 0 6px;font-size:28px;letter-spacing:-.03em">SalesGod</h1><p style="color:var(--mute);margin:0 0 26px">Your AI voice sales agent.</p>
  <label>Password</label><input id="pw" type="password" autocomplete="current-password"><div style="height:16px"></div><button class="btn" id="go">Sign in</button><div class="err" id="lerr"></div></div>`;
  const go=async()=>{try{await api('/api/login',{method:'POST',body:JSON.stringify({password:$('#pw').value})});boot()}catch(e){$('#lerr').textContent=e.message}};
  $('#go').onclick=go;$('#pw').onkeydown=e=>{if(e.key==='Enter')go()};return}
  if(!S.authed){r.innerHTML='';return}
  const T={calls:'Calls',dial:'New call',chat:'Test chat',stats:'Stats'};
  r.innerHTML=`<div class="app"><div class="top"><span id="cdot" class="dot ${S.conn}"></span><h1>${T[S.tab]}</h1>
- <select class="ten" id="ten">${S.tenants.map(t=>`<option value="${esc(t.id)}" ${t.id===S.tenant?'selected':''}>${esc(t.name)}</option>`).join('')}</select></div>
+ <button class="ib" id="thm" aria-label="Toggle theme">${document.documentElement.classList.contains('light')?I.moon:I.sun}</button><select class="ten" id="ten" aria-label="Project">${S.tenants.map(t=>`<option value="${esc(t.id)}" ${t.id===S.tenant?'selected':''}>${esc(t.name)}</option>`).join('')}</select></div>
  <div class="view" id="view"></div>
  <nav class="tabs">${Object.entries(T).map(([k,v])=>`<button data-t="${k}" class="${S.tab===k?'on':''}">${I[k]}<span>${v}</span></button>`).join('')}</nav></div>`;
+ $('#thm').onclick=()=>{const l=document.documentElement.classList.toggle('light');try{localStorage.setItem('sg_theme',l?'light':'dark')}catch(e){}render()};
  $('#ten').onchange=e=>{S.tenant=localStorage.sgm_tenant=e.target.value;S.sim={...S.sim,sid:null,turns:[],pid:''};render()};
  r.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{S.tab=localStorage.sgm_tab=b.dataset.t;render()});
  drawView();}
@@ -134,7 +161,7 @@ function vCalls(v){const pids=new Set(myProducts().map(p=>p.id));const cs=S.call
  const item=c=>{const nm=c.customer_name||c.to||'Unknown';const ct=(c.turns||[]).filter(t=>t.role==='customer').length;
   return`<div class="card call" data-id="${c.call_id}"><div class="av ${isLive(c)?'live':''}">${/^[+\d]/.test(nm)?'#':esc(nm.slice(0,1).toUpperCase())}</div><div class="b"><div class="n">${esc(nm)}</div><div class="s">${esc(pname(c.campaign))} · ${ct} replies${dur(c)?' · '+dur(c):''} · ${ago(c.created_at)}</div></div>${statusPill(c)}</div>`};
  v.innerHTML=(live.length?`<div class="sec">Live now</div><div class="list">${live.map(item).join('')}</div>`:'')+
-  `<div class="sec">Recent</div>`+(past.length?`<div class="list">${past.map(item).join('')}</div>`:`<div class="empty">No calls yet.<br><br><button class="btn" style="width:auto;padding:12px 22px;margin:auto" onclick="S.tab='dial';render()">Make a call</button></div>`);
+  `<div class="sec">Recent</div>`+(past.length?`<div class="list">${past.map(item).join('')}</div>`:`<div class="empty"><b>No calls yet</b>Place the first one from New call.<br><br><button class="btn" style="width:auto;padding:12px 22px;margin:auto" onclick="S.tab='dial';render()">New call</button></div>`);
  v.querySelectorAll('.call').forEach(e=>e.onclick=()=>openCall(e.dataset.id));}
 
 function openCall(id){S.open=id;const s=document.createElement('div');s.className='sheet';s.id='sheet';document.body.append(s);history.pushState({s:1},'');drawCall()}
@@ -145,8 +172,8 @@ function drawCall(){const s=$('#sheet');const c=S.calls.find(x=>x.call_id===S.op
  const items=[];(c.turns||[]).forEach((t,i)=>items.push({k:'t',t,i}));
  (c.events||[]).filter(e=>['barge_in','sms','error','link_sent'].includes(e.type)).forEach(e=>items.push({k:'e',e,i:(e.after_turn??999)-.5}));
  items.sort((a,b)=>a.i-b.i);
- const body=items.map(x=>x.k==='t'?`<div class="bub ${x.t.role==='customer'?'c':'a'}">${esc(x.t.text)}${x.t.role==='agent'&&x.t.intent?`<small>${esc(String(x.t.intent).replace(/_/g,' '))}</small>`:x.t.emotion?`<small>${esc(x.t.emotion)}</small>`:''}</div>`
-  :`<div class="ev">${esc(x.e.type==='barge_in'?'Customer interrupted':x.e.type==='error'?'⚠ '+(x.e.message||'error'):x.e.type.replace(/_/g,' '))}</div>`).join('');
+ const body=items.map(x=>x.k==='t'?`<div class="bub ${x.t.role==='customer'?'c':'a'}">${esc(x.t.text)}${x.t.role==='agent'&&x.t.intent?`<small>${esc(String(x.t.intent).replace(/_/g,' '))}</small>`:x.t.emotion?`<small>${esc(typeof x.t.emotion==='object'?x.t.emotion.label:x.t.emotion)}</small>`:''}</div>`
+  :`<div class="ev">${esc(x.e.type==='barge_in'?'Customer interrupted':x.e.type==='error'?'⚠ '+(errText(x.e.message)||'error'):x.e.type.replace(/_/g,' '))}</div>`).join('');
  const nm=c.customer_name||c.to;
  s.innerHTML=`<div class="hd"><button class="back" id="bk">${I.back}</button><div class="t"><b>${esc(nm)}</b><small>${esc(pname(c.campaign))} · ${esc(c.language)}${dur(c)?' · '+dur(c):''}</small></div>${statusPill(c)}<span style="width:8px"></span></div>
  <div class="view" id="thr"><div class="thread">${body||'<div class="empty">Waiting for the call to connect…</div>'}${c.end_reason&&!isLive(c)?`<div class="ev">Ended · ${esc(String(c.end_reason).replace(/_/g,' '))}</div>`:''}</div>
@@ -157,20 +184,31 @@ function drawCall(){const s=$('#sheet');const c=S.calls.find(x=>x.call_id===S.op
  const th=$('#thr');if(nearBottom)th.scrollTop=th.scrollHeight;}
 
 function langSeg(cur,id){return`<div class="seg" id="${id}">${[['hi','Hindi'],['hinglish','Hinglish'],['en','English']].map(([k,v])=>`<button data-l="${k}" class="${cur===k?'on':''}">${v}</button>`).join('')}</div>`}
-function vDial(v){const ps=myProducts();
- v.innerHTML=`<div class="card"><label style="margin-top:0">Product</label><select id="dp">${ps.map(p=>`<option value="${esc(p.id)}">${esc(pnm(p))}</option>`).join('')}</select>
- <label>Phone number</label><input id="dn" type="tel" inputmode="tel" placeholder="+91 98765 43210" autocomplete="tel">
- <div class="row"><div><label>Name (optional)</label><input id="dname" placeholder="Rahul"></div><div style="flex:.55"><label>Age</label><input id="dage" type="number" inputmode="numeric" placeholder="—"></div></div>
+function vDial(v){const ps=myProducts();S.nc.model=S.nc.model||'gemini';
+ if(!ps.length){v.innerHTML='<div class="empty"><b>No products in this project</b>Add one in the desktop console first: a call needs something to talk about.</div>';return}
+ v.innerHTML=`<div class="card"><label style="margin-top:0" for="dn">Phone number</label><textarea id="dn" rows="2" inputmode="tel" placeholder="+91 98765 43210" autocomplete="tel"></textarea>
+ <div class="hint">Several numbers? One per line or comma separated.</div>
+ <label for="dp">Product</label><select id="dp">${ps.map(p=>`<option value="${esc(p.id)}" ${p.id===S.nc.pid?'selected':''}>${esc(pnm(p))}</option>`).join('')}</select>
  <label>Language</label>${langSeg(S.nc.lang,'dl')}
- <label class="chk"><input type="checkbox" id="dflag"> Call even if safety-flagged before</label></div>
- <div style="height:14px"></div><button class="btn" id="dgo">${I.calls.replace('<svg','<svg width="20" height="20"')} Call now</button><div class="err" id="derr"></div>
- <p style="color:var(--mute);font-size:13px;text-align:center;margin-top:14px">Several numbers? Separate them with commas.</p>`;
+ <label>Reply model</label><div class="seg" id="dm">${[['gemini','Gemini'],['llm','Sales 8B'],['qwen','Qwen 14B'],['template','Scripted']].map(([k,n])=>`<button data-m="${k}" class="${S.nc.model===k?'on':''}">${n}</button>`).join('')}</div>
+ <div class="row"><div><label for="dname">Name <span class="opt">· optional</span></label><input id="dname" placeholder="Rahul"></div><div style="flex:.6"><label for="dage">Age <span class="opt">· optional</span></label><input id="dage" type="number" inputmode="numeric" placeholder="—"></div></div>
+ <label class="chk"><input type="checkbox" id="dflag"><span>Call even if this person was safety-flagged before</span></label></div>
+ <div id="dres"></div><div class="err" id="derr"></div>
+ <div style="height:14px"></div><button class="btn" id="dgo">${I.calls.replace('<svg','<svg width="20" height="20"')} Call now</button>`;
  v.querySelectorAll('#dl button').forEach(b=>b.onclick=()=>{S.nc.lang=b.dataset.l;v.querySelectorAll('#dl button').forEach(x=>x.classList.toggle('on',x===b))});
- $('#dgo').onclick=async()=>{const b=$('#dgo');$('#derr').textContent='';if(!$('#dn').value.trim()){$('#derr').textContent='Enter a phone number';return}b.disabled=true;
-  try{const r=await api('/api/calls',{method:'POST',body:JSON.stringify({numbers:$('#dn').value,campaign:$('#dp').value,language:S.nc.lang,backend:'llm',customer_name:$('#dname').value,customer_age:$('#dage').value||null,allow_flagged:$('#dflag').checked})});
-   const ok=(r.calls||[]).filter(c=>c.call_id&&!c.error),bad=(r.calls||[]).filter(c=>c.error&&!c.call_id);
-   if(bad.length)$('#derr').textContent=bad.map(c=>c.number+': '+c.error).join('\n');
-   if(ok.length){toast('Calling…');await loadCalls();S.tab='calls';localStorage.sgm_tab='calls';render();if(ok.length===1)openCall(ok[0].call_id)}}
+ v.querySelectorAll('#dm button').forEach(b=>b.onclick=()=>{S.nc.model=b.dataset.m;v.querySelectorAll('#dm button').forEach(x=>x.classList.toggle('on',x===b))});
+ $('#dp').onchange=e=>S.nc.pid=e.target.value;
+ $('#dn').oninput=()=>$('#dn').classList.remove('invalid');
+ $('#dgo').onclick=async()=>{const b=$('#dgo');$('#derr').textContent='';$('#dres').innerHTML='';if(!$('#dn').value.trim()){$('#dn').classList.add('invalid');$('#derr').textContent='Enter a phone number';$('#dn').focus();return}b.disabled=true;
+  try{const r=await api('/api/calls',{method:'POST',body:JSON.stringify({numbers:$('#dn').value,campaign:$('#dp').value,language:S.nc.lang,backend:S.nc.model,customer_name:$('#dname').value,customer_age:$('#dage').value||null,allow_flagged:$('#dflag').checked})});
+   const list=r.calls||[];const warnOf=c=>[].concat(c.warning||[],c.warnings||[]).filter(Boolean).map(w=>typeof w==='string'?w:errText(w)).join(' ');
+   const ok=list.filter(c=>c.call_id&&!c.error),bad=list.filter(c=>c.error);
+   $('#dres').innerHTML=`<div class="res">${list.map(c=>{const w=warnOf(c),k=c.error?'bad':w?'warn':'ok';const m=c.error?(c.call_id?'Could not dial: ':'')+c.error:w?'Placed, with a warning: '+w:'Placed';
+    return`<div class="r ${k}"><span class="ic">${k==='ok'?'✓':k==='warn'?'!':'×'}</span><div style="min-width:0"><div class="num">${esc(c.number||c.to||'')}</div><div class="m">${esc(m)}</div></div>${c.call_id&&!c.error?`<button class="pill" data-open="${esc(c.call_id)}">Open</button>`:''}</div>`}).join('')||'<div class="r bad"><span class="ic">×</span><div class="m">The server did not return any calls.</div></div>'}</div>`;
+   $('#dres').querySelectorAll('[data-open]').forEach(x=>x.onclick=()=>{S.tab='calls';localStorage.sgm_tab='calls';render();openCall(x.dataset.open)});
+   if(bad.length)$('#dn').value=bad.map(c=>c.number||c.to).join('\n');else $('#dn').value='';
+   if(ok.length){toast(ok.length>1?ok.length+' calls placed':'Calling…');await loadCalls();
+    if(ok.length===1&&!bad.length&&!warnOf(ok[0])){S.tab='calls';localStorage.sgm_tab='calls';render();openCall(ok[0].call_id)}}}
   catch(e){$('#derr').textContent=e.message}b.disabled=false}}
 
 function vChat(v){const ps=myProducts();const sm=S.sim;if(!ps.find(p=>p.id===sm.pid))sm.pid=(ps[0]||{}).id||'';
@@ -182,7 +220,7 @@ function vChat(v){const ps=myProducts();const sm=S.sim;if(!ps.find(p=>p.id===sm.
   $('#sp').onchange=e=>sm.pid=e.target.value;
   v.querySelectorAll('#sl button').forEach(b=>b.onclick=()=>{sm.lang=b.dataset.l;v.querySelectorAll('#sl button').forEach(x=>x.classList.toggle('on',x===b))});
   $('#sgo').onclick=async()=>{const b=$('#sgo');b.disabled=true;b.textContent='Starting…';
-   try{const r=await api('/api/sim/start',{method:'POST',body:JSON.stringify({campaign:sm.pid,language:sm.lang,backend:'llm',customer_name:$('#sn').value,customer_age:$('#sa').value||null})});sm.sid=r.sim_id;sm.turns=[{role:'agent',text:r.agent}];drawView()}
+   try{const r=await api('/api/sim/start',{method:'POST',body:JSON.stringify({campaign:sm.pid,language:sm.lang,backend:'gemini',customer_name:$('#sn').value,customer_age:$('#sa').value||null})});sm.sid=r.sim_id;sm.turns=[{role:'agent',text:r.agent}];drawView()}
    catch(e){$('#serr').textContent=e.message;b.disabled=false;b.textContent='Start chat'}};return}
  v.style.padding='0';v.style.display='flex';v.style.flexDirection='column';
  v.innerHTML=`<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--line);font-size:13px;color:var(--mute)"><span>${esc(pname(sm.pid))} · ${esc(sm.lang)}</span><button class="pill" id="snew" style="border:0">New chat</button></div>

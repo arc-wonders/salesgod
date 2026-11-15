@@ -276,6 +276,11 @@ def check(bundle: dict, spec: Spec, eff: Effective) -> dict:
     dup = [v for k, v in dq.items() if k and len(v) > 1]
     checks.append(_check("duplicates", "No duplicate questions", not dup, f"{len(dup)} duplicated questions" if dup else "ok", [i for v in dup for i in v[1:]], blocking=False))
 
+    from .lengths import over_length
+    long_ = over_length(bundle)
+    checks.append(_check("lengths", "Phone-length spoken texts (pitch <= 25 words, answers <= 22, benefits <= 10, questions <= 15)", not long_,
+                         f"{len(long_)} too long" if long_ else "ok", [x.key for x in long_][:50], blocking=False))
+
     failed = [x for x in checks if not x["passed"]]
     return {"passed": not failed, "publishable": not any(x["blocking"] for x in failed), "checks": checks,
             "counts": {"topics_top": len(top), "topics": len(topics), "entries": len(entries), "offerings": len(offs), "situations": top_n,

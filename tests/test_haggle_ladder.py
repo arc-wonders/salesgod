@@ -35,7 +35,7 @@ def prices_in(text):
 def test_ladder_math_comes_from_list_and_floor_only():
     assert FLOOR == 2400.0
     seq = negotiation.ladder_prices(2999, FLOOR)
-    assert seq == [2799, 2649, 2549, 2449]                      # 33%, 25%, 17% of the 599 room, friendly ...49/...99, last = floor rounded UP
+    assert seq == [2799, 2649, 2549, 2499, 2449]                # 33/25/17/12/8% of the 599 room, friendly ...49/...99; cuts shrink (only the 50 step repeats)
     cuts = [a - b for a, b in zip([2999] + seq, seq)]
     assert cuts == sorted(cuts, reverse=True) or cuts[-1] <= cuts[0]   # shrinking steps
     assert cuts[0] == 200 and cuts[1] == 150 and cuts[2] == 100
@@ -54,7 +54,7 @@ def test_first_push_is_a_warm_no_with_value_and_the_budget_question_no_cut():
 def test_haggler_saying_only_bahut_mehenga_gets_stepwise_prices_asks_and_never_a_repeated_no():
     out = play(["bahut mehenga hai"] * 5)
     got = [r.offer["price"] for r in out[1:]]
-    assert got == [2799, 2649, 2549, 2449]
+    assert got == [2799, 2649, 2549, 2499]                      # at most negotiation.max_concessions (4) cuts
     for r in out[1:]:
         assert "?" in r.text["hinglish"] and r.offer
     texts = [r.text["hinglish"] for r in out]
@@ -68,8 +68,8 @@ def test_haggler_saying_only_bahut_mehenga_gets_stepwise_prices_asks_and_never_a
 
 def test_only_the_true_last_step_says_final_and_only_once():
     out = play(["kam karo"] * 9)
-    finals = [i for i, r in enumerate(out) if FINAL_WORDS.search(r.text["hinglish"]) and r.offer and r.offer["price"] == 2449]
-    assert finals == [4]                                                                    # the 2,449 step, nowhere else
+    finals = [i for i, r in enumerate(out) if FINAL_WORDS.search(r.text["hinglish"]) and r.offer and r.offer["price"] == 2499]
+    assert finals == [4]                                                                    # the last allowed step, nowhere else
     for r in out[1:4]:
         assert not FINAL_WORDS.search(r.text["hinglish"])
     assert sum("mushkil" in r.text["hinglish"] for r in out[1:4]) == 1                      # "isse neeche mushkil hai" once per call, never a false "last offer"
@@ -99,14 +99,14 @@ def test_counter_at_or_above_the_next_step_or_after_the_last_step_is_accepted_at
     out = play(["bahut mehenga", "kam karo", "2500 mein do", "2500 mein do", "2500 mein do", "2500 mein do"])
     prices = [r.offer["price"] for r in out if r.offer]
     assert prices[-1] == 2500.0 and "pakka" in out[-1].text["hinglish"]
-    last = play(["kam karo"] * 6 + ["2430 mein do"])[-1]   # at the floor: a number at/above the floor is accepted
-    assert last.offer == {"price": 2430.0}
+    last = play(["kam karo"] * 6 + ["2430 mein do"])[-1]   # after "final" was said, final stays final: no agreement below it
+    assert not (last.offer and last.offer["price"] < 2499)
 
 
 def test_at_the_floor_final_once_then_one_sweetener_then_a_warm_walk_away_never_a_loss():
     out = play(["kam karo"] * 10)
-    assert out[4].offer["price"] == 2449 and out[4].state.final_said
-    assert out[5].offer and out[5].offer["price"] == 2449 and not out[5].state.closed        # the sweetener at the floor (a configured lever), with a closing ask
+    assert out[4].offer["price"] == 2499 and out[4].state.final_said
+    assert out[5].offer and out[5].offer["price"] == 2499 and not out[5].state.closed        # the sweetener at the floor (a configured lever), with a closing ask
     assert out[6].state.closed and not out[6].offer and "?" in out[6].text["hinglish"]        # the warm walk-away offers a callback / details
     assert not any(r.offer for r in out[7:])
     for r in out:
@@ -146,7 +146,7 @@ def test_a_yes_after_a_concession_puts_the_agreed_price_in_terms_offer_and_ledge
     assert ns.agreed == 2799.0 and ns.price == 2799.0
     # a later push never retracts or raises it
     r = negotiation.step(dom.p, "aur kam karo", ns, "", None)
-    assert r.offer is None and r.state.agreed == 2799.0
+    assert r.kind == "hold" and r.offer == {"price": 2799.0} and r.state.agreed == 2799.0   # the agreed price is said again, never lowered
 
 
 def _eco(rng):

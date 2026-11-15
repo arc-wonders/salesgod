@@ -126,6 +126,7 @@ class Customer(BaseModel):
     last_contact_at: float | None = None
     created_at: float = Field(default_factory=time.time)
     updated_at: float = Field(default_factory=time.time)
+    demo: bool = False  # made-up demo record (team/demo/seed.py): its phone is fake and is never dialled
 
     @field_validator("stage")
     @classmethod
@@ -133,6 +134,12 @@ class Customer(BaseModel):
         if v not in STAGES:
             raise ValueError(f"stage must be one of {STAGES}")
         return v
+
+
+def is_demo(c) -> bool:
+    """A made-up demo record (team/demo/seed.py: demo flag, id 'cudemo...', fake +91 90000 000xx number): never dial it.
+    Matched by flag/id, not by the number, so a real or test record with a similar number is unaffected. Not a compliance gate."""
+    return bool(getattr(c, "demo", False)) or str(getattr(c, "id", "") or "").startswith("cudemo")
 
 
 # ---------------------------------------------------------------- campaigns
@@ -174,6 +181,7 @@ class Campaign(BaseModel):
     auto_confirmed: bool = False
     stats: dict[str, int] = Field(default_factory=dict)
     created_at: float = Field(default_factory=time.time)
+    demo: bool = False  # made-up demo campaign (team/demo/seed.py)
 
 
 # ---------------------------------------------------------------- call types (the schema lives in acie.calltypes)

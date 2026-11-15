@@ -55,6 +55,13 @@ class Understanding(BaseModel):
     attention: float | None = Field(None, ge=0, le=1)
     participation: float | None = Field(None, ge=0, le=1)
     receptiveness: float | None = Field(None, ge=0, le=1)
+    # social signals (acie/state/social.py, ACIE_NLU_SOCIAL): None = not returned, the lexicon decides alone
+    sarcasm: float | None = Field(None, ge=0, le=1)
+    humour: float | None = Field(None, ge=0, le=1)
+    hostility: float | None = Field(None, ge=0, le=1)
+    interest: float | None = Field(None, ge=0, le=1)
+    impatience: float | None = Field(None, ge=0, le=1)
+    scepticism: float | None = Field(None, ge=0, le=1)
 
 
 STATE_DIMS_PROMPT = (
@@ -64,6 +71,19 @@ STATE_DIMS_PROMPT = (
 )
 _NEW = ["satisfaction", "anxiety", "excitement", "calmness", "trust", "certainty", "cognitive_load",
         "attention", "participation", "receptiveness"]
+
+
+SOCIAL_PROMPT = (
+    "\n- sarcasm (says the opposite of what they mean: 'oh wow, another sales call, my lucky day' = 0.9 and is NOT enthusiasm), "
+    "humour (joking / playful / teasing), hostility (rude or insulting AT the agent: 'bakwas mat karo', 'stupid bot'; plain "
+    "annoyance at repetition is frustration, not hostility), interest (real curiosity about the product: specific questions, "
+    "'tell me more'), impatience (wants it short now), scepticism (doubts it is genuine: scam, hidden charges): 0..1 each for THIS turn."
+)
+_SOCIAL = ["sarcasm", "humour", "hostility", "interest", "impatience", "scepticism"]
+
+
+def social_enabled() -> bool:
+    return os.getenv("ACIE_NLU_SOCIAL", "1") == "1"
 
 
 def state_dims_enabled() -> bool:
@@ -96,6 +116,10 @@ def _schema(intents: list[str]) -> dict:
     sch = _base_schema(intents, lvl)
     if state_dims_enabled():
         for d in _NEW:
+            sch["properties"][d] = lvl
+            sch["required"].append(d)
+    if social_enabled():
+        for d in _SOCIAL:
             sch["properties"][d] = lvl
             sch["required"].append(d)
     return sch
@@ -133,8 +157,10 @@ class LLMUnderstanding:
         guide = "\n".join(f"- {k}: {v}" for k, v in intents.items())
         user = (f"WHAT THE AGENT IS CALLING ABOUT: {about}\n\nINTENTS:\n{guide}\n\nCONVERSATION SO FAR:\n{convo}\n\n"
                 f"CUSTOMER NOW SAYS: {text}")
-        body = {"model": self.model, "temperature": 0, "max_tokens": 260 if state_dims_enabled() else 140,
-                "messages": [{"role": "system", "content": SYSTEM + (STATE_DIMS_PROMPT if state_dims_enabled() else "")}, {"role": "user", "content": user}],
+        sys_prompt = SYSTEM + (STATE_DIMS_PROMPT if state_dims_enabled() else "") + (SOCIAL_PROMPT if social_enabled() else "")
+        max_tok = (260 if state_dims_enabled() else 140) + (70 if social_enabled() else 0)
+        body = {"model": self.model, "temperature": 0, "max_tokens": max_tok,
+                "messages": [{"role": "system", "content": sys_prompt}, {"role": "user", "content": user}],
                 "guided_json": _schema(list(intents)), **self.extra_body}
         try:
             r = await self.client.post(f"{self.base_url}/chat/completions", json=body)

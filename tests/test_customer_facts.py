@@ -90,7 +90,11 @@ async def test_goal_is_never_asked_again_and_not_echoed():
     f = CustomerFacts.load(sess.dialog)
     assert f.knows("goal")
     agent = [u.text for u in sess.history if u.role == "agent"]
-    assert not any("help with muscle" in a.lower() or "aesthetics" in a.lower() for a in agent)
+    # style (owner plan 15 Nov): a short mirror of their own word ("Aesthetics? Nice.") is allowed once; restating it as news is not
+    import re as _re
+    sents = [x for a in agent for x in _re.split(r"(?<=[.!?])\s+", a)]
+    assert not any("help with muscle" in x.lower() or ("aesthetics" in x.lower() and len(x.split()) > 4) for x in sents)
+    assert sum("aesthetics" in x.lower() for x in sents) <= 1
     assert not any("didn't quite get" in a for a in agent)  # clear words are never "I didn't catch that"
 
 

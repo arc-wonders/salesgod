@@ -92,7 +92,39 @@ class App:
         if not path.exists():
             default = Product()  # Claude Pro at 60% off, editable from the console
             path.write_text(json.dumps({default.id: default.model_dump()}, ensure_ascii=False, indent=1))
-        return {k: Product.model_validate(v) for k, v in json.loads(path.read_text()).items()}
+        products = {k: Product.model_validate(v) for k, v in json.loads(path.read_text()).items()}
+        return {k: self.with_agent(p) for k, p in products.items()}
+
+    # ------------------------------------------------------------------ agents (personas: name + gender + voices)
+
+    @property
+    def agents(self):
+        from acie.agents import AgentStore
+        store = getattr(self, "_agents", None)
+        if store is None or store.path != DATA / "agents.json":
+            store = self._agents = AgentStore(DATA / "agents.json")
+        return store
+
+    def with_agent(self, product: Product, agent_id: str = "") -> Product:
+        """The product as its agent speaks it: the persona's display name and Hindi grammatical gender replace the
+        product's agent_name / agent_gender (so templates, LLM persona and gender checks all follow the agent)."""
+        try:
+            from acie.agents import grammar_gender
+            a = self.agents.resolve(agent_id or getattr(product, "agent_id", ""), getattr(product, "tenant", ""))
+            return product.model_copy(update={"agent_name": a.display_name,
+                                              "agent_gender": grammar_gender(a, self.agents.catalogue())})
+        except Exception:  # noqa: BLE001 - a broken agents.json never stops a call; the product's own fields stay
+            log.exception("agent resolution failed for product %s", getattr(product, "id", "?"))
+            return product
+
+    def agent_for(self, call, product: Product | None = None):
+        """The call's persona: the call's own agent_id, else the product's, else the tenant default, else 'arjun'."""
+        try:
+            return self.agents.resolve(getattr(call, "agent_id", "") or (getattr(product, "agent_id", "") if product else ""),
+                                       getattr(product, "tenant", "") if product else "")
+        except Exception:  # noqa: BLE001
+            log.exception("agent_for failed")
+            return None
 
     def save_products(self, products: dict[str, Product]) -> None:
         (DATA / "products.json").write_text(
@@ -104,6 +136,8 @@ class App:
             domain, prompt = BankDemoDomain(), "बैलेंस, ट्रांसफर, लिमिट, क्रेडिट कार्ड, हाँ, नहीं, ठीक है"
         else:
             product = self.products()[call.campaign]
+            if getattr(call, "agent_id", ""):
+                product = self.with_agent(product, call.agent_id)  # a call/campaign that names its own agent
             tone = getattr(call, "tone_level", "") or ""
             if tone in ("professional", "mid", "casual") and tone != getattr(product, "tone_level", "mid"):
                 product = product.model_copy(update={"tone_level": tone})  # a campaign/sim tone overrides the product's
@@ -125,7 +159,13 @@ class App:
                             session_store=getattr(self, "session_store", None))
         for sink in getattr(self, "sinks", ()):
             pipe.context_sinks.append(sink.for_call(call.call_id) if hasattr(sink, "for_call") else sink)
+        pipe.caller_memory = self.caller_memory_store()
         return pipe, prompt
+
+    def caller_memory_store(self):
+        from acie.caller_memory import CallerMemoryStore
+        st = getattr(self, "session_store", None)
+        return CallerMemoryStore(DATA / "profiles" / "caller_memory", st if hasattr(st, "record_turn") else None)
 
     # ------------------------------------------------------------------ do-not-call list
 
@@ -141,11 +181,11 @@ class App:
     def dial_block(self, to: str, campaign: str, body: dict) -> str | None:
         """One gate for every dial (voice_platform gate.rs, the parts that apply here)."""
         if campaign != "bank_demo":
-            allowed = self.products()[campaign].allowed_numbers
-            if allowed and to not in allowed:  # not overridable: e.g. a real brand's name on a demo
-                return "this campaign may only call its test numbers (product setting allowed_numbers)"
-        if to in self.dnc() and not body.get("allow_dnc"):
-            return "on the do-not-call list (the person asked not to be called)"
+            allowed = [a for a in (self.products()[campaign].allowed_numbers or []) if str(a).strip()]
+            if allowed and to not in allowed:  # not overridable: e.g. a real brand's name on a demo. Empty list = anyone
+                return "this product may only call the numbers in its allowed_numbers list (add the number in the product settings)"
+        if to in self.dnc() and not body.get("allow_dnc"):  # the operator decides: allow_dnc ("call anyway") dials it
+            return "on the do-not-call list (the person asked not to be called); tick 'call anyway' to dial it regardless"
         from datetime import datetime
         from zoneinfo import ZoneInfo
         h = datetime.now(ZoneInfo(self.cfg.timezone)).hour
@@ -153,6 +193,18 @@ class App:
         if os.getenv("CALL_HOURS", "0") == "1" and not (a <= h < b) and not body.get("allow_after_hours"):  # off by default
             return f"outside calling hours ({a}:00-{b}:00 {self.cfg.timezone})"
         return None
+
+    async def dial_warning(self, to: str) -> str:
+        """Things the operator should know before/while the call runs. Never blocks a dial (owner, 15 Nov)."""
+        notes = []
+        try:
+            if "safety_distress" in (await self.store.load(to)).outcomes[-10:]:
+                notes.append("a previous call flagged this person as possibly in distress; check the last transcript")
+        except Exception:  # noqa: BLE001 - a warning must never stop the call
+            pass
+        if to in self.dnc():
+            notes.append("on the do-not-call list; dialed because the operator chose 'call anyway'")
+        return "; ".join(notes)
 
     def broadcast(self, event: dict) -> None:
         for q in list(self.listeners):
@@ -211,7 +263,26 @@ class App:
         if any(t.get("intent") == "opt_out" for t in call.turns if t["role"] == "agent"):
             self.add_dnc(call.to)
             call.events.append({"type": "dnc_added", "t": time.time(), "after_turn": len(call.turns)})
+        sess = pipeline.sessions.get(session_id)
+        st = getattr(self, "session_store", None)
+        if sess is not None and hasattr(st, "record_turn"):  # durable call log: the final state + a call_end event
+            try:
+                st.record_turn(sess, {"type": "call_end", "v": 1, "session_id": session_id, "turn": sess.turn_index, "ts": time.time(),
+                                      "status": call.status, "end_reason": getattr(call, "end_reason", ""),
+                                      "outcome": sess.context.outcome, "checklist": sess.context.checklist.model_dump(),
+                                      "deal_view": sess.context.deal_view})
+            except Exception as e:
+                log.warning("[%s] call_end event not queued: %s", call.call_id, e)
         sess = await pipeline.forget_session(session_id)
+        if sess is not None and not str(call.customer_id).startswith("sim-") and any(u.role == "customer" for u in sess.history):
+            try:  # long-term caller memory (how they talk, what happened), read at their next call's first turn
+                from acie import caller_memory as cm
+                cms = self.caller_memory_store()
+                prev = await cms.get(call.customer_id)
+                prof_ = await pipeline.store.load(call.customer_id)
+                await cms.put(cm.build(prev, sess, call.turns, getattr(self.products().get(call.campaign), "product_name", call.campaign), prof_))
+            except Exception as e:
+                log.warning("[%s] caller memory not saved: %s", call.call_id, e)
         if sess is not None:
             call.context = sess.context.model_dump(exclude={"events"})
             from . import live_map
@@ -227,6 +298,155 @@ class App:
         self.live_sessions.pop(call.call_id, None)
         self.maps.pop(call.call_id, None)
         self.broadcast({"type": "status", "call": call.public()})
+
+
+def _register_agent_routes(api: FastAPI, state: App, _require) -> None:
+    """/api/agents: the personas (acie/agents.py). Auth like every console route."""
+    from acie.agents import (LANGUAGES, Agent, AgentError, grammar_gender, gendered, validation_errors,
+                             voice_chain)
+
+    def _used_by(agent_id: str) -> list[str]:
+        try:
+            raw = json.loads((DATA / "products.json").read_text())
+        except Exception:  # noqa: BLE001
+            return []
+        return [k for k, v in raw.items() if isinstance(v, dict) and v.get("agent_id") == agent_id]
+
+    def _view(a: Agent) -> dict:
+        cat = state.agents.catalogue()
+        return {**a.model_dump(), "grammar_gender": grammar_gender(a, cat), "used_by": _used_by(a.id),
+                "voice_names": {k: cat.get(v.voice_id, {}).get("name", v.voice_id) for k, v in a.voices.items()},
+                "problems": validation_errors(a, cat)}
+
+    def _parse(body: dict, agent_id: str | None = None) -> Agent:
+        if not isinstance(body, dict):
+            raise HTTPException(422, "a JSON object")
+        body = {k: v for k, v in body.items() if k not in ("created_at", "updated_at", "grammar_gender", "used_by",
+                                                            "voice_names", "problems")}
+        if agent_id is not None:
+            body["id"] = agent_id
+        try:
+            return Agent.model_validate(body)
+        except Exception as e:  # pydantic: every field error at once
+            errs = getattr(e, "errors", None)
+            msg = "; ".join(f"{'.'.join(str(x) for x in er['loc'])}: {er['msg']}" for er in errs()) if callable(errs) else str(e)
+            raise HTTPException(422, msg[:600])
+
+    @api.get("/api/agents")
+    async def agents_list(request: Request, tenant: str | None = None) -> dict:
+        _require(request)
+        data = state.agents.data()
+        cat = state.agents.catalogue()
+        return {"agents": [_view(a) for a in state.agents.list(tenant)],
+                "tenant_defaults": data.get("tenant_defaults", {}),
+                "voices": sorted(cat.values(), key=lambda v: (v["gender"], v["name"])),
+                "languages": list(LANGUAGES), "genders": ["male", "female", "neutral"],
+                "tone_levels": ["professional", "mid", "casual"], "greeting_styles": ["standard", "warm", "brief"]}
+
+    @api.get("/api/agents/{agent_id}")
+    async def agents_get(agent_id: str, request: Request) -> dict:
+        _require(request)
+        a = state.agents.get(agent_id)
+        if a is None:
+            raise HTTPException(404, "unknown agent")
+        return {"agent": _view(a)}
+
+    @api.post("/api/agents")
+    async def agents_create(request: Request) -> dict:
+        _require(request)
+        a = _parse(await request.json())
+        try:
+            a = state.agents.save(a, create=True)
+        except AgentError as e:
+            raise HTTPException(422, str(e))
+        return {"agent": _view(a)}
+
+    @api.put("/api/agents/{agent_id}")
+    async def agents_update(agent_id: str, request: Request) -> dict:
+        _require(request)
+        a = _parse(await request.json(), agent_id)
+        try:
+            a = state.agents.save(a, create=False)
+        except KeyError:
+            raise HTTPException(404, "unknown agent")
+        except AgentError as e:
+            raise HTTPException(422, str(e))
+        return {"agent": _view(a)}
+
+    @api.delete("/api/agents/{agent_id}")
+    async def agents_delete(agent_id: str, request: Request) -> dict:
+        _require(request)
+        try:
+            state.agents.delete(agent_id, _used_by(agent_id))
+        except KeyError:
+            raise HTTPException(404, "unknown agent")
+        except AgentError as e:
+            raise HTTPException(422, str(e))
+        return {"ok": True}
+
+    @api.put("/api/agents-default/{tenant_id}")
+    async def agents_set_default(tenant_id: str, request: Request) -> dict:
+        _require(request)
+        body = await request.json()
+        try:
+            state.agents.set_default(tenant_id, str(body.get("agent_id", "")))
+        except AgentError as e:
+            raise HTTPException(422, str(e))
+        return {"ok": True, "tenant_defaults": state.agents.data().get("tenant_defaults", {})}
+
+    @api.post("/api/agents-voices")
+    async def agents_add_voice(request: Request) -> dict:
+        """Add a Fish voice to the catalogue with its gender and languages (needed before an agent may use it)."""
+        _require(request)
+        try:
+            return {"voice": state.agents.add_voice(await request.json())}
+        except ValueError as e:
+            raise HTTPException(422, str(e))
+
+    _PREVIEW = {"hi": "नमस्ते, मैं {name} बोल रहा हूँ। क्या आपके पास दो मिनट हैं?",
+                "hinglish": "Namaste, main {name} bol raha hoon. Kya aapke paas do minute hain?",
+                "en": "Hi, this is {name}. Do you have two minutes?"}
+
+    @api.post("/api/agents/preview")
+    async def agents_preview(request: Request) -> Response:
+        """Speak a short line with an agent's settings (saved, or unsaved from the editor) so the operator can hear it.
+        Body: {agent_id} or {agent: {...}}, language, optional text (<= 200 chars). Returns audio/wav (8 kHz)."""
+        _require(request)
+        body = await request.json()
+        lang = body.get("language", "hi")
+        if lang not in LANGUAGES:
+            raise HTTPException(422, f"language: one of {list(LANGUAGES)}")
+        if isinstance(body.get("agent"), dict):
+            a = _parse(body["agent"], str(body["agent"].get("id") or "preview"))
+            errs = validation_errors(a, state.agents.catalogue())
+            if errs:
+                raise HTTPException(422, "; ".join(errs))
+        else:
+            a = state.agents.get(str(body.get("agent_id", "")))
+            if a is None:
+                raise HTTPException(404, "unknown agent")
+        text = str(body.get("text") or "").strip()[:200] or _PREVIEW[lang]
+        text = gendered(text.replace("{name}", a.display_name), grammar_gender(a, state.agents.catalogue()))
+        if state.tts is None:
+            raise HTTPException(503, "TTS is still loading")
+        import io
+        import wave
+        pcm = bytearray()
+        try:
+            kw = {"voices": voice_chain(a, lang), "speed": a.speaking_rate} if getattr(state.tts, "accepts_voice", False) else {}
+            async for chunk in state.tts.stream(text, lang, **kw):
+                pcm += chunk
+        except Exception as e:  # noqa: BLE001
+            raise HTTPException(502, f"TTS failed: {str(e)[:200]}")
+        buf = io.BytesIO()
+        with wave.open(buf, "wb") as w:
+            w.setnchannels(1)
+            w.setsampwidth(2)
+            w.setframerate(8000)
+            w.writeframes(bytes(pcm))
+        from urllib.parse import quote
+        return Response(buf.getvalue(), media_type="audio/wav",
+                        headers={"Cache-Control": "no-store", "X-Spoken": quote(text)})
 
 
 def build_app() -> tuple[FastAPI, App]:
@@ -250,11 +470,14 @@ def build_app() -> tuple[FastAPI, App]:
         if any(os.getenv(k) for k in ("ACIE_SESSION_STORE", "ACIE_PROFILE_STORE", "ACIE_MEMORY_STORE", "ACIE_NATS_URL")):
             from acie.store import build_stores_from_env  # flags unset = exactly the stores above
             state.session_store, state.store, state.memory, state.sinks = build_stores_from_env(profile_dir=DATA / "profiles")
+            if hasattr(state.session_store, "start"):
+                await state.session_store.start()  # NATS JetStream call context; never raises (memory fallback)
         from acie.world import WorldKnowledge
         state.world = WorldKnowledge()
         from acie.understanding import LLMUnderstanding
         state.nlu = LLMUnderstanding()
-        # qwen: the local vLLM (ACIE_LLM_*); gemini: ACIE_EXPR_* when set; llm: whichever ACIE_EXPR_* points at
+        # qwen: the local vLLM (ACIE_LLM_*); llm: whichever ACIE_EXPR_* points at (the tuned 8B);
+        # gemini: real Gemini (GEMINI_* or the Google URL/key in ACIE_EXPR_* / ACIE_PLANNER_*), else the same as llm
         import json as _json
         qwen = OpenAICompatibleBackend(base_url=os.getenv("ACIE_LLM_BASE_URL", "http://localhost:8000/v1"),
                                        model=os.getenv("ACIE_LLM_MODEL", "acie-expression"),
@@ -262,13 +485,14 @@ def build_app() -> tuple[FastAPI, App]:
                                        max_tokens=int(os.getenv("ACIE_LLM_MAX_TOKENS", "320")),
                                        extra_body=_json.loads(os.getenv("ACIE_LLM_EXTRA_BODY", "{}") or "{}"))
         state.backends = {"llm": make_backend_from_env(), "qwen": qwen, "template": TemplateBackend()}
-        if os.getenv("ACIE_EXPR_BASE_URL"):
-            state.backends["gemini"] = state.backends["llm"]
+        from acie.expression import make_gemini_backend
+        state.backends["gemini"] = make_gemini_backend() or state.backends["llm"]
         state.products()  # writes the default product on first start
         state.pipelines = {"llm": ACIEPipeline(DecisionEngine(BankDemoDomain()), backend=state.backends["llm"],
                                                store=state.store, buffer_reply=True)}
-        log.info("ready: whisper=%s fish=%s replies=%s nlu=%s backends=%s", state.stt.model_name, state.tts.model,
-                 getattr(state.backends["llm"], "model", "?"), os.getenv("ACIE_LLM_MODEL"), sorted(state.backends))
+        log.info("ready: whisper=%s fish=%s replies=%s gemini=%s nlu=%s backends=%s", state.stt.model_name, state.tts.model,
+                 getattr(state.backends["llm"], "model", "?"), getattr(state.backends["gemini"], "model", "?"),
+                 os.getenv("ACIE_LLM_MODEL"), sorted(state.backends))
         asyncio.create_task(_warmup())
 
     async def _warmup() -> None:
@@ -352,22 +576,18 @@ def build_app() -> tuple[FastAPI, App]:
             if not to:
                 out.append({"number": raw, "error": "not a phone number (use +91XXXXXXXXXX)"})
                 continue
-            if not body.get("allow_flagged"):
-                prof = await state.store.load(to)
-                if "safety_distress" in prof.outcomes[-10:]:
-                    out.append({"number": to, "error": "on a previous call this person said they were in distress; "
-                                                        "tick 'call anyway' only if you have checked on them"})
-                    continue
             campaign = body.get("campaign", "bank_demo")
             if campaign != "bank_demo" and campaign not in state.products():
                 raise HTTPException(400, f"unknown product {campaign!r}")
             if why := state.dial_block(to, campaign, body):
                 out.append({"number": to, "error": why})
                 continue
+            warning = await state.dial_warning(to)  # information for the operator, never a blocker
             call = CallRecord(to=to, language=body.get("language", "hi"), backend=body.get("backend", "llm"),
                               campaign=campaign, customer_name=str(body.get("customer_name", ""))[:40],
                               customer_age=_age(body.get("customer_age")),
                               customer_id=body.get("customer_id", "c1") if campaign == "bank_demo" else to)
+            call.agent_id = str(body.get("agent_id", "") or "")[:40]  # optional persona override (acie/agents.py)
             if call.backend not in state.backends or call.language not in ("hi", "en", "hinglish"):
                 raise HTTPException(400, "bad backend/language")
             state.calls[call.call_id] = call
@@ -377,7 +597,8 @@ def build_app() -> tuple[FastAPI, App]:
                 call.status, call.end_reason = "failed", str(e)[:200]
             state.save(call)
             state.broadcast({"type": "status", "call": call.public()})
-            out.append({"number": to, "call_id": call.call_id, "status": call.status, "error": call.end_reason})
+            out.append({"number": to, "call_id": call.call_id, "status": call.status, "error": call.end_reason,
+                        **({"warning": warning} if warning else {})})
         return {"calls": out}
 
     @api.get("/api/dnc")
@@ -478,6 +699,10 @@ def build_app() -> tuple[FastAPI, App]:
             product = Product.model_validate(body)
         except Exception as e:
             raise HTTPException(400, str(e)[:300])
+        if product.agent_id:  # the persona must exist and be this tenant's (or a stock one)
+            ag = state.agents.get(product.agent_id)
+            if ag is None or ag.tenant not in ("", product.tenant):
+                raise HTTPException(400, f"agent_id: unknown agent {product.agent_id!r} for tenant {product.tenant!r}")
         try:  # negotiation range: floor <= every step <= list, no concessions on a real company's product
             # validate what the operator SENT: the Economics model drops out-of-range steps silently on load
             live_map.validate_economics(raw_eco if raw_eco is not None else product.economics, product)
@@ -650,6 +875,55 @@ def build_app() -> tuple[FastAPI, App]:
             return {"map": rec["map"], "live": False}
         return {"map": live_map.from_record(rec, state.products().get(rec.get("campaign"))), "live": False}
 
+    @api.get("/api/calls/{call_id}/context")
+    async def call_context(call_id: str, request: Request) -> dict:
+        """Where the call is: sale checklist + deal + the compact summary the agent works from (live: memory; after a
+        restart: the NATS snapshot; ended: the call record). The deal floor is never included."""
+        _require(request)
+        from acie.context import CallContext
+        from acie.schemas import SessionState
+        cid = "".join(c for c in call_id if c.isalnum())
+        sid = f"call-{cid}"
+        sess, source = None, "memory"
+        cs = state.live_sessions.get(cid)
+        if cs is not None:
+            sess = getattr(cs, "pipeline", None) and cs.pipeline.sessions.get(sid)
+        if sess is None and cid in state.sims:
+            sess = state.sims[cid][0].sessions.get(cid)
+            sid = cid
+        st = getattr(state, "session_store", None)
+        if not sess and hasattr(st, "load_snapshot"):
+            snap = await st.load_snapshot(sid) or await st.load_snapshot(cid)
+            if snap:
+                try:
+                    sess, source = SessionState.model_validate(snap), "nats"
+                except Exception:
+                    sess = None
+        if sess:
+            view, turn = sess.context.public_view(), sess.turn_index
+        else:
+            path = CALLS_DIR / f"{cid}.json"
+            if not path.exists():
+                raise HTTPException(404, "no such call")
+            rec = json.loads(path.read_text())
+            try:
+                ctx = CallContext.model_validate(rec.get("context") or {})
+            except Exception:
+                ctx = CallContext()
+            view, turn, source = ctx.public_view(), sum(1 for t in rec.get("turns", []) if t.get("role") == "customer"), "record"
+        return {"call_id": cid, "live": cid in state.live_sessions, "source": source, "turn": turn, **view,
+                "nats": st.status() if hasattr(st, "status") else None}
+
+    @api.get("/api/customers/{phone}/memory")
+    async def customer_memory(phone: str, request: Request) -> dict:
+        """Long-term caller memory (acie/caller_memory.py) + the block the agent gets at the next call."""
+        _require(request)
+        from acie.caller_memory import about_block
+        mem = await state.caller_memory_store().get(phone.strip())
+        if not mem:
+            raise HTTPException(404, "no memory for this caller yet")
+        return {"customer_id": phone, "memory": mem, "about": about_block(mem)}
+
     @api.get("/api/calls/{call_id}/recording")
     async def recording(call_id: str, request: Request) -> FileResponse:
         _require(request)
@@ -754,25 +1028,32 @@ def build_app() -> tuple[FastAPI, App]:
     # ------------------------------------------------------------------ productgen (add a product by name): one self-contained block
     from acie.productgen.api import register as _productgen_register
     _productgen_register(api, _require, DATA, CALLS_DIR)
+    # product studio (drafts, facts, recommendations, tests): agent "studio"
+    from acie.productgen.studio_api import register as _studio_register
+    from .studio_runner import StudioRunner
+    _studio_register(api, _require, DATA, runner=StudioRunner(state))
 
     # ------------------------------------------------------------------ CRM (projects, customers, campaigns, follow-ups): one self-contained block
     from .crm.api import register as _crm_register
 
     async def _crm_dial(to: str, product_id: str, language: str, customer_name: str, link: dict) -> dict:
-        """Operator/auto dial for the CRM: the same gates as POST /api/calls (allowed_numbers, DNC, call hours, max parallel)."""
+        """Operator/auto dial for the CRM: the same gates as POST /api/calls (allowed_numbers, DNC unless link["allow_dnc"], call hours
+        only with CALL_HOURS=1, max parallel). A past distress flag is a warning, never a block."""
         live = sum(1 for c in state.calls.values() if c.status in ("dialing", "ringing", "live"))
         if live >= cfg.max_parallel_calls:
             return {"error": f"max {cfg.max_parallel_calls} calls at once ({live} running)"}
         if product_id not in state.products():
             return {"error": f"unknown product {product_id!r}"}
-        if why := state.dial_block(to, product_id, {}):
+        if why := state.dial_block(to, product_id, {"allow_dnc": bool(link.get("allow_dnc"))}):
             return {"error": why}
+        warning = await state.dial_warning(to)
         call = CallRecord(to=to, language=language if language in ("hi", "en", "hinglish") else "hi", backend="llm", campaign=product_id,
                           customer_name=customer_name[:40], customer_id=to)
         call.crm = {"project_id": link["project_id"], "crm_customer_id": link["customer_id"], "campaign_id": link["campaign_id"],
                     "call_type": link["call_type"]}
         call.call_type = link["call_type"]  # read by make_pipeline (acie.calltypes.factory.build_domain)
         call.tone_level = link.get("tone_level", "")  # campaign tone: make_pipeline overrides the product's tone_level
+        call.agent_id = str(link.get("agent_id", "") or "")[:40]  # campaign persona, if the campaign names one
         call.project_id = link["project_id"]  # the call-type registry looks up this project's own call types
         state.calls[call.call_id] = call
         try:
@@ -781,7 +1062,7 @@ def build_app() -> tuple[FastAPI, App]:
             call.status, call.end_reason = "failed", str(e)[:200]
         state.save(call)
         state.broadcast({"type": "status", "call": call.public()})
-        return {"call_id": call.call_id, "status": call.status, "error": call.end_reason}
+        return {"call_id": call.call_id, "status": call.status, "error": call.end_reason, **({"warning": warning} if warning else {})}
 
     def _crm_active() -> tuple[int, set[str]]:
         live = [c for c in state.calls.values() if c.status in ("dialing", "ringing", "live")]
@@ -789,6 +1070,10 @@ def build_app() -> tuple[FastAPI, App]:
 
     state.crm = _crm_register(api, _require, DATA, CALLS_DIR, dialer=_crm_dial, active=_crm_active)
     state.on_call_end = state.crm["on_call_end"]
+
+    _register_agent_routes(api, state, _require)
+    from .pronounce_api import register as _pronounce_register  # TTS pronunciation lexicon: agent "phonetics"
+    _pronounce_register(api, state, _require, DATA)
 
     @api.get("/healthz")
     async def health() -> dict:

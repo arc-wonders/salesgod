@@ -200,11 +200,23 @@ def _packs(names, text, lang="hi", ctx=None, reference=None):
 
 
 def test_agent_is_male_in_hindi_and_hinglish():
-    assert _packs(["agent_male"], "माफ़ी चाहती हूँ।")
-    assert _packs(["agent_male"], "मैं बता सकती हूँ।")
-    assert _packs(["agent_male"], "Main aapko bata sakti hoon.", lang="hinglish")
-    assert not _packs(["agent_male"], "माफ़ी चाहता हूँ।")
-    assert _packs(["agent_female"], "माफ़ी चाहता हूँ।")
+    # the pack still recognises the wrong gender ...
+    from acie.rules.claims import AgentGenderPack
+    plan, expr = TurnPlan(intent="answer", objective="x"), ExpressionParams(language="hi")
+    assert AgentGenderPack("male").check("माफ़ी चाहती हूँ।", plan, expr)
+    assert AgentGenderPack("male").check("Main aapko bata sakti hoon.", plan, expr)
+    assert AgentGenderPack("female").check("माफ़ी चाहता हूँ।", plan, expr)
+    assert not AgentGenderPack("male").check("माफ़ी चाहता हूँ।", plan, expr)
+    # ... and the validator now puts the verb in the agent's gender instead of dropping the sentence (acie/agents.py)
+    assert not _packs(["agent_male"], "माफ़ी चाहती हूँ।") and not _packs(["agent_male"], "मैं बता सकती हूँ।")
+    assert _spoken(["agent_male"], "मैं बता सकती हूँ।") == ["मैं बता सकता हूँ।"]
+    assert _spoken(["agent_male"], "Main aapko bata sakti hoon.", "hinglish") == ["Main aapko bata sakta hoon."]
+    assert _spoken(["agent_female"], "माफ़ी चाहता हूँ।") == ["माफ़ी चाहती हूँ।"]
+
+
+def _spoken(names, text, lang="hi"):
+    v = StreamingValidator(TurnPlan(intent="answer", objective="x", rule_packs=names), ExpressionParams(language=lang))
+    return v.feed(text) + v.finish()
 
 
 def test_english_sentence_in_a_hinglish_or_hindi_reply_is_refused():
@@ -470,8 +482,8 @@ def test_counter_at_or_above_the_floor_is_met_then_accepted_never_at_once_on_the
     assert "₹2,500" in out[2][1] and "₹2,999" not in out[2][1].split("?")[-1] and out[2][0] == "negotiation"  # first push: a no to their number
     assert "₹2,749" in out[3][1]                                              # then the middle of 2,999 and 2,500, friendly
     assert "₹2,649" in out[4][1] and "₹2,599" in out[5][1] and "₹2,549" in out[6][1]   # meeting in the middle each time, never up
-    assert "₹2,500" in out[7][1] and "pakka" in out[7][1]                    # their number clears the floor and our next step: accepted
-    assert out[-1][0] == "confirm_close" and "₹2,500" in out[-1][1]
+    assert "₹2,500" in out[7][1] and "pakka" in out[7][1] and out[7][0] == "confirm_close"   # agreed at their number, confirmed
+    assert out[-1][0] == "link_sent" and "₹2,500" in out[-1][1]
     assert float(sess.dialog["closed_price"]) == 2500.0 and float(sess.dialog["margin_pct"]) >= 20.0 * 0.99
 
 

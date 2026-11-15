@@ -1,5 +1,5 @@
-"""Owner, 15 Nov 2026: no Tele-MANAS / mental-health handling inside sales calls (default off), and the live false
-trigger "So can't you just give me a good discount for me?" must never read as a crisis even with the switch on."""
+"""The crisis guardrail is ON by default (owner's standing rule; live miss 2ccf3f1387 while it was off). ACIE_SAFETY=0 turns
+it off. The live false trigger "So can't you just give me a good discount for me?" must never read as a crisis."""
 import asyncio
 
 from acie import safety
@@ -23,14 +23,16 @@ ENGLISH_HAGGLE = [
 ]
 
 
-def test_switch_is_off_by_default(monkeypatch):
+def test_switch_is_on_by_default_and_zero_turns_it_off(monkeypatch):
     monkeypatch.delenv("ACIE_SAFETY", raising=False)
+    assert safety.enabled()
+    monkeypatch.setenv("ACIE_SAFETY", "0")
     assert not safety.enabled()
     assert emotion_policy.decide(HumanState(), "mujhe marne ka mann hai").row != "crisis"
 
 
 def test_no_helpline_in_a_call_when_off(monkeypatch):
-    monkeypatch.delenv("ACIE_SAFETY", raising=False)
+    monkeypatch.setenv("ACIE_SAFETY", "0")
     pipe = ACIEPipeline(DecisionEngine(BankDemoDomain()))
     for text in (OWNER_LINE, "what are you talking about"):
         r = asyncio.run(pipe.run_turn(TurnInput(session_id="sw", customer_id="c1", text=text)))

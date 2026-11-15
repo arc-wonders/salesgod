@@ -61,8 +61,8 @@ def test_agreed_price_holds_in_confirm_and_link_and_the_link_is_confirmed_at_tha
 @pytest.mark.parametrize("tone", TONES)
 def test_counter_in_range_after_step_two_is_accepted_in_every_tone(tone):
     out, sess = talk(["haan batao", "bahut mehenga hai", "aur kam karo", "aur kam karo", "2600 kar do", "haan"], tone)
-    assert "₹2,600" in out[4][1] and out[4][0] == "negotiation"
-    assert out[5][0] == "confirm_close" and "₹2,600" in out[5][1]
+    assert "₹2,600" in out[4][1] and out[4][0] == "confirm_close"          # their number clears our next step: AGREED, confirmed with the terms
+    assert out[5][0] == "link_sent" and "₹2,600" in out[5][1]
     assert float(sess.dialog["closed_price"]) == 2600.0
 
 

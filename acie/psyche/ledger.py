@@ -119,6 +119,7 @@ _I = re.I
 # topic -> regex on the CALLER's words that answers it
 _ANSWERS = {
     "goal": re.compile(r"muscle|bulk|मसल|बॉडी|body ?build|physique|aesthetic|strength|power ?lift|stamina|weight ?(loss|lose|gain)|lose weight|"
+                       r"marathon|मैराथन|\brun(ning)?\b|\b\d+\s*(km|kilomet)|endurance|\blean\b|lifting|"
                        r"fat ?loss|वज़न|वजन|stay fit|fitness|fit rehna|fit रहना|फिट रहना|toning|coding|code|कोडिंग|writing|study|padhai|पढ़ाई|"
                        r"resume|assignment|report|research|business|dukaan|दुकान|content|marketing|design", _I),
     "schedule": re.compile(r"\b(\d+|one|two|three|four|five|six|seven|ek|do|teen|char|chaar|paanch|panch)\s*(to|-|se)?\s*(\d+|four|five|six|char|paanch)?\s*"
@@ -173,7 +174,7 @@ _REPEAT_ASK = re.compile(r"(say|repeat|tell) (that|it|this)? ?(once more|again)|
                          r"can.?t hear|sunai nahi|सुनाई नहीं|come again|pardon|\bsorry\?\s*$|क्या कहा|kya kaha|didn.?t (get|catch)", _I)
 _BYE = re.compile(r"\b(bye|goodbye|good bye|bye ?bye|thanks?,? bye|ok(ay)? thanks?|thank you|thanks|that.?s all|that.?s it|talk later|take care|"
                   r"dhanyavaad|dhanyawad|shukriya|alvida|rakhta hoon|rakhti|rakh raha|chalo bye|theek hai bye|cut the call|cut call|hang up|disconnect|end the call|end call)\b|"
-                  r"बाय|धन्यवाद|शुक्रिया|अलविदा|रखता हूँ|रखता हूं|फोन रख|कॉल (काट|खत्म)", _I)
+                  r"बाय|धन्यवाद|शुक्रिया|अलविदा|रखता हूँ|रखता हूं|फोन रख|फ़ोन रख|कॉल (काट|खत्म)|रखो (फोन|फ़ोन)|राम[- ]राम|\b(rakho phone|phone rakho|phone rakh|ram[- ]ram)\b", _I)
 _ASKS_AGAIN = re.compile(r"\baur\b|और (कुछ|क्या)|anything else|what else|kuch aur|कुछ और|\bmore\b|tell me more|aur batao|और बताओ", _I)
 _INFO_Q = re.compile(r"what (will|do|can) i get|what.?s (in|inside|included)|what does it (do|include|give)|kya milega|kya milta|क्या मिलेगा|क्या मिलता|"
                      r"kya kya|क्या क्या|benefits?|features?|tell me about|kya karta|क्या करता|batao|बताओ|बताइए|bataiye|what (is|are) (it|this)|kya hai|क्या है", _I)
@@ -197,6 +198,18 @@ _MEMORY = re.compile(r"your (details|record|data|number|info\w*) (are|is)? ?(in|
                      r"aapne (pehle|pichli baar) (poocha|inquiry|enquiry|call)", _I)
 
 _TOK = re.compile(r"[\wऀ-ॿ]+")
+
+
+def _run(a: list[str], b: list[str]) -> int:
+    """Longest run of consecutive words shared by a and b (the 4-word mirror cap)."""
+    best = 0
+    for i in range(len(a)):
+        for j in range(len(b)):
+            k = 0
+            while i + k < len(a) and j + k < len(b) and a[i + k] == b[j + k]:
+                k += 1
+            best = max(best, k)
+    return best
 
 
 def content_words(text: str) -> list[str]:
@@ -433,9 +446,15 @@ class CustomerFacts:
             words = set(_TOK.findall(low))
             own = {w for w in words if w in mine and len(w) >= 3}
             echo = {w for w in words if w in heard}
-            if _ECHO_FRAME.search(low) and (own or len(echo) >= 2):
+            # style (owner plan 15 Nov): using the caller's fact as a HOOK for a tailored point is human ("Since you run, the
+            # treadmills..."); only a sentence that just hands their fact back as news, a whole-sentence parrot, or a mirror longer
+            # than 4 of their words in a row is flagged. Re-asking a known fact is reasks()'s job.
+            rest = {w for w in content_words(s) if w not in own and w not in echo and w not in _STOPW and len(w) >= 3}
+            if _ECHO_FRAME.search(low) and (own or len(echo) >= 2) and len(rest) < 3:
                 out.append(s)
             elif self.heard and any(len(norm(h).split()) >= 3 and ratio(s, h) > 0.62 for h in self.heard[-4:]):
+                out.append(s)
+            elif self.heard and any(_run(norm(s).split(), norm(h).split()) > 4 for h in self.heard[-4:]):
                 out.append(s)
         return out
 
@@ -513,7 +532,7 @@ class CustomerFacts:
             known.append("caller decisions: " + ", ".join(self.decisions[:4]))
         lines = []
         if known:
-            lines.append("The caller ALREADY TOLD you (never ask it again, never say it back to them): " + "; ".join(known) + ".")
+            lines.append("The caller ALREADY TOLD you (never ask it again; you may reuse one of their words to show you heard, never as news): " + "; ".join(known) + ".")
         if self.said_slots:
             lines.append("Points ALREADY SAID (do not say them again, pick something new): " + ", ".join(self.said_slots[:12]) + ".")
         if self.phrases:

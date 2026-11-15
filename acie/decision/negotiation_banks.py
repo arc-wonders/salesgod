@@ -284,3 +284,63 @@ CLOSED_WALK = _b(
          "Baat karne ke liye shukriya bhai; jo bhi tay karein, achha laga baat karke."),
     ],
 )
+
+# ---- after both sides said the same price: a plain next step, never a conditional ("if I make it {p}...") and never a new offer
+AGREED_ASK = _b(
+    professional=[("Sir, shall I go ahead with the payment link at {p}?", "सर, क्या मैं {p} पर पेमेंट लिंक की प्रक्रिया आगे बढ़ाऊँ?",
+                   "Sir, kya main {p} par payment link ki process aage badhaun?"),
+                  ("Sir, shall I proceed at {p}?", "सर, क्या मैं {p} पर आगे बढ़ूँ?", "Sir, kya main {p} par aage badhun?")],
+    mid=[("Shall I go ahead with the payment link at {p}?", "तो {p} पर पेमेंट लिंक की बात आगे बढ़ाऊँ?", "To {p} par payment link aage badhaun?"),
+         ("Shall I go ahead at {p} then?", "तो {p} पर आगे बढ़ें?", "To {p} par aage badhein?")],
+    casual=[("Bhai, shall I go ahead at {p}?", "भाई, {p} पर आगे बढ़ें?", "Bhai, {p} par aage badhein?"),
+            ("Boss, go ahead at {p}?", "बॉस, {p} पर आगे बढ़ें?", "Boss, {p} par aage badhein?")],
+)
+# ---- "where were we?": the deal as it stands, numbers only from the state
+RESTATE_AGREED = _b(
+    professional=[("Sir, we agreed on {p}.", "सर, हमारी बात {p} पर पक्की हुई थी।", "Sir, hamari baat {p} par pakki hui thi."),
+                  ("Sir, the price we settled on is {p}.", "सर, हमने {p} तय किया था।", "Sir, humne {p} tay kiya tha.")],
+    mid=[("We agreed on {p}.", "हमारी बात {p} पर पक्की हुई थी।", "Hamari baat {p} par pakki hui thi."),
+         ("The price we settled on is {p}.", "हमने {p} तय किया था।", "Humne {p} tay kiya tha.")],
+    casual=[("Bhai, we agreed on {p}.", "भाई, बात {p} पर पक्की हुई थी।", "Bhai, baat {p} par pakki hui thi."),
+            ("Boss, we settled on {p}.", "बॉस, हमने {p} तय किया था।", "Boss, humne {p} tay kiya tha.")],
+)
+RESTATE_BOTH = _b(
+    professional=[("Sir, my last offer was {p}, and you had said {n}.", "सर, मेरा आख़िरी ऑफ़र {p} था, और आपने {n} कहा था।",
+                   "Sir, mera aakhri offer {p} tha, aur aapne {n} kaha tha.")],
+    mid=[("My last offer was {p}, and you had said {n}.", "मेरा आख़िरी ऑफ़र {p} था, और आपने {n} कहा था।", "Mera last offer {p} tha, aur aapne {n} kaha tha.")],
+    casual=[("Bhai, my last offer was {p}, and you said {n}.", "भाई, मेरा आख़िरी ऑफ़र {p} था, और आपने {n} बोला था।", "Bhai, mera last offer {p} tha, aur aapne {n} bola tha.")],
+)
+RESTATE_OFFER = _b(
+    professional=[("Sir, the price on the table right now is {p}.", "सर, अभी कीमत {p} है।", "Sir, abhi price {p} hai.")],
+    mid=[("Right now the price on the table is {p}.", "अभी कीमत {p} पर है।", "Abhi price {p} par hai.")],
+    casual=[("Bhai, right now it's at {p}.", "भाई, अभी {p} पर है।", "Bhai, abhi {p} par hai.")],
+)
+VAGUE_ASK = _b(
+    professional=[("Sir, if that does not work, please tell me the figure you have in mind.", "सर, अगर यह ठीक नहीं है, तो बताइए आपके मन में कितनी रकम है।",
+                   "Sir, agar yeh theek nahi hai, to bataiye aapke mann mein kitni rakam hai.")],
+    mid=[("If that doesn't work, tell me the number you have in mind.", "अगर ठीक नहीं है, तो बताइए आपके मन में कितना है।",
+          "Agar theek nahi hai, to bataiye aapke mann mein kitna hai.")],
+    casual=[("Bhai, if that doesn't work, tell me your number.", "भाई, ठीक नहीं है तो अपना नंबर बताइए।", "Bhai, theek nahi hai to apna number bataiye.")],
+)
+# ---- a push after agreement: the agreed price stays
+HOLD_AGREED = _b(
+    professional=[("Sir, we have already agreed on {p}, and that stays; it is the best I can do.", "सर, हम {p} पर पहले ही सहमत हो चुके हैं, वही रहेगा; इससे बेहतर मैं नहीं कर सकता।",
+                   "Sir, hum {p} par pehle hi sehmat ho chuke hain, wahi rahega; isse behtar main nahi kar sakta.")],
+    mid=[("We've already agreed on {p}, and that stays; it's the best I can do.", "हम {p} पर पहले ही पक्का कर चुके हैं, वही रहेगा; इससे बेहतर मैं नहीं कर सकता।",
+          "Hum {p} par pehle hi pakka kar chuke hain, wahi rahega; isse behtar main nahi kar sakta."),
+         ("{p} is what we shook hands on, and I'll keep my word on it.", "{p} पर हमने हाथ मिलाया था, मैं अपनी बात पर क़ायम हूँ।",
+          "{p} par humne haath milaya tha, main apni baat par kaayam hoon.")],
+    casual=[("Bhai, we already agreed on {p}; that stays, it's my best.", "भाई, {p} पर पहले ही पक्का हो चुका है; वही रहेगा, यही मेरा बेस्ट है।",
+             "Bhai, {p} par pehle hi pakka ho chuka hai; wahi rahega, yehi mera best hai.")],
+)
+# ---- an absurd counter (far below the floor): light humour, no movement
+JOKE = _b(
+    professional=[("Sir, {n}? I appreciate the sense of humour! Jokes apart, {p} is where we stand.", "सर, {n}? आपका मज़ाक अच्छा लगा! मज़ाक अलग, बात {p} पर ही है।",
+                   "Sir, {n}? Aapka mazaak achha laga! Mazaak alag, baat {p} par hi hai.")],
+    mid=[("Ha, {n}? Nice try! Jokes apart, {p} is where we stand.", "हा हा, {n}? अच्छी कोशिश थी! मज़ाक अलग, बात {p} पर ही है।",
+          "Haha, {n}? Achhi koshish thi! Mazaak alag, baat {p} par hi hai."),
+         ("{n}? You should be the one selling, not me! Seriously though, {p} is the price.", "{n}? सेल्समैन तो आपको होना चाहिए! पर सच में, कीमत {p} ही है।",
+          "{n}? Salesman to aapko hona chahiye! Par sach mein, price {p} hi hai.")],
+    casual=[("Haha bhai, {n}? Nice one! Jokes apart, {p} it is.", "हा हा भाई, {n}? बढ़िया मज़ाक! मज़ाक अलग, {p} ही है।",
+             "Haha bhai, {n}? Badhiya mazaak! Mazaak alag, {p} hi hai.")],
+)

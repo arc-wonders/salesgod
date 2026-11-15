@@ -131,14 +131,17 @@ def test_operator_call_goes_through_dialer_and_links(tmp_path):
     assert c.post(f"/api/campaigns/{cp['id']}/call/ghost", json={}, headers=H).status_code == 404
 
 
-def test_operator_call_refuses_dnc_and_gate_blocks(tmp_path):
+def test_operator_call_dnc_needs_override_and_gate_blocks(tmp_path):
     d = FakeDialer()
     c, _, _ = setup(tmp_path, dialer=d)
     cu = customer(c, phone="9000000001")
     cp = camp(c)
     c.put(f"/api/customers/{cu['id']}", json={"consent": {"dnc": True}}, headers=H)
+    r = c.post(f"/api/campaigns/{cp['id']}/call/{cu['id']}", json={}, headers=H)
+    assert r.status_code == 409 and "allow_dnc" in r.json()["detail"] and d.calls == []  # no silent DNC dial
+    # owner, 15 Nov: the operator decides; "call anyway" dials and tells the dial gate it was an override
     r = c.post(f"/api/campaigns/{cp['id']}/call/{cu['id']}", json={"allow_dnc": True}, headers=H)
-    assert r.status_code == 409 and d.calls == []  # allow_dnc is not honoured by the CRM
+    assert r.status_code == 200 and len(d.calls) == 1 and d.calls[0]["link"]["allow_dnc"] is True
     d2 = FakeDialer(block="this campaign may only call its test numbers (product setting allowed_numbers)")
     c2, _, _ = make(tmp_path / "b", dialer=d2) if (tmp_path / "b").mkdir() is None else None
     project(c2)
@@ -149,13 +152,14 @@ def test_operator_call_refuses_dnc_and_gate_blocks(tmp_path):
     assert c2.get(f"/api/customers/{cu2['id']}/timeline", headers=H).json()["timeline"][0]["type"] == "created"  # nothing logged as started
 
 
-def test_auto_mode_needs_confirm_flag_env_and_running(tmp_path, monkeypatch):
+def test_auto_mode_needs_env_and_running(tmp_path, monkeypatch):
     d = FakeDialer()
     c, _, clock = setup(tmp_path, dialer=d)
     customer(c, phone="9000000001")
     customer(c, phone="9000000002")
-    assert c.post("/api/campaigns", json={"project": "acme", "name": "x", "product_id": "p1", "dial_mode": "auto"}, headers=H).status_code == 400
-    cp = camp(c, dial_mode="auto", confirm_auto=True, schedule={"max_parallel": 5, "pacing_seconds": 0})
+    # owner, 15 Nov: confirm_auto is no longer required; choosing auto is the confirmation
+    assert c.post("/api/campaigns", json={"project": "acme", "name": "x", "product_id": "p1", "dial_mode": "auto"}, headers=H).status_code == 200
+    cp = camp(c, dial_mode="auto", schedule={"max_parallel": 5, "pacing_seconds": 0})
     assert cp["auto_confirmed"] is True
     monkeypatch.delenv("CRM_AUTO_DIAL", raising=False)
     c.post(f"/api/campaigns/{cp['id']}/start", headers=H)
@@ -168,9 +172,9 @@ def test_auto_mode_needs_confirm_flag_env_and_running(tmp_path, monkeypatch):
     clock.t = OPEN
     r = c.post(f"/api/campaigns/{cp['id']}/tick", headers=H).json()
     assert len(r["dialed"]) == 2 and len(d.calls) == 2
-    # switching back to manual drops the confirmation; switching to auto again needs a fresh confirm
+    # switching back to manual drops the flag; switching to auto again needs no extra confirm
     assert c.put(f"/api/campaigns/{cp['id']}", json={"dial_mode": "manual"}, headers=H).json()["campaign"]["auto_confirmed"] is False
-    assert c.put(f"/api/campaigns/{cp['id']}", json={"dial_mode": "auto"}, headers=H).status_code == 400
+    assert c.put(f"/api/campaigns/{cp['id']}", json={"dial_mode": "auto"}, headers=H).status_code == 200
     # paused campaigns are never ticked
     c.post(f"/api/campaigns/{cp['id']}/pause", headers=H)
     c.put(f"/api/campaigns/{cp['id']}", json={"dial_mode": "auto", "confirm_auto": True}, headers=H)
@@ -472,3 +476,18 @@ def test_import_with_comma_header_is_not_sniffed_into_another_delimiter(tmp_path
     csv_text = "name,phone,tags\n\"Rao; Asha\",9876543210,a;b\nMehta; Rahul,9999911111,\n"
     r = c.post("/api/customers/import", json={"project": "acme", "csv": csv_text, "commit": True}, headers=H).json()
     assert r["counts"]["new"] == 2 and r["columns"] == ["name", "phone", "tags"]
+
+
+def test_operator_can_lift_dnc_and_then_call(tmp_path):
+    d = FakeDialer()
+    c, _, _ = setup(tmp_path, dialer=d)
+    cu = customer(c, phone="9000000001")
+    c.put(f"/api/customers/{cu['id']}", json={"consent": {"dnc": True}}, headers=H)
+    assert "+919000000001" in json.loads((tmp_path / "dnc.json").read_text())
+    r = c.put(f"/api/customers/{cu['id']}", json={"consent": {"dnc": False}}, headers=H)
+    assert r.status_code == 200, r.text
+    cust = r.json()["customer"]
+    assert not cust["consent"]["dnc"] and cust["stage"] != "do_not_call"
+    assert "+919000000001" not in json.loads((tmp_path / "dnc.json").read_text())
+    r = c.post(f"/api/customers/{cu['id']}/call", json={"product_id": "p1"}, headers=H)
+    assert r.status_code == 200 and len(d.calls) == 1 and "allow_dnc" not in d.calls[0]["link"]

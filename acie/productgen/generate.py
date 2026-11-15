@@ -14,6 +14,7 @@ from typing import Awaitable, Callable
 
 from . import criteria as C
 from . import kbops as K
+from . import lengths as LN
 from . import store as S
 from .llm import LLM
 from .spec import Effective, Spec, resolve
@@ -218,6 +219,9 @@ async def build_negotiation(spec: Spec, eff: Effective, llm: LLM) -> dict:
 def deterministic_fixes(bundle: dict, spec: Spec, eff: Effective) -> list[str]:
     kb, tree = bundle["kb"], bundle["tree"]
     log = []
+    cut = LN.trim_all(bundle)  # phone length: anything a repair made too long again is trimmed at a sentence boundary
+    if cut:
+        log.append(f"trimmed {len(cut)} over-length spoken texts")
     if len(kb["offerings"]) > eff.criteria.max_offerings:
         drop = {o["id"] for o in kb["offerings"][eff.criteria.max_offerings:]}
         kb["offerings"] = kb["offerings"][:eff.criteria.max_offerings]
@@ -536,6 +540,8 @@ async def generate(spec: Spec, llm: LLM, data: Path, progress: Progress = _noop)
     progress("negotiation", "done" if neg["suggested"] else "skipped", neg["reason"][:140])
 
     bundle = {"product": product, "kb": kb, "tree": tree, "negotiation": neg, "review": []}
+    progress("validate", "running", "shortening to phone length")
+    await LN.shorten(bundle, llm, notes)
     progress("validate", "running", "checking the criteria")
     report, history = await validate_and_repair(bundle, spec, eff, llm, notes, progress)
     failed = [c["label"] for c in report["checks"] if not c["passed"]]

@@ -2,7 +2,8 @@
 
 `dialer` is `async (to, product_id, language, customer_name, link: dict) -> {"call_id", "status", "error"}` and must go through the
 console's dial gate (allowed_numbers, DNC, call hours, max parallel). It is never called by anything except an explicit operator
-call endpoint, or `tick` on a campaign that is running, in `auto` mode, confirmed by the operator AND with CRM_AUTO_DIAL=1.
+call endpoint, or `tick` on a campaign that is running, in `auto` mode AND with CRM_AUTO_DIAL=1. A do-not-call number is dialed
+only when the operator overrides it (allow_dnc: true -> link["allow_dnc"]); the operator can also lift DNC (consent.dnc: false).
 """
 
 from __future__ import annotations
@@ -22,7 +23,7 @@ from voice.plivo import e164
 from . import ai_assist, followups, importer
 from . import queue as Q
 from acie.calltypes.schema import validate_call_type
-from .models import (BUILTIN_CALLTYPES, CT_ID_RE, Campaign, CallType, Customer, FieldDef, ID_RE, NextAction, Project, STAGES, ct_slug, slug, new_id)
+from .models import (BUILTIN_CALLTYPES, CT_ID_RE, Campaign, CallType, Customer, FieldDef, ID_RE, NextAction, Project, STAGES, ct_slug, is_demo, slug, new_id)
 from .scoring import score
 from .store import JsonStore
 
@@ -308,6 +309,23 @@ def register(api: FastAPI, require: Callable[[Request], None], data: Path, calls
         c.next_action = None
         _log_stage(c, "do_not_call")
 
+    def _lift_dnc(c: Customer, stage: str | None = None) -> None:
+        """Operator lifts do-not-call: off the shared list (dnc.json, also read by the console dial gate) and the customer."""
+        import json as _json
+        path = data / "dnc.json"
+        with store.lock:
+            try:
+                d = _json.loads(path.read_text())
+            except (OSError, ValueError):
+                d = {}
+            if c.phone in d:
+                d.pop(c.phone, None)
+                path.write_text(_json.dumps(d, indent=1))
+        c.consent.dnc, c.consent.reason, c.consent.at = False, "do-not-call lifted by the operator", clock()
+        c.events.append({"t": clock(), "type": "dnc_lifted", "by": "operator"})
+        if c.stage == "do_not_call" or stage:
+            _log_stage(c, stage if stage and stage != "do_not_call" else "contacted")
+
     @api.get("/api/customers")
     async def list_customers(request: Request, project: str, q: str = "", stage: str = "", tag: str = "", page: int = 1,
                              page_size: int = 50) -> dict:
@@ -402,13 +420,13 @@ def register(api: FastAPI, require: Callable[[Request], None], data: Path, calls
         cons = b.get("consent") or {}
         if cons.get("dnc") is True or b.get("stage") == "do_not_call":
             _apply_dnc(c, str(cons.get("reason") or "marked do-not-call by the operator")[:200])
-        elif cons.get("dnc") is False and (c.consent.dnc or c.phone in store.dnc()):
-            raise HTTPException(409, "do-not-call can only be lifted by the person asking us again, not from the CRM")
+        elif cons.get("dnc") is False and (c.consent.dnc or c.phone in store.dnc() or c.stage == "do_not_call"):
+            _lift_dnc(c, b.get("stage") if b.get("stage") in STAGES else None)  # the operator decides (owner, 15 Nov)
         elif "stage" in b:
             if b["stage"] not in STAGES:
                 raise HTTPException(422, f"stage must be one of {STAGES}")
             if c.consent.dnc or c.phone in store.dnc():
-                raise HTTPException(409, "this person is on the do-not-call list")
+                raise HTTPException(409, "this person is on the do-not-call list: lift it first (consent.dnc: false)")
             _log_stage(c, b["stage"])
         c.updated_at = clock()
         c.score = score(c, clock())
@@ -498,13 +516,8 @@ def register(api: FastAPI, require: Callable[[Request], None], data: Path, calls
             raise HTTPException(400, f"unknown call type {c.call_type_id!r}")
 
     def _auto_gate(c: Campaign, b: dict) -> None:
-        if c.dial_mode == "auto":
-            if b.get("confirm_auto") is True:
-                c.auto_confirmed = True
-            if not c.auto_confirmed:
-                raise HTTPException(400, "auto dialing needs confirm_auto: true from the operator")
-        else:
-            c.auto_confirmed = False
+        # owner, 15 Nov: choosing dial_mode "auto" is the operator's confirmation; confirm_auto is no longer required
+        c.auto_confirmed = c.dial_mode == "auto"
 
     @api.get("/api/campaigns")
     async def list_campaigns(request: Request, project: str | None = None) -> dict:
@@ -588,14 +601,19 @@ def register(api: FastAPI, require: Callable[[Request], None], data: Path, calls
         require(request)
         return _queue(campaign_or_404(cid))
 
-    async def _dial(c: Campaign, cust: Customer, call_type: str, language: str | None) -> dict:
+    async def _dial(c: Campaign, cust: Customer, call_type: str, language: str | None, allow_dnc: bool = False) -> dict:
         if dialer is None:
             raise HTTPException(503, "dialing is not available here")
         if not c.product_id:
             raise HTTPException(400, "this campaign has no product")
-        if cust.consent.dnc or cust.stage == "do_not_call" or cust.phone in store.dnc():
-            raise HTTPException(409, "on the do-not-call list: not calling")
+        if is_demo(cust):
+            raise HTTPException(409, "demo record - no real number")
+        is_dnc = cust.consent.dnc or cust.stage == "do_not_call" or cust.phone in store.dnc()
+        if is_dnc and not allow_dnc:
+            raise HTTPException(409, "on the do-not-call list: send allow_dnc: true ('call anyway') to dial regardless, or lift DNC")
         link = {"project_id": c.project_id, "customer_id": cust.id, "campaign_id": c.id, "call_type": call_type}
+        if is_dnc:
+            link["allow_dnc"] = True  # the operator chose to call anyway; the dial gate checks the same flag
         if c.id and getattr(c, "tone_level", ""):
             link["tone_level"] = c.tone_level  # the campaign's tone overrides the product's (voice/server.make_pipeline)
         res = await dialer(cust.phone, c.product_id, language or cust.language or c.language, cust.name, link)
@@ -626,7 +644,7 @@ def register(api: FastAPI, require: Callable[[Request], None], data: Path, calls
         ct = b.get("call_type") or (cust.next_action.call_type if cust.next_action and cust.next_action.call_type else None) or c.call_type_id
         if ct not in {x.id for x in _all_calltypes(c.project_id)}:
             raise HTTPException(400, f"unknown call type {ct!r}")
-        res = await _dial(c, cust, ct, b.get("language"))
+        res = await _dial(c, cust, ct, b.get("language"), allow_dnc=b.get("allow_dnc") is True)
         if res.get("error") and not res.get("call_id"):
             raise HTTPException(409, res["error"])
         return res
@@ -649,7 +667,7 @@ def register(api: FastAPI, require: Callable[[Request], None], data: Path, calls
         if ct not in {x.id for x in _all_calltypes(cust.project_id)}:
             raise HTTPException(400, f"unknown call type {ct!r}")
         stub = Campaign(id="", project_id=cust.project_id, product_id=pid, call_type_id=ct, name="single call", language=cust.language)
-        res = await _dial(stub, cust, ct, b.get("language"))
+        res = await _dial(stub, cust, ct, b.get("language"), allow_dnc=b.get("allow_dnc") is True)
         if res.get("error") and not res.get("call_id"):
             raise HTTPException(409, res["error"])
         return res
@@ -657,11 +675,11 @@ def register(api: FastAPI, require: Callable[[Request], None], data: Path, calls
     @api.post("/api/campaigns/{cid}/tick")
     async def tick(cid: str, request: Request) -> dict:
         """Auto mode only: dial the next customers the queue allows. Needs status running, dial_mode auto, the operator's
-        confirm_auto, and CRM_AUTO_DIAL=1 in the server environment. Otherwise it only reports the queue."""
+        and CRM_AUTO_DIAL=1 in the server environment (confirm_auto is no longer needed). Otherwise it only reports the queue."""
         require(request)
         c = campaign_or_404(cid)
         q = _queue(c)
-        armed = c.dial_mode == "auto" and c.auto_confirmed and c.status == "running" and os.getenv("CRM_AUTO_DIAL") == "1"
+        armed = c.dial_mode == "auto" and c.status == "running" and os.getenv("CRM_AUTO_DIAL") == "1"
         dialed = []
         if armed:
             for row in q["next"]:
